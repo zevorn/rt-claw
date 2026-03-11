@@ -1,0 +1,31 @@
+menu "rt-claw Configuration"
+
+    menu "AI Engine"
+
+        config CLAW_AI_API_KEY
+            string "LLM API Key"
+            default ""
+            help
+                API key for LLM service (e.g. Claude, DeepSeek).
+                Set via: idf.py menuconfig -> rt-claw -> AI Engine
+
+        config CLAW_AI_API_URL
+            string "LLM API endpoint URL"
+            default "https://api.anthropic.com/v1/messages"
+            help
+                Full URL of the chat completion API endpoint.
+
+        config CLAW_AI_MODEL
+            string "LLM model name"
+            default "claude-sonnet-4-20250514"
+            help
+                Model identifier sent in the API request.
+
+        config CLAW_AI_MAX_TOKENS
+            int "Max response tokens"
+            default 1024
+            range 64 4096
+
+    endmenu
+
+endmenu

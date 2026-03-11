@@ -21,6 +21,8 @@ idf_component_register(
         esp_netif
         esp_event
         esp_http_client
+        esp-tls
+        json
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC CLAW_PLATFORM_ESP_IDF)
