@@ -1,0 +1,39 @@
+# Build output
+build/
+*.o
+*.d
+*.bin
+*.elf
+*.map
+*.hex
+*.img
+rtthread.elf
+rtthread.bin
+rtthread.map
+rt-thread.elf
+
+# SCons
+.sconsign.dblite
+*.pyc
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.cproject
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# RT-Thread env tool
+packages/
+
+# Auto-generated
+drivers/automac.h
+sd.bin

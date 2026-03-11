@@ -1,0 +1,3 @@
+[submodule "vendor/rt-thread"]
+	path = vendor/rt-thread
+	url = https://github.com/RT-Thread/rt-thread.git

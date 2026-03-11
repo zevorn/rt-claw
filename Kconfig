@@ -1,0 +1,11 @@
+mainmenu "RT-Claw Project Configuration"
+
+BSP_DIR := .
+
+RTT_DIR := vendor/rt-thread
+
+PKGS_DIR := packages
+
+source "$(RTT_DIR)/Kconfig"
+osource "$PKGS_DIR/Kconfig"
+source "$(BSP_DIR)/drivers/Kconfig"
