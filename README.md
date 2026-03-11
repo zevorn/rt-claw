@@ -7,10 +7,10 @@ Multi-RTOS support via OSAL. Build swarm intelligence with networked nodes.
 ## Architecture
 
 ```
-+--------------------------------------------------+
-|               rt-claw Application                 |
++---------------------------------------------------+
+|                rt-claw Application                |
 |   gateway  |  swarm  |  net_service  |  ai_engine |
-+--------------------------------------------------+
++---------------------------------------------------+
 |               claw_os.h  (OSAL API)               |
 +-----------------+---------------------------------+
 | FreeRTOS (IDF)  |          RT-Thread              |
