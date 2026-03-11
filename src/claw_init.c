@@ -9,6 +9,7 @@
 #include "gateway.h"
 #include "swarm.h"
 #include "net_service.h"
+#include "claw_tools.h"
 #include "ai_engine.h"
 
 int claw_init(void)
@@ -23,6 +24,7 @@ int claw_init(void)
     gateway_init();
     swarm_init();
     net_service_init();
+    claw_tools_init();
     ai_engine_init();
 
     return CLAW_OK;

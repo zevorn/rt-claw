@@ -8,6 +8,7 @@ idf_component_register(
         "${RT_CLAW_ROOT}/src/services/swarm"
         "${RT_CLAW_ROOT}/src/services/net"
         "${RT_CLAW_ROOT}/src/services/ai"
+        "${RT_CLAW_ROOT}/src/tools"
     INCLUDE_DIRS
         "${RT_CLAW_ROOT}/osal/include"
         "${RT_CLAW_ROOT}/src"
@@ -15,6 +16,7 @@ idf_component_register(
         "${RT_CLAW_ROOT}/src/services/swarm"
         "${RT_CLAW_ROOT}/src/services/net"
         "${RT_CLAW_ROOT}/src/services/ai"
+        "${RT_CLAW_ROOT}/src/tools"
     REQUIRES
         freertos
         esp_eth
@@ -23,6 +25,8 @@ idf_component_register(
         esp_http_client
         esp-tls
         json
+        esp_driver_gpio
+        esp_timer
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC CLAW_PLATFORM_ESP_IDF)
