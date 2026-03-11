@@ -17,6 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHECKPATCH="$SCRIPT_DIR/checkpatch.pl"
+CHECKPATCH_FLAGS="--no-tree"
 
 # Directories to check (app layer + framework layer)
 CHECK_DIRS="src/ osal/"
@@ -68,7 +69,7 @@ check_files() {
             continue
         fi
         info "Checking $f ..."
-        if ! "$CHECKPATCH" --no-signoff --file "$PROJECT_ROOT/$f"; then
+        if ! $CHECKPATCH $CHECKPATCH_FLAGS --no-signoff --file "$PROJECT_ROOT/$f"; then
             ret=1
         fi
     done
@@ -109,7 +110,7 @@ check_branch() {
         local diff
         diff=$(git -C "$PROJECT_ROOT" show "$sha" -- $CHECK_DIRS)
         if [ -n "$diff" ]; then
-            if ! echo "$diff" | "$CHECKPATCH" --no-signoff -; then
+            if ! echo "$diff" | $CHECKPATCH $CHECKPATCH_FLAGS --no-signoff -; then
                 ret=1
             fi
         fi
@@ -127,7 +128,7 @@ check_staged() {
         return 0
     fi
     info "Checking staged changes in $CHECK_DIRS ..."
-    if ! echo "$diff" | "$CHECKPATCH" --no-signoff -; then
+    if ! echo "$diff" | $CHECKPATCH $CHECKPATCH_FLAGS --no-signoff -; then
         return 1
     fi
     return 0
@@ -165,7 +166,7 @@ case "${1:-}" in
             exit 0
         fi
         for f in $files; do
-            if ! "$CHECKPATCH" --no-signoff --terse --file "$PROJECT_ROOT/$f"; then
+            if ! $CHECKPATCH $CHECKPATCH_FLAGS --no-signoff --terse --file "$PROJECT_ROOT/$f"; then
                 ret=1
             fi
         done
