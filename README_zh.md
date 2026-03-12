@@ -70,6 +70,14 @@ rt-claw 通过低成本嵌入式节点与蜂群组网，让智能从云端走向
 source $HOME/esp/esp-idf/export.sh
 cd platform/esp32c3
 idf.py set-target esp32c3
+
+# 配置 LLM API 密钥（AI 对话功能必需）
+idf.py menuconfig
+# 路径：rt-claw Configuration → AI Engine
+#   - LLM API Key:          <你的 API 密钥>
+#   - LLM API endpoint URL: https://api.anthropic.com/v1/messages
+#   - LLM model name:       claude-sonnet-4-6
+
 idf.py build
 idf.py qemu monitor                   # QEMU 仿真（仅串口）
 idf.py qemu --graphics monitor        # QEMU 仿真 + LCD 显示

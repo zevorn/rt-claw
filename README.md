@@ -74,6 +74,14 @@ tasks in real time.
 source $HOME/esp/esp-idf/export.sh
 cd platform/esp32c3
 idf.py set-target esp32c3
+
+# Configure your LLM API key (required for AI chat)
+idf.py menuconfig
+# Navigate: rt-claw Configuration → AI Engine
+#   - LLM API Key:          <your-api-key>
+#   - LLM API endpoint URL: https://api.anthropic.com/v1/messages
+#   - LLM model name:       claude-sonnet-4-6
+
 idf.py build
 idf.py qemu monitor                   # QEMU (serial only)
 idf.py qemu --graphics monitor        # QEMU with LCD display
