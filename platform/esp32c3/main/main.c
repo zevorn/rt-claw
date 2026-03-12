@@ -68,7 +68,12 @@ static int uart_read_line(char *buf, int size)
                 while (pos > 0 && (buf[pos] & 0xC0) == 0x80) {
                     pos--;
                 }
-                uart_write_bytes(UART_NUM_0, "\b \b", 3);
+                if ((uint8_t)buf[pos] >= 0xE0) {
+                    /* 3/4-byte UTF-8 (CJK, emoji): 2 columns */
+                    uart_write_bytes(UART_NUM_0, "\b \b\b \b", 6);
+                } else {
+                    uart_write_bytes(UART_NUM_0, "\b \b", 3);
+                }
             }
             continue;
         }
@@ -260,13 +265,63 @@ static void dispatch_command(char *line)
     }
 }
 
+/* ---- Thinking animation ---- */
+
+static volatile int s_anim_active;
+static volatile int s_anim_phase; /* 0=thinking, 1=tool */
+
+static void anim_thread_fn(void *arg)
+{
+    (void)arg;
+    int dots = 0;
+    const char *dot_str[] = { ".", "..", "..." };
+
+    while (s_anim_active) {
+        if (s_anim_phase == 0) {
+            printf("\r  " CLR_MAGENTA "thinking %s"
+                   CLR_RESET "   ", dot_str[dots]);
+            fflush(stdout);
+            dots = (dots + 1) % 3;
+        }
+        claw_thread_delay_ms(500);
+    }
+}
+
+static void chat_status_cb(int status, const char *detail)
+{
+    if (status == AI_STATUS_THINKING) {
+        s_anim_phase = 0;
+    } else if (status == AI_STATUS_TOOL_CALL) {
+        s_anim_phase = 1;
+        printf("\r  " CLR_YELLOW "► %s" CLR_RESET
+               "                    \n", detail ? detail : "?");
+        fflush(stdout);
+    } else if (status == AI_STATUS_DONE) {
+        s_anim_active = 0;
+    }
+}
+
 /* Chat with AI (direct input) */
 static void do_chat(const char *msg)
 {
-    if (ai_chat(msg, s_reply, REPLY_SIZE) == CLAW_OK) {
-        printf("\n" CLR_GREEN "<rt-claw> " CLR_RESET "%s\n", s_reply);
+    s_anim_active = 1;
+    s_anim_phase = 0;
+    ai_set_status_cb(chat_status_cb);
+
+    claw_thread_create("anim", anim_thread_fn, NULL, 2048, 20);
+
+    int ret = ai_chat(msg, s_reply, REPLY_SIZE);
+
+    s_anim_active = 0;
+    ai_set_status_cb(NULL);
+    claw_thread_delay_ms(100);
+    /* Clear animation line */
+    printf("\r                              \r");
+
+    if (ret == CLAW_OK) {
+        printf(CLR_GREEN "<rt-claw> " CLR_RESET "%s\n", s_reply);
     } else {
-        printf("\n" CLR_RED "<error> " CLR_RESET "%s\n", s_reply);
+        printf(CLR_RED "<error> " CLR_RESET "%s\n", s_reply);
     }
 }
 
@@ -333,7 +388,7 @@ void app_main(void)
 #endif
 
 #ifdef CLAW_PLATFORM_ESP_IDF
-    /* Suppress all log output by default; use /log on to enable */
+    /* Suppress log output by default; use /log on to enable */
     esp_log_level_set("*", ESP_LOG_NONE);
 #endif
 
