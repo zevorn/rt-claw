@@ -44,15 +44,16 @@ scenario without writing, compiling, or flashing embedded code again.
 | LLM Chat Engine | Interactive conversation with Claude API over HTTP | Done |
 | Tool Use | LLM-driven hardware control (GPIO, system info, LCD) via function calling | Done |
 | LCD Graphics | 320x240 RGB565 framebuffer with text, shapes, and drawing primitives; AI agent can draw on screen via tool calls | Done |
-| ESP-IDF Shell | esp_console-based REPL with line editing, history, and UTF-8 input support | Done |
+| Chat-first Shell | UART REPL where direct input goes to AI, /commands for system; UTF-8 support | Done |
 | OSAL | Write once, run on FreeRTOS and RT-Thread with zero code changes | Done |
 | Gateway | Thread-safe message routing between services | Done |
 | Networking | Ethernet + HTTP client on ESP32-C3 QEMU; WiFi on real hardware | Done |
 | Multi-Model API | Support mainstream LLM APIs: Claude, GPT, Gemini, DeepSeek, GLM, MiniMax, Grok, Moonshot, Baichuan, Qwen, Doubao, Llama (Ollama) | Planned |
 | Web Config Portal | Lightweight built-in web page for configuring API keys, selecting models, and tuning parameters at runtime | Planned |
-| Swarm Intelligence | Node discovery, heartbeat, distributed task scheduling | Planned |
-| Skill Memory | Nodes learn and recall frequently used operation patterns | Planned |
-| Scheduled Tasks | Timer-driven task execution and periodic automation | Planned |
+| Swarm Intelligence | Node discovery, heartbeat, distributed task scheduling | In Progress |
+| Conversation Memory | Short-term RAM ring buffer + long-term NVS Flash persistent storage | Done |
+| Skill Memory | Nodes learn and recall frequently used operation patterns | In Progress |
+| Scheduled Tasks | Timer-driven task execution and periodic automation | Done |
 | IM Integrations | Connect to Feishu, DingTalk, QQ, and Telegram as message channels | Planned |
 | Claw Skill Provider | Serve as a skill for other Claws, giving them the ability to sense and control the physical world | Planned |
 
@@ -104,7 +105,7 @@ sudo pacman -S --needed libgcrypt glib2 pixman sdl2 libslirp \
 ./tools/setup-esp-env.sh
 ```
 
-**3. Build and run**
+**3. Configure API key**
 
 ```bash
 source $HOME/esp/esp-idf/export.sh
@@ -117,11 +118,19 @@ idf.py menuconfig
 #   - LLM API Key:          <your-api-key>
 #   - LLM API endpoint URL: https://api.anthropic.com/v1/messages
 #   - LLM model name:       claude-sonnet-4-6
+```
 
-idf.py build
-idf.py qemu monitor                   # QEMU (serial only)
-idf.py qemu --graphics monitor        # QEMU with LCD display
-idf.py -p /dev/ttyUSB0 flash monitor  # real hardware
+**4. Build and run**
+
+```bash
+# Build (auto-detects target if sdkconfig exists)
+./tools/esp32c3-build.sh
+
+# Run on QEMU (generates flash image + launches emulator)
+./tools/esp32c3-qemu-run.sh --raw
+
+# Or flash to real hardware
+idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
 ### QEMU vexpress-a9 (RT-Thread)

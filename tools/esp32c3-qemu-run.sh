@@ -44,7 +44,7 @@ if [ "$1" = "--raw" ]; then
 
     echo ">>> Starting QEMU (ESP32-C3) ..."
     exec qemu-system-riscv32 -nographic \
-        -icount 3 \
+        -icount 1 \
         -machine esp32c3 \
         -drive "file=$FLASH_IMAGE,if=mtd,format=raw" \
         -global driver=timer.esp32c3.timg,property=wdt_disable,value=true \
