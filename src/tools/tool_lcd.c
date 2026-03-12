@@ -24,7 +24,8 @@
 #define LCD_BPP     16  /* RGB565 */
 
 static esp_lcd_panel_handle_t s_panel;
-static uint16_t *s_fb; /* Direct pointer to QEMU framebuffer (not in SRAM) */
+static uint16_t *s_fb;      /* QEMU framebuffer pointer */
+static int s_lcd_active;    /* Skip rendering until first tool use */
 
 /* -------------------- 8x8 ASCII font (chars 32-126) -------------------- */
 
@@ -352,16 +353,13 @@ int claw_lcd_init(void)
     esp_lcd_rgb_qemu_get_frame_buffer(s_panel, &fb);
     s_fb = (uint16_t *)fb;
 
-    /* Clear to dark blue */
-    lcd_fill(rgb888_to_565(0, 0, 40));
-
-    /* Show boot message */
-    lcd_draw_text(20, 20, "rt-claw v0.1.0", 0xFFFF,
-                  rgb888_to_565(0, 0, 40), 2);
-    lcd_draw_text(20, 50, "ESP32-C3 QEMU Display", 0xFFFF,
-                  rgb888_to_565(0, 0, 40), 1);
-
     CLAW_LOGI(TAG, "LCD initialized (%dx%d RGB565)", LCD_WIDTH, LCD_HEIGHT);
+
+    /*
+     * Skip initial fill and text drawing at boot — QEMU MMIO writes
+     * are extremely slow (>10min for 320x240 fill). LCD tools still
+     * work on demand after boot completes.
+     */
     return CLAW_OK;
 }
 
@@ -373,6 +371,7 @@ static int tool_lcd_fill(const cJSON *params, cJSON *result)
         cJSON_AddStringToObject(result, "error", "LCD not initialized");
         return CLAW_ERROR;
     }
+    s_lcd_active = 1;
 
     cJSON *color_j = cJSON_GetObjectItem(params, "color");
     const char *color_str = (color_j && cJSON_IsString(color_j))
@@ -393,6 +392,7 @@ static int tool_lcd_text(const cJSON *params, cJSON *result)
         cJSON_AddStringToObject(result, "error", "LCD not initialized");
         return CLAW_ERROR;
     }
+    s_lcd_active = 1;
 
     cJSON *x_j = cJSON_GetObjectItem(params, "x");
     cJSON *y_j = cJSON_GetObjectItem(params, "y");
@@ -592,7 +592,12 @@ void claw_tools_register_lcd(void)
 
 void claw_lcd_status(const char *msg)
 {
-    if (!s_fb || !msg) {
+    if (!msg) {
+        return;
+    }
+
+    /* Skip slow MMIO framebuffer writes until user explicitly uses LCD */
+    if (!s_fb || !s_lcd_active) {
         return;
     }
 
@@ -607,7 +612,7 @@ void claw_lcd_status(const char *msg)
 
 void claw_lcd_progress(int percent)
 {
-    if (!s_fb) {
+    if (!s_fb || !s_lcd_active) {
         return;
     }
     if (percent < 0) {
