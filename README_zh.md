@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>中文</strong> | [English](README.md)</p>
+<p align="center"><strong>中文</strong> | <a href="README.md">English</a></p>
 
 **RT-Claw** — 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，面向嵌入式设备的智能助手。
 通过 OSAL 支持多 RTOS，以组网节点构建蜂群智能。

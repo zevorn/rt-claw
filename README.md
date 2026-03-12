@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-<p align="center">[中文](README_zh.md) | <strong>English</strong></p>
+<p align="center"><a href="README_zh.md">中文</a> | <strong>English</strong></p>
 
 **RT-Claw** is an [OpenClaw](https://github.com/openclaw/openclaw)-inspired intelligent assistant for embedded devices.
 Multi-RTOS support via OSAL. Build swarm intelligence with networked nodes.
