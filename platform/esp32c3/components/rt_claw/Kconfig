@@ -36,4 +36,29 @@ menu "rt-claw Configuration"
 
     endmenu
 
+    menu "Feishu (Lark) Integration"
+
+        config CLAW_FEISHU_ENABLE
+            bool "Enable Feishu IM integration"
+            default n
+            help
+                Connect to Feishu via WebSocket long connection.
+                Receives user messages and replies through AI engine.
+
+        config CLAW_FEISHU_APP_ID
+            string "Feishu App ID"
+            default ""
+            depends on CLAW_FEISHU_ENABLE
+            help
+                App ID from Feishu Open Platform (open.feishu.cn).
+
+        config CLAW_FEISHU_APP_SECRET
+            string "Feishu App Secret"
+            default ""
+            depends on CLAW_FEISHU_ENABLE
+            help
+                App Secret from Feishu Open Platform.
+
+    endmenu
+
 endmenu

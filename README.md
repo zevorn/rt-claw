@@ -54,7 +54,7 @@ scenario without writing, compiling, or flashing embedded code again.
 | Conversation Memory | Short-term RAM ring buffer + long-term NVS Flash persistent storage | Done |
 | Skill Memory | Nodes learn and recall frequently used operation patterns | In Progress |
 | Scheduled Tasks | Timer-driven task execution and periodic automation | Done |
-| IM Integrations | Connect to Feishu, DingTalk, QQ, and Telegram as message channels | Planned |
+| IM Integrations | Connect to Feishu, DingTalk, QQ, and Telegram as message channels | In Progress |
 | Claw Skill Provider | Serve as a skill for other Claws, giving them the ability to sense and control the physical world | Planned |
 
 ## Architecture
@@ -120,7 +120,22 @@ idf.py menuconfig
 #   - LLM model name:       claude-sonnet-4-6
 ```
 
-**4. Build and run**
+**4. (Optional) Configure Feishu bot**
+
+```bash
+idf.py menuconfig
+# Navigate: rt-claw Configuration → Feishu (Lark) Integration
+#   - Enable Feishu IM integration: [*]
+#   - Feishu App ID:     <your-app-id>
+#   - Feishu App Secret: <your-app-secret>
+```
+
+Create an app on [Feishu Open Platform](https://open.feishu.cn), enable
+**Event Subscription → Long Connection** mode, and subscribe to
+`im.message.receive_v1`. The device establishes a WebSocket long connection
+on boot — no public IP required.
+
+**5. Build and run**
 
 ```bash
 # Build (auto-detects target if sdkconfig exists)

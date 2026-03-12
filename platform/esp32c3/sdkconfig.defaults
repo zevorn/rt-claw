@@ -45,3 +45,7 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 
 # Newlib
 CONFIG_NEWLIB_STDIN_LINE_ENDING_LF=y
+
+# Feishu (Lark) Integration
+# CONFIG_CLAW_FEISHU_ENABLE=y
+# Set App ID and Secret via: idf.py menuconfig -> rt-claw -> Feishu

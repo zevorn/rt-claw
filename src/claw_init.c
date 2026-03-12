@@ -13,6 +13,7 @@
 #include "claw_tools.h"
 #include "ai_engine.h"
 #include "ai_skill.h"
+#include "feishu.h"
 
 int claw_init(void)
 {
@@ -32,6 +33,8 @@ int claw_init(void)
     claw_tools_init();
     ai_engine_init();
     ai_skill_init();
+    feishu_init();
+    feishu_start();
 
     return CLAW_OK;
 }
