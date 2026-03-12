@@ -26,6 +26,14 @@ menu "rt-claw Configuration"
             default 1024
             range 64 4096
 
+        config CLAW_AI_MEMORY_MAX_MSGS
+            int "Max conversation memory messages"
+            default 20
+            range 4 64
+            help
+                Maximum number of messages stored in AI conversation memory.
+                When full, the oldest user+assistant pair is dropped.
+
     endmenu
 
 endmenu

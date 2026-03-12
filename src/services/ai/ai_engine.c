@@ -2,11 +2,12 @@
  * Copyright (c) 2025, rt-claw Development Team
  * SPDX-License-Identifier: MIT
  *
- * AI engine — LLM API client with Tool Use support.
+ * AI engine — LLM API client with Tool Use support and conversation memory.
  */
 
 #include "claw_os.h"
 #include "ai_engine.h"
+#include "ai_memory.h"
 #include "claw_tools.h"
 
 #include <string.h>
@@ -27,8 +28,12 @@
 #define AI_MODEL        CONFIG_CLAW_AI_MODEL
 #define AI_MAX_TOKENS   CONFIG_CLAW_AI_MAX_TOKENS
 
-#define RESP_BUF_SIZE   8192
-#define MAX_TOOL_ROUNDS 5
+#define RESP_BUF_SIZE      8192
+#define MAX_TOOL_ROUNDS    5
+#define API_MAX_RETRIES    3
+#define API_RETRY_BASE_MS  3000
+
+static claw_mutex_t s_api_lock;
 
 static const char *SYSTEM_PROMPT =
     "You are rt-claw, an AI assistant running on an ESP32-C3 microcontroller. "
@@ -60,6 +65,12 @@ static esp_err_t on_http_event(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
+static int is_retryable_status(int status)
+{
+    return status == 429 || status == 500 || status == 502 ||
+           status == 503 || status == 529;
+}
+
 static cJSON *do_api_call(cJSON *req_body, resp_ctx_t *ctx)
 {
     char *body_str = cJSON_PrintUnformatted(req_body);
@@ -67,59 +78,81 @@ static cJSON *do_api_call(cJSON *req_body, resp_ctx_t *ctx)
         return NULL;
     }
 
-    ctx->len = 0;
-    ctx->buf[0] = '\0';
+    for (int attempt = 0; attempt <= API_MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+            int delay = API_RETRY_BASE_MS * attempt;
+            CLAW_LOGW(TAG, "retry %d/%d in %dms ...",
+                      attempt, API_MAX_RETRIES, delay);
+            claw_lcd_status("Retrying ...");
+            claw_thread_delay_ms(delay);
+        }
 
-    esp_http_client_config_t http_cfg = {
-        .url = AI_API_URL,
-        .method = HTTP_METHOD_POST,
-        .timeout_ms = 60000,
-        .event_handler = on_http_event,
-        .user_data = ctx,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .buffer_size = 4096,
-        .buffer_size_tx = 4096,
-    };
+        ctx->len = 0;
+        ctx->buf[0] = '\0';
 
-    esp_http_client_handle_t client = esp_http_client_init(&http_cfg);
-    if (!client) {
+        esp_http_client_config_t http_cfg = {
+            .url = AI_API_URL,
+            .method = HTTP_METHOD_POST,
+            .timeout_ms = 60000,
+            .event_handler = on_http_event,
+            .user_data = ctx,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+            .buffer_size = 4096,
+            .buffer_size_tx = 4096,
+        };
+
+        esp_http_client_handle_t client = esp_http_client_init(&http_cfg);
+        if (!client) {
+            continue;
+        }
+
+        esp_http_client_set_header(client, "Content-Type",
+                                   "application/json");
+        esp_http_client_set_header(client, "x-api-key", AI_API_KEY);
+        esp_http_client_set_header(client, "anthropic-version",
+                                   "2023-06-01");
+        esp_http_client_set_post_field(client, body_str, strlen(body_str));
+
+        esp_err_t err = esp_http_client_perform(client);
+        int status = 0;
+        if (err == ESP_OK) {
+            status = esp_http_client_get_status_code(client);
+        }
+        esp_http_client_cleanup(client);
+
+        if (err != ESP_OK) {
+            CLAW_LOGE(TAG, "HTTP failed: %s", esp_err_to_name(err));
+            continue;
+        }
+
+        if (is_retryable_status(status)) {
+            CLAW_LOGW(TAG, "HTTP %d (transient)", status);
+            continue;
+        }
+
+        if (status != 200) {
+            CLAW_LOGE(TAG, "HTTP %d: %.200s", status, ctx->buf);
+            cJSON_free(body_str);
+            return NULL;
+        }
+
         cJSON_free(body_str);
-        return NULL;
+        return cJSON_Parse(ctx->buf);
     }
 
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_header(client, "x-api-key", AI_API_KEY);
-    esp_http_client_set_header(client, "anthropic-version", "2023-06-01");
-    esp_http_client_set_post_field(client, body_str, strlen(body_str));
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status = 0;
-    if (err == ESP_OK) {
-        status = esp_http_client_get_status_code(client);
-    }
-
-    esp_http_client_cleanup(client);
+    CLAW_LOGE(TAG, "API call failed after %d retries", API_MAX_RETRIES);
     cJSON_free(body_str);
-
-    if (err != ESP_OK) {
-        CLAW_LOGE(TAG, "HTTP failed: %s", esp_err_to_name(err));
-        return NULL;
-    }
-    if (status != 200) {
-        CLAW_LOGE(TAG, "HTTP %d: %.200s", status, ctx->buf);
-        return NULL;
-    }
-
-    return cJSON_Parse(ctx->buf);
+    return NULL;
 }
 
 /* Build the base request object (reused across tool-use rounds) */
-static cJSON *build_request(cJSON *messages, cJSON *tools)
+static cJSON *build_request(const char *system_prompt,
+                            cJSON *messages, cJSON *tools)
 {
     cJSON *req = cJSON_CreateObject();
     cJSON_AddStringToObject(req, "model", AI_MODEL);
     cJSON_AddNumberToObject(req, "max_tokens", AI_MAX_TOKENS);
-    cJSON_AddStringToObject(req, "system", SYSTEM_PROMPT);
+    cJSON_AddStringToObject(req, "system", system_prompt);
 
     /* Attach references (not copies) — caller manages lifetime */
     cJSON_AddItemReferenceToObject(req, "messages", messages);
@@ -128,6 +161,31 @@ static cJSON *build_request(cJSON *messages, cJSON *tools)
     }
 
     return req;
+}
+
+/* Build system prompt with long-term memory context appended */
+static char *build_system_prompt(void)
+{
+    char *ltm_ctx = ai_ltm_build_context();
+    if (!ltm_ctx) {
+        /* No LTM, return a copy of the base prompt */
+        size_t len = strlen(SYSTEM_PROMPT);
+        char *p = claw_malloc(len + 1);
+        if (p) {
+            memcpy(p, SYSTEM_PROMPT, len + 1);
+        }
+        return p;
+    }
+
+    size_t base_len = strlen(SYSTEM_PROMPT);
+    size_t ctx_len = strlen(ltm_ctx);
+    char *p = claw_malloc(base_len + ctx_len + 1);
+    if (p) {
+        memcpy(p, SYSTEM_PROMPT, base_len);
+        memcpy(p + base_len, ltm_ctx, ctx_len + 1);
+    }
+    claw_free(ltm_ctx);
+    return p;
 }
 
 /* Extract concatenated text blocks from response content array */
@@ -209,19 +267,15 @@ static cJSON *execute_tool_calls(const cJSON *content)
     return results;
 }
 
-int ai_chat(const char *user_msg, char *reply, size_t reply_size)
+/*
+ * Core API call loop with tool-use support.
+ * Takes a pre-built messages array and runs the tool-use loop.
+ * Does NOT touch conversation memory.
+ */
+static int ai_chat_with_messages(const char *system_prompt,
+                                 cJSON *messages, cJSON *tools,
+                                 char *reply, size_t reply_size)
 {
-    if (!user_msg || !reply || reply_size == 0) {
-        return CLAW_ERROR;
-    }
-
-    if (strlen(AI_API_KEY) == 0) {
-        snprintf(reply, reply_size,
-                 "[no API key — set via idf.py menuconfig]");
-        return CLAW_ERROR;
-    }
-
-    /* Allocate response buffer */
     char *resp_buf = claw_malloc(RESP_BUF_SIZE);
     if (!resp_buf) {
         CLAW_LOGE(TAG, "no memory for response buffer");
@@ -229,17 +283,6 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
     }
 
     resp_ctx_t ctx = { .buf = resp_buf, .size = RESP_BUF_SIZE, .len = 0 };
-
-    /* Build tools JSON */
-    cJSON *tools = claw_tools_to_json();
-
-    /* Build messages array */
-    cJSON *messages = cJSON_CreateArray();
-    cJSON *user_m = cJSON_CreateObject();
-    cJSON_AddStringToObject(user_m, "role", "user");
-    cJSON_AddStringToObject(user_m, "content", user_msg);
-    cJSON_AddItemToArray(messages, user_m);
-
     int ret = CLAW_ERROR;
     reply[0] = '\0';
 
@@ -247,7 +290,7 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
     claw_lcd_progress(0);
 
     for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        cJSON *req = build_request(messages, tools);
+        cJSON *req = build_request(system_prompt, messages, tools);
         cJSON *resp = do_api_call(req, &ctx);
         cJSON_Delete(req);
 
@@ -279,10 +322,6 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
         extract_text(content, reply, reply_size);
 
         if (strcmp(stop_reason, "tool_use") == 0) {
-            /*
-             * Tool use round: execute tools, append assistant + result
-             * messages, then loop for the next API call.
-             */
             CLAW_LOGI(TAG, "tool_use round %d", round + 1);
             claw_lcd_status("Tool call ...");
             claw_lcd_progress((round + 1) * 100 / MAX_TOOL_ROUNDS);
@@ -313,16 +352,126 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
         break;
     }
 
+    claw_free(resp_buf);
+    return ret;
+}
+
+int ai_chat(const char *user_msg, char *reply, size_t reply_size)
+{
+    if (!user_msg || !reply || reply_size == 0) {
+        return CLAW_ERROR;
+    }
+
+    if (strlen(AI_API_KEY) == 0) {
+        snprintf(reply, reply_size,
+                 "[no API key — set via idf.py menuconfig]");
+        return CLAW_ERROR;
+    }
+
+    claw_mutex_lock(s_api_lock, CLAW_WAIT_FOREVER);
+
+    /* Add user message to memory */
+    ai_memory_add_message("user", user_msg);
+
+    /* Build system prompt with long-term memory context */
+    char *sys_prompt = build_system_prompt();
+    if (!sys_prompt) {
+        claw_mutex_unlock(s_api_lock);
+        return CLAW_ERROR;
+    }
+
+    /* Build messages from conversation memory */
+    cJSON *messages = ai_memory_build_messages();
+    cJSON *tools = claw_tools_to_json();
+
+    /* Track original message count to detect tool-round additions */
+    int orig_msg_count = cJSON_GetArraySize(messages);
+
+    int ret = ai_chat_with_messages(sys_prompt, messages, tools,
+                                     reply, reply_size);
+
+    /*
+     * Store tool-use intermediate messages in memory first.
+     * Messages appended during tool rounds start at orig_msg_count.
+     */
+    int msg_count = cJSON_GetArraySize(messages);
+    for (int i = orig_msg_count; i < msg_count; i++) {
+        cJSON *msg = cJSON_GetArrayItem(messages, i);
+        cJSON *role = cJSON_GetObjectItem(msg, "role");
+        cJSON *content = cJSON_GetObjectItem(msg, "content");
+        if (!role || !content) {
+            continue;
+        }
+        char *content_str = cJSON_PrintUnformatted(content);
+        if (content_str) {
+            ai_memory_add_message(role->valuestring, content_str);
+            cJSON_free(content_str);
+        }
+    }
+
+    /* Store final assistant text reply in memory (after tool messages) */
+    if (ret == CLAW_OK && reply[0] != '\0') {
+        ai_memory_add_message("assistant", reply);
+    }
+
+    claw_free(sys_prompt);
     cJSON_Delete(messages);
     if (tools) {
         cJSON_Delete(tools);
     }
-    claw_free(resp_buf);
+
+    claw_mutex_unlock(s_api_lock);
+    return ret;
+}
+
+int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
+{
+    if (!prompt || !reply || reply_size == 0) {
+        return CLAW_ERROR;
+    }
+
+    if (strlen(AI_API_KEY) == 0) {
+        snprintf(reply, reply_size,
+                 "[no API key — set via idf.py menuconfig]");
+        return CLAW_ERROR;
+    }
+
+    claw_mutex_lock(s_api_lock, CLAW_WAIT_FOREVER);
+
+    char *sys_prompt = build_system_prompt();
+    if (!sys_prompt) {
+        claw_mutex_unlock(s_api_lock);
+        return CLAW_ERROR;
+    }
+
+    /* Build single-message array (no memory) */
+    cJSON *messages = cJSON_CreateArray();
+    cJSON *user_m = cJSON_CreateObject();
+    cJSON_AddStringToObject(user_m, "role", "user");
+    cJSON_AddStringToObject(user_m, "content", prompt);
+    cJSON_AddItemToArray(messages, user_m);
+
+    cJSON *tools = claw_tools_to_json();
+
+    int ret = ai_chat_with_messages(sys_prompt, messages, tools,
+                                     reply, reply_size);
+
+    claw_free(sys_prompt);
+    cJSON_Delete(messages);
+    if (tools) {
+        cJSON_Delete(tools);
+    }
+
+    claw_mutex_unlock(s_api_lock);
     return ret;
 }
 
 int ai_engine_init(void)
 {
+    s_api_lock = claw_mutex_create("ai_api");
+    ai_memory_init();
+    ai_ltm_init();
+
     if (strlen(AI_API_KEY) == 0) {
         CLAW_LOGW(TAG, "no API key — set via: idf.py menuconfig");
         claw_lcd_status("No API key configured");
@@ -343,8 +492,17 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
     return CLAW_ERROR;
 }
 
+int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
+{
+    (void)prompt;
+    snprintf(reply, reply_size, "[AI not available on this platform]");
+    return CLAW_ERROR;
+}
+
 int ai_engine_init(void)
 {
+    ai_memory_init();
+    ai_ltm_init();
     CLAW_LOGI(TAG, "engine initialized (inference backend pending)");
     return CLAW_OK;
 }
