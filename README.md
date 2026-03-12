@@ -1,10 +1,24 @@
-# RT-Claw — Making AI Assistants Cheap
+<p align="center">
+  <img src="logo.png" alt="RT-Claw" width="500">
+</p>
+
+<p align="center">
+  <strong>Making AI Assistants Cheap</strong>
+</p>
+
+<p align="center">
+  <a href="https://qm.qq.com/q/heSPPC9De8"><img src="https://img.shields.io/badge/Join%20QQ-GTOC-brightgreen?style=for-the-badge&logo=QQ&logoColor=76bad9&color=76bad9" alt="QQ Group"></a>
+  <a href="https://t.me/gevico_channel"><img src="https://img.shields.io/badge/Telegram-GTOC-blue?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+  <a href="https://space.bilibili.com/483048140"><img src="https://img.shields.io/badge/Bilibili-%E7%BB%9D%E5%AF%B9%E6%98%AF%E6%B3%BD%E6%96%87%E5%95%A6-FB7299?style=for-the-badge&logo=bilibili" alt="Bilibili"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+</p>
 
 [中文](README_zh.md) | **English**
 
-Real-Time Claw — an OpenClaw-inspired intelligent assistant for embedded devices.
-
+**RT-Claw** is an [OpenClaw](https://github.com/openclaw/openclaw)-inspired intelligent assistant for embedded devices.
 Multi-RTOS support via OSAL. Build swarm intelligence with networked nodes.
+
+[Architecture](docs/en/architecture.md) · [ESP32-C3 QEMU Guide](docs/en/esp32c3-qemu.md) · [Contributing](docs/en/contributing.md) · [Coding Style](docs/en/coding-style.md)
 
 ## Core Idea
 
@@ -33,7 +47,7 @@ tasks in real time.
 ```
 +---------------------------------------------------+
 |                rt-claw Application                |
-|  gateway | swarm | net | ai_engine | tools | lcd |
+|  gateway | swarm | net | ai_engine | tools | lcd  |
 +---------------------------------------------------+
 |               claw_os.h  (OSAL API)               |
 +-----------------+---------------------------------+
@@ -103,6 +117,15 @@ rt-claw/
 ├── scripts/                     # Code style & dev tools
 └── tools/                       # Build, launch & dev scripts
 ```
+
+## Community
+
+Join the GTOC (Gevico Open-Source Community) channels:
+
+- **QQ Group**: [Join](https://qm.qq.com/q/heSPPC9De8)
+- **Telegram**: [GTOC Channel](https://t.me/gevico_channel)
+- **Bilibili**: [Zevorn](https://space.bilibili.com/483048140)
+- **WeChat**: GTOC
 
 ## Documentation
 

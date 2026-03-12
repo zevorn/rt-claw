@@ -1,10 +1,24 @@
-# RT-Claw — 让 AI 助理触手可及
+<p align="center">
+  <img src="logo.png" alt="RT-Claw" width="500">
+</p>
+
+<p align="center">
+  <strong>让 AI 助理触手可及</strong>
+</p>
+
+<p align="center">
+  <a href="https://qm.qq.com/q/heSPPC9De8"><img src="https://img.shields.io/badge/Join%20QQ-GTOC-brightgreen?style=for-the-badge&logo=QQ&logoColor=76bad9&color=76bad9" alt="QQ 群"></a>
+  <a href="https://t.me/gevico_channel"><img src="https://img.shields.io/badge/Telegram-GTOC-blue?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+  <a href="https://space.bilibili.com/483048140"><img src="https://img.shields.io/badge/Bilibili-%E7%BB%9D%E5%AF%B9%E6%98%AF%E6%B3%BD%E6%96%87%E5%95%A6-FB7299?style=for-the-badge&logo=bilibili" alt="Bilibili"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+</p>
 
 **中文** | [English](README.md)
 
-Real-Time Claw — 受 OpenClaw 启发，面向嵌入式设备的智能助手。
-
+**RT-Claw** — 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，面向嵌入式设备的智能助手。
 通过 OSAL 支持多 RTOS，以组网节点构建蜂群智能。
+
+[架构设计](docs/zh/architecture.md) · [ESP32-C3 QEMU 指南](docs/zh/esp32c3-qemu.md) · [贡献指南](docs/zh/contributing.md) · [编码风格](docs/zh/coding-style.md)
 
 ## 核心理念
 
@@ -99,6 +113,15 @@ rt-claw/
 ├── scripts/                     # 代码风格与开发工具
 └── tools/                       # 构建、启动与开发脚本
 ```
+
+## 社区
+
+加入 GTOC（格维开源社区）交流频道：
+
+- **QQ 群**：[加入](https://qm.qq.com/q/heSPPC9De8)
+- **Telegram**：[GTOC 频道](https://t.me/gevico_channel)
+- **Bilibili**：[绝对是泽文啦](https://space.bilibili.com/483048140)
+- **微信**：GTOC 微信公众号
 
 ## 文档
 
