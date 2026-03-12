@@ -227,23 +227,44 @@ void claw_log(int level, const char *tag, const char *fmt, ...)
 {
     va_list ap;
     esp_log_level_t esp_level;
+
     static const char *letters[] = { "E", "W", "I", "D" };
     int idx = level;
-    if (idx < 0) idx = 0;
-    if (idx > 3) idx = 3;
+
+    if (idx < 0) {
+        idx = 0;
+    }
+    if (idx > 3) {
+        idx = 3;
+    }
+
     switch (level) {
     case CLAW_LOG_ERROR: esp_level = ESP_LOG_ERROR; break;
     case CLAW_LOG_WARN:  esp_level = ESP_LOG_WARN;  break;
     case CLAW_LOG_INFO:  esp_level = ESP_LOG_INFO;  break;
     default:             esp_level = ESP_LOG_DEBUG;  break;
     }
-    /*
-     * esp_log_writev does NOT add prefix/newline — ESP_LOGx macros
-     * embed them in the format string. We do the same here.
-     */
+
+#ifdef CONFIG_LOG_COLORS
+    static const char *colors[] = {
+        "\033[0;31m",   /* E: red */
+        "\033[0;33m",   /* W: yellow */
+        "\033[0;32m",   /* I: green */
+        "\033[0;36m",   /* D: cyan */
+    };
     char fmtbuf[256];
+
+    snprintf(fmtbuf, sizeof(fmtbuf),
+             "%s%s (%lu) %s: %s\033[0m\n",
+             colors[idx], letters[idx],
+             (unsigned long)esp_log_timestamp(), tag, fmt);
+#else
+    char fmtbuf[256];
+
     snprintf(fmtbuf, sizeof(fmtbuf), "%s (%lu) %s: %s\n",
-             letters[idx], (unsigned long)esp_log_timestamp(), tag, fmt);
+             letters[idx],
+             (unsigned long)esp_log_timestamp(), tag, fmt);
+#endif
     va_start(ap, fmt);
     esp_log_writev(esp_level, tag, fmtbuf, ap);
     va_end(ap);
