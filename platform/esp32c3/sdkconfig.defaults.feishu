@@ -7,8 +7,8 @@
 #   idf.py menuconfig   # set API key, Feishu App ID & Secret
 #   idf.py build
 #
-# Enables: Feishu, all tools, skills, scheduler, swarm, LCD
-# Disables: Shell (saves ~4KB RAM)
+# Enables: Feishu, tools (no LCD), skills, scheduler, swarm
+# Disables: Shell (saves ~4KB RAM), LCD (headless mode)
 
 # ---- Base platform ----
 CONFIG_FREERTOS_HZ=1000
@@ -33,13 +33,13 @@ CONFIG_NEWLIB_STDIN_LINE_ENDING_LF=y
 
 # ---- rt-claw modules ----
 # CONFIG_CLAW_SHELL_ENABLE is not set
-CONFIG_CLAW_LCD_ENABLE=y
+# CONFIG_CLAW_LCD_ENABLE is not set
 CONFIG_CLAW_SWARM_ENABLE=y
 CONFIG_CLAW_SCHED_ENABLE=y
 CONFIG_CLAW_SKILL_ENABLE=y
 CONFIG_CLAW_TOOL_GPIO=y
 CONFIG_CLAW_TOOL_SYSTEM=y
-CONFIG_CLAW_TOOL_LCD=y
+# CONFIG_CLAW_TOOL_LCD is not set
 CONFIG_CLAW_TOOL_SCHED=y
 CONFIG_CLAW_TOOL_NET=y
 
