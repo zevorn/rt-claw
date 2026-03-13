@@ -73,7 +73,7 @@ idf.py build                       # 链接生成最终固件
 ### 方式一：统一脚本（推荐）
 
 ```bash
-./tools/esp32c3-qemu-run.sh
+./tools/qemu-run.sh -m esp32c3
 ```
 
 ### 方式二：idf.py 封装
@@ -84,12 +84,6 @@ idf.py qemu monitor
 ```
 
 按 `Ctrl+]` 退出。
-
-### 方式三：直接启动 QEMU
-
-```bash
-./tools/esp32c3-qemu-run.sh --raw
-```
 
 此命令会生成合并的 flash 镜像并执行：
 ```
@@ -130,7 +124,7 @@ idf.py gdb
 
 ```bash
 # 终端 1
-./tools/esp32c3-qemu-dbg.sh --raw
+./tools/qemu-run.sh -m esp32c3 -g
 
 # 终端 2
 cd platform/esp32c3

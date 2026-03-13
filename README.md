@@ -160,7 +160,7 @@ on boot — no public IP required.
 make esp32c3
 
 # Run on QEMU
-./tools/esp32c3-qemu-run.sh
+./tools/qemu-run.sh -m esp32c3
 
 # Or flash to real hardware (untested)
 idf.py -p /dev/ttyUSB0 flash monitor
@@ -183,7 +183,7 @@ cd platform/qemu-a9-rtthread && scons -j$(nproc)
 python3 tools/api-proxy.py https://api.anthropic.com &
 
 # Run
-./tools/qemu-run.sh
+./tools/qemu-run.sh -m qemu-a9
 ```
 
 ## Project Structure

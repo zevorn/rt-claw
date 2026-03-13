@@ -27,7 +27,7 @@ meson compile -C build/esp32c3
 
 ```bash
 make run-qemu-a9                       # build + launch QEMU
-tools/qemu-run.sh                      # launch only (must build first)
+tools/qemu-run.sh -m qemu-a9           # launch only (must build first)
 
 # ESP32-C3 QEMU
 make run-esp32c3                       # build + launch QEMU
@@ -76,7 +76,7 @@ No unit test framework yet. Verify changes by:
 
 1. Build passes on at least one platform
 2. `scripts/check-patch.sh --staged` passes
-3. QEMU boot test: `idf.py qemu monitor` or `tools/qemu-run.sh`
+3. QEMU boot test: `idf.py qemu monitor` or `tools/qemu-run.sh -m qemu-a9`
 
 ## Key Paths
 

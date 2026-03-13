@@ -73,7 +73,7 @@ idf.py build                       # link into final firmware
 ### Method 1: Launch script (recommended)
 
 ```bash
-./tools/esp32c3-qemu-run.sh
+./tools/qemu-run.sh -m esp32c3
 ```
 
 ### Method 2: idf.py wrapper
@@ -84,12 +84,6 @@ idf.py qemu monitor
 ```
 
 Exit with `Ctrl+]`.
-
-### Method 3: Direct QEMU launch
-
-```bash
-./tools/esp32c3-qemu-run.sh --raw
-```
 
 This generates a merged flash image and runs:
 ```
@@ -130,7 +124,7 @@ idf.py gdb
 
 ```bash
 # Terminal 1
-./tools/esp32c3-qemu-dbg.sh --raw
+./tools/qemu-run.sh -m esp32c3 -g
 
 # Terminal 2
 cd platform/esp32c3

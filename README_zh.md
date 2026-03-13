@@ -155,7 +155,7 @@ idf.py menuconfig
 make esp32c3
 
 # 在 QEMU 上运行
-./tools/esp32c3-qemu-run.sh
+./tools/qemu-run.sh -m esp32c3
 
 # 或烧录到真实硬件（未测试）
 idf.py -p /dev/ttyUSB0 flash monitor
@@ -178,7 +178,7 @@ cd platform/qemu-a9-rtthread && scons -j$(nproc)
 python3 tools/api-proxy.py https://api.anthropic.com &
 
 # 运行
-./tools/qemu-run.sh
+./tools/qemu-run.sh -m qemu-a9
 ```
 
 ## 项目结构

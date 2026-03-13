@@ -27,5 +27,5 @@ idf.py build
 
 echo ""
 echo "=== Build Complete ==="
-echo "Run on QEMU:  ./tools/esp32c3-qemu-run.sh"
+echo "Run on QEMU:  ./tools/qemu-run.sh -m esp32c3"
 echo "Flash device: idf.py -p /dev/ttyUSB0 flash monitor"

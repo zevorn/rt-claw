@@ -12,6 +12,7 @@ help:
 	@echo "  make qemu-a9      Build for QEMU vexpress-a9 (RT-Thread)"
 	@echo "  make esp32c3      Build for ESP32-C3 (ESP-IDF + FreeRTOS)"
 	@echo "  make run-qemu-a9  Run RT-Thread on QEMU"
+	@echo "  make run-esp32c3  Run ESP32-C3 on QEMU"
 	@echo "  make clean        Clean all build artifacts"
 	@echo "  make check        Run code style checks"
 	@echo ""
@@ -35,7 +36,7 @@ qemu-a9:
 
 .PHONY: run-qemu-a9
 run-qemu-a9: qemu-a9
-	tools/qemu-run.sh
+	tools/qemu-run.sh -m qemu-a9
 
 # --- ESP32-C3 (ESP-IDF) ---
 # Prerequisite: source $$HOME/esp/esp-idf/export.sh
@@ -61,7 +62,7 @@ esp32c3:
 
 .PHONY: run-esp32c3
 run-esp32c3: esp32c3
-	tools/esp32c3-qemu-run.sh
+	tools/qemu-run.sh -m esp32c3
 
 # --- Clean ---
 .PHONY: clean
