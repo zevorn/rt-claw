@@ -79,7 +79,7 @@ foreach opt_name, pair : _env_overrides
 endforeach
 
 # Unified header directory for all rt-claw public headers
-claw_inc = include_directories('include', '.')
+claw_inc = include_directories('include')
 
 subdir('vendor/lib/cjson')
 subdir('osal')

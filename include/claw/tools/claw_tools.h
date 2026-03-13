@@ -8,7 +8,7 @@
 #ifndef CLAW_TOOLS_H
 #define CLAW_TOOLS_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 #include "cJSON.h"
 
 #define CLAW_TOOL_MAX       16

@@ -6,10 +6,10 @@
  * Chat-first shell: direct input goes to AI, /commands for system.
  */
 
-#include "claw_os.h"
-#include "claw_init.h"
-#include "services/ai/ai_engine.h"
-#include "shell/shell_commands.h"
+#include "osal/claw_os.h"
+#include "claw/claw_init.h"
+#include "claw/services/ai/ai_engine.h"
+#include "claw/shell/shell_commands.h"
 
 #include <stdio.h>
 #include <string.h>

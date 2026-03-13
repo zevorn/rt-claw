@@ -5,10 +5,10 @@
  * AI skill — predefined prompt templates + built-in skills.
  */
 
-#include "claw_os.h"
-#include "services/ai/ai_skill.h"
-#include "services/ai/ai_engine.h"
-#include "tools/claw_tools.h"
+#include "osal/claw_os.h"
+#include "claw/services/ai/ai_skill.h"
+#include "claw/services/ai/ai_engine.h"
+#include "claw/tools/claw_tools.h"
 
 #include <string.h>
 #include <stdio.h>

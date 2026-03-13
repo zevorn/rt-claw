@@ -5,24 +5,24 @@
  * Common shell command implementations shared across all platforms.
  */
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "shell/shell_commands.h"
-#include "services/ai/ai_engine.h"
-#include "services/ai/ai_memory.h"
-#include "services/im/feishu.h"
+#include "claw/shell/shell_commands.h"
+#include "claw/services/ai/ai_engine.h"
+#include "claw/services/ai/ai_memory.h"
+#include "claw/services/im/feishu.h"
 
 #ifdef CONFIG_RTCLAW_SKILL_ENABLE
-#include "services/ai/ai_skill.h"
+#include "claw/services/ai/ai_skill.h"
 #endif
 #ifdef CONFIG_RTCLAW_SCHED_ENABLE
-#include "core/scheduler.h"
+#include "claw/core/scheduler.h"
 #endif
 #ifdef CONFIG_RTCLAW_SWARM_ENABLE
-#include "services/swarm/swarm.h"
+#include "claw/services/swarm/swarm.h"
 #endif
 
 #ifdef CLAW_PLATFORM_ESP_IDF

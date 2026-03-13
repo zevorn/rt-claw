@@ -5,12 +5,12 @@
  * Swarm service — heartbeat broadcast and node discovery via UDP.
  */
 
-#include "claw_os.h"
-#include "claw_config.h"
-#include "claw_net.h"
-#include "services/swarm/swarm.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
+#include "osal/claw_net.h"
+#include "claw/services/swarm/swarm.h"
 #ifdef CONFIG_RTCLAW_HEARTBEAT_ENABLE
-#include "core/heartbeat.h"
+#include "claw/core/heartbeat.h"
 #endif
 
 #include <string.h>

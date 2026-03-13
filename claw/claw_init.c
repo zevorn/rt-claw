@@ -3,31 +3,31 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "claw_os.h"
-#include "claw_config.h"
-#include "claw_init.h"
-#include "core/claw_service.h"
-#include "core/gateway.h"
-#include "services/net/net_service.h"
-#include "tools/claw_tools.h"
-#include "services/ai/ai_engine.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
+#include "claw/claw_init.h"
+#include "claw/core/claw_service.h"
+#include "claw/core/gateway.h"
+#include "claw/services/net/net_service.h"
+#include "claw/tools/claw_tools.h"
+#include "claw/services/ai/ai_engine.h"
 
 #include <stdio.h>
 
 #ifdef CONFIG_RTCLAW_SCHED_ENABLE
-#include "core/scheduler.h"
+#include "claw/core/scheduler.h"
 #endif
 #ifdef CONFIG_RTCLAW_SWARM_ENABLE
-#include "services/swarm/swarm.h"
+#include "claw/services/swarm/swarm.h"
 #endif
 #ifdef CONFIG_RTCLAW_SKILL_ENABLE
-#include "services/ai/ai_skill.h"
+#include "claw/services/ai/ai_skill.h"
 #endif
 #ifdef CONFIG_RTCLAW_HEARTBEAT_ENABLE
-#include "core/heartbeat.h"
+#include "claw/core/heartbeat.h"
 #endif
 #ifdef CONFIG_RTCLAW_FEISHU_ENABLE
-#include "services/im/feishu.h"
+#include "claw/services/im/feishu.h"
 #endif
 
 #define TAG "init"

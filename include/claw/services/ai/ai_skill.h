@@ -8,7 +8,7 @@
 #ifndef CLAW_AI_SKILL_H
 #define CLAW_AI_SKILL_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 #define SKILL_MAX       8
 #define SKILL_NAME_MAX  24

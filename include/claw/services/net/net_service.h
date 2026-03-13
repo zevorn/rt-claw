@@ -6,7 +6,7 @@
 #ifndef CLAW_SERVICES_NET_SERVICE_H
 #define CLAW_SERVICES_NET_SERVICE_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 int net_service_init(void);
 

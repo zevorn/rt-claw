@@ -4,7 +4,6 @@ set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32c3-qemu")
 # Headers exported to dependent components (e.g. main)
 set(CLAW_INC_DIRS
     "${RT_CLAW_ROOT}/include"
-    "${RT_CLAW_ROOT}"
 )
 
 # ESP-IDF component dependencies (needed for symbol resolution at link time)

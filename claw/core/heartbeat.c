@@ -11,11 +11,11 @@
  *              the summary to IM or serial console.
  */
 
-#include "claw_os.h"
-#include "claw_config.h"
-#include "core/heartbeat.h"
-#include "core/scheduler.h"
-#include "services/ai/ai_engine.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
+#include "claw/core/heartbeat.h"
+#include "claw/core/scheduler.h"
+#include "claw/services/ai/ai_engine.h"
 
 #include <string.h>
 #include <stdio.h>

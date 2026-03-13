@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "claw_os.h"
-#include "core/gateway.h"
+#include "osal/claw_os.h"
+#include "claw/core/gateway.h"
 
 #define TAG "gateway"
 

@@ -5,7 +5,7 @@
  * OSAL implementation for FreeRTOS (ESP-IDF and standalone).
  */
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 #ifdef CLAW_PLATFORM_ESP_IDF
   #include "freertos/FreeRTOS.h"

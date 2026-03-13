@@ -9,7 +9,7 @@
 #ifndef CLAW_SHELL_COMMANDS_H
 #define CLAW_SHELL_COMMANDS_H
 
-#include "shell/shell_cmd.h"
+#include "claw/shell/shell_cmd.h"
 
 /* Common command table (defined in claw/shell/shell_commands.c) */
 extern const shell_cmd_t shell_common_commands[];

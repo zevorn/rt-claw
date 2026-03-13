@@ -5,8 +5,8 @@
  * OSAL network — ESP-IDF implementation using esp_http_client.
  */
 
-#include "claw_net.h"
-#include "claw_os.h"
+#include "osal/claw_net.h"
+#include "osal/claw_os.h"
 
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"

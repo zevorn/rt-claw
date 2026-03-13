@@ -5,8 +5,8 @@
  * Network service — Ethernet init and HTTP connectivity test.
  */
 
-#include "claw_os.h"
-#include "services/net/net_service.h"
+#include "osal/claw_os.h"
+#include "claw/services/net/net_service.h"
 
 #include <string.h>
 

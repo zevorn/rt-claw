@@ -9,10 +9,10 @@
  * the scheduler or the interactive shell.
  */
 
-#include "claw_os.h"
-#include "tools/claw_tools.h"
-#include "core/scheduler.h"
-#include "services/ai/ai_engine.h"
+#include "osal/claw_os.h"
+#include "claw/tools/claw_tools.h"
+#include "claw/core/scheduler.h"
+#include "claw/services/ai/ai_engine.h"
 
 #include <string.h>
 #include <stdio.h>

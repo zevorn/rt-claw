@@ -6,7 +6,7 @@
  * Uses esp_lcd_qemu_rgb with direct framebuffer access.
  */
 
-#include "tools/claw_tools.h"
+#include "claw/tools/claw_tools.h"
 
 #include <string.h>
 #include <stdio.h>

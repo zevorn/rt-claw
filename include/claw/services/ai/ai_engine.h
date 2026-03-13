@@ -6,7 +6,7 @@
 #ifndef CLAW_SERVICES_AI_ENGINE_H
 #define CLAW_SERVICES_AI_ENGINE_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 /* Status phases for the progress callback */
 #define AI_STATUS_THINKING   0  /* waiting for API response */

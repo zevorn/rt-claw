@@ -14,10 +14,10 @@
  * pulling in a full protobuf library on an embedded target.
  */
 
-#include "claw_os.h"
-#include "services/im/feishu.h"
-#include "services/ai/ai_engine.h"
-#include "tools/claw_tools.h"
+#include "osal/claw_os.h"
+#include "claw/services/im/feishu.h"
+#include "claw/services/ai/ai_engine.h"
+#include "claw/tools/claw_tools.h"
 
 #include <string.h>
 #include <stdio.h>

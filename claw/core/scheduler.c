@@ -5,9 +5,9 @@
  * Task scheduler — dedicated thread polls task array every tick.
  */
 
-#include "claw_os.h"
-#include "claw_config.h"
-#include "core/scheduler.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
+#include "claw/core/scheduler.h"
 
 #include <string.h>
 #include <stdio.h>

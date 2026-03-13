@@ -8,7 +8,7 @@
 #ifndef CLAW_AI_MEMORY_H
 #define CLAW_AI_MEMORY_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 #include "cJSON.h"
 
 #ifdef CLAW_PLATFORM_ESP_IDF

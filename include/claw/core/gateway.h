@@ -8,8 +8,8 @@
 #ifndef CLAW_CORE_GATEWAY_H
 #define CLAW_CORE_GATEWAY_H
 
-#include "claw_os.h"
-#include "claw_config.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
 
 enum gateway_msg_type {
     GW_MSG_DATA = 0,

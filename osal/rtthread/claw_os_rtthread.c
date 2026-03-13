@@ -5,7 +5,7 @@
  * OSAL implementation for RT-Thread.
  */
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 #include <rtthread.h>
 
 #include <stdio.h>

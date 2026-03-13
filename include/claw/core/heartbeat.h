@@ -10,7 +10,7 @@
 #ifndef CLAW_CORE_HEARTBEAT_H
 #define CLAW_CORE_HEARTBEAT_H
 
-#include "claw_os.h"
+#include "osal/claw_os.h"
 
 typedef void (*heartbeat_reply_fn_t)(const char *target,
                                      const char *text);

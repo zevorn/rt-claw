@@ -14,7 +14,6 @@ for d in os.listdir(cwd):
 # rt-claw headers (unified include/ directory)
 claw_inc = [
     os.path.join(project_root, 'include'),
-    project_root,
     os.path.join(project_root, 'vendor', 'lib', 'cjson'),
 ]
 Env.AppendUnique(CPPPATH=[os.path.abspath(p) for p in claw_inc])

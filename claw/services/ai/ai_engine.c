@@ -5,12 +5,12 @@
  * AI engine — LLM API client with Tool Use support and conversation memory.
  */
 
-#include "claw_os.h"
-#include "claw_config.h"
-#include "claw_net.h"
-#include "services/ai/ai_engine.h"
-#include "services/ai/ai_memory.h"
-#include "tools/claw_tools.h"
+#include "osal/claw_os.h"
+#include "claw/claw_config.h"
+#include "osal/claw_net.h"
+#include "claw/services/ai/ai_engine.h"
+#include "claw/services/ai/ai_memory.h"
+#include "claw/tools/claw_tools.h"
 #include "cJSON.h"
 
 #include <string.h>
