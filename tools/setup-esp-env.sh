@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup ESP-IDF development environment + Espressif QEMU for ESP32-C3
+# Setup ESP-IDF development environment + Espressif QEMU for ESP32-C3/S3
 #
 # Prerequisites (Arch Linux):
 #   sudo pacman -S --needed libgcrypt glib2 pixman sdl2 libslirp \
@@ -18,7 +18,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ESP_IDF_DIR="${ESP_IDF_DIR:-$HOME/esp/esp-idf}"
 ESP_IDF_TAG="${ESP_IDF_TAG:-v5.4}"
 
-echo "=== rt-claw ESP32-C3 Environment Setup ==="
+echo "=== rt-claw ESP32-C3/S3 Environment Setup ==="
 echo "ESP-IDF directory: $ESP_IDF_DIR"
 echo "ESP-IDF version:   $ESP_IDF_TAG"
 echo ""
@@ -38,11 +38,12 @@ fi
 echo ""
 echo ">>> Installing ESP-IDF tools (including QEMU) ..."
 cd "$ESP_IDF_DIR"
-./install.sh esp32c3
+./install.sh esp32c3,esp32s3
 
 echo ""
-echo ">>> Installing Espressif QEMU (riscv32) ..."
+echo ">>> Installing Espressif QEMU (riscv32 + xtensa) ..."
 python3 tools/idf_tools.py install qemu-riscv32
+python3 tools/idf_tools.py install qemu-xtensa
 
 # Step 3: Print usage
 echo ""
@@ -52,12 +53,11 @@ echo "To activate the environment, run:"
 echo "  source $ESP_IDF_DIR/export.sh"
 echo ""
 echo "To build rt-claw for ESP32-C3:"
-echo "  cd $PROJECT_DIR/platform/esp32c3"
-echo "  idf.py set-target esp32c3"
-echo "  idf.py build"
+echo "  make esp32c3"
+echo ""
+echo "To build rt-claw for ESP32-S3:"
+echo "  make esp32s3"
 echo ""
 echo "To run on QEMU:"
-echo "  idf.py qemu monitor"
-echo ""
-echo "Or use the helper script:"
-echo "  $PROJECT_DIR/tools/qemu-run.sh -M esp32c3"
+echo "  tools/qemu-run.sh -M esp32c3"
+echo "  tools/qemu-run.sh -M esp32s3"

@@ -11,8 +11,10 @@ help:
 	@echo "Targets:"
 	@echo "  make qemu-a9      Build for QEMU vexpress-a9 (RT-Thread)"
 	@echo "  make esp32c3      Build for ESP32-C3 (ESP-IDF + FreeRTOS)"
+	@echo "  make esp32s3      Build for ESP32-S3 (ESP-IDF + FreeRTOS)"
 	@echo "  make run-qemu-a9  Run RT-Thread on QEMU"
 	@echo "  make run-esp32c3  Run ESP32-C3 on QEMU"
+	@echo "  make run-esp32s3  Run ESP32-S3 on QEMU"
 	@echo "  make clean        Clean all build artifacts"
 	@echo "  make check        Run code style checks"
 	@echo ""
@@ -64,6 +66,32 @@ esp32c3:
 run-esp32c3: esp32c3
 	tools/qemu-run.sh -M esp32c3
 
+# --- ESP32-S3 (ESP-IDF) ---
+# Prerequisite: source $$HOME/esp/esp-idf/export.sh
+MESON_BUILDDIR_S3 := $(BUILD_DIR)/esp32s3
+CROSS_FILE_S3     := platform/esp32s3/cross.ini
+ESP_S3_PLATFORM   := platform/esp32s3
+
+.PHONY: esp32s3
+esp32s3:
+	@if [ ! -f $(ESP_S3_PLATFORM)/sdkconfig ]; then \
+		cd $(ESP_S3_PLATFORM) && idf.py set-target esp32s3; \
+	fi
+	@if [ ! -f $(ESP_S3_PLATFORM)/build/compile_commands.json ]; then \
+		cd $(ESP_S3_PLATFORM) && idf.py reconfigure; \
+	fi
+	python3 scripts/gen-esp32s3-cross.py
+	@if [ ! -f $(MESON_BUILDDIR_S3)/build.ninja ]; then \
+		meson setup $(MESON_BUILDDIR_S3) --cross-file $(CROSS_FILE_S3); \
+	fi
+	meson compile -C $(MESON_BUILDDIR_S3)
+	cd $(ESP_S3_PLATFORM) && idf.py reconfigure && idf.py build
+	@echo "Output: $(ESP_S3_PLATFORM)/build/rt-claw.bin"
+
+.PHONY: run-esp32s3
+run-esp32s3: esp32s3
+	tools/qemu-run.sh -M esp32s3
+
 # --- Clean ---
 .PHONY: clean
 clean:
@@ -79,6 +107,11 @@ clean-qemu-a9:
 clean-esp32c3:
 	rm -rf $(BUILD_DIR)/esp32c3
 	rm -f platform/esp32c3/cross.ini
+
+.PHONY: clean-esp32s3
+clean-esp32s3:
+	rm -rf $(BUILD_DIR)/esp32s3
+	rm -f platform/esp32s3/cross.ini
 
 # --- Checks ---
 .PHONY: check

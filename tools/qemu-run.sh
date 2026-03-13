@@ -9,6 +9,7 @@
 # Machines:
 #   qemu-a9   QEMU vexpress-a9 (RT-Thread, ARM Cortex-A9)
 #   esp32c3   QEMU ESP32-C3 (ESP-IDF, Espressif QEMU fork)
+#   esp32s3   QEMU ESP32-S3 (ESP-IDF, Espressif QEMU fork)
 #
 # Options:
 #   -M MACHINE   Target machine (required)
@@ -24,7 +25,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-MACHINES="qemu-a9 esp32c3"
+MACHINES="qemu-a9 esp32c3 esp32s3"
 MACHINE=""
 GDB_MODE=0
 GRAPHICS=0
@@ -44,7 +45,7 @@ _qemu_run() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    machines="qemu-a9 esp32c3"
+    machines="qemu-a9 esp32c3 esp32s3"
     opts="-M -g --graphics -h --help"
 
     case "$prev" in
@@ -177,14 +178,64 @@ run_esp32c3() {
         $gdb_flags
 }
 
+# ---- esp32s3: QEMU ESP32-S3 (Espressif fork) ----
+
+run_esp32s3() {
+    local platform_dir="$PROJECT_ROOT/platform/esp32s3"
+
+    cd "$platform_dir" || exit 1
+
+    if [ -z "$IDF_PATH" ]; then
+        echo "Error: IDF_PATH not set. Source ESP-IDF first:"
+        echo "  source \$HOME/esp/esp-idf/export.sh"
+        exit 1
+    fi
+
+    if [ ! -d "build" ]; then
+        echo "Error: build/ not found. Build first:"
+        echo "  make esp32s3"
+        exit 1
+    fi
+
+    local flash_image="build/flash_image.bin"
+
+    echo ">>> Generating merged flash image ..."
+    (cd build && esptool.py --chip esp32s3 merge_bin \
+        --fill-flash-size 4MB \
+        -o flash_image.bin \
+        @flash_args)
+
+    local display_flag="-nographic"
+    if [ "$GRAPHICS" -eq 1 ]; then
+        display_flag=""
+    fi
+
+    local gdb_flags=""
+    if [ "$GDB_MODE" -eq 1 ]; then
+        gdb_flags="-S -s"
+        echo "Starting QEMU in debug mode (GDB port 1234)..."
+        echo "Connect: xtensa-esp32s3-elf-gdb build/rt-claw.elf -ex 'target remote :1234'"
+    fi
+
+    echo ">>> Starting QEMU (ESP32-S3, icount=3) ..."
+    exec qemu-system-xtensa $display_flag \
+        -icount 3 \
+        -machine esp32s3 \
+        -drive "file=$flash_image,if=mtd,format=raw" \
+        -global driver=timer.esp32s3.timg,property=wdt_disable,value=true \
+        -nic user,model=open_eth \
+        $gdb_flags
+}
+
 # ---- dispatch ----
 
 case "$MACHINE" in
     qemu-a9)  run_qemu_a9 ;;
     esp32c3)  run_esp32c3 ;;
+    esp32s3)  run_esp32s3 ;;
     *)
         echo "Error: unknown machine '$MACHINE'"
-        echo "Available: qemu-a9, esp32c3"
+        echo "Available: $MACHINES"
         exit 1
         ;;
 esac
