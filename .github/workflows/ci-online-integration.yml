@@ -10,6 +10,7 @@ on:
       - 'platform/esp32c3-qemu/**'
       - 'platform/esp32s3-qemu/**'
       - 'scripts/**'
+      - 'tests/**'
       - 'Makefile'
       - 'meson.build'
       - 'meson_options.txt'
@@ -100,7 +101,7 @@ jobs:
           : "${RTCLAW_AI_API_URL:=https://api.anthropic.com/v1/messages}"
           : "${RTCLAW_AI_MODEL:=claude-sonnet-4-5}"
           export RTCLAW_AI_API_URL RTCLAW_AI_MODEL
-          scripts/ci/qemu-smoke.sh "${{ matrix.target }}" online
+          tests/qemu/run-online.sh "${{ matrix.target }}"
 
       - name: Upload integration logs
         if: ${{ always() && steps.secrets.outputs.enabled == 'true' }}

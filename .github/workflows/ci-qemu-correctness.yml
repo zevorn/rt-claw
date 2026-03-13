@@ -11,6 +11,7 @@ on:
       - 'platform/esp32s3-qemu/**'
       - 'platform/vexpress-a9-qemu/**'
       - 'scripts/**'
+      - 'tests/**'
       - 'Makefile'
       - 'meson.build'
       - 'meson_options.txt'
@@ -24,6 +25,7 @@ on:
       - 'platform/esp32s3-qemu/**'
       - 'platform/vexpress-a9-qemu/**'
       - 'scripts/**'
+      - 'tests/**'
       - 'Makefile'
       - 'meson.build'
       - 'meson_options.txt'
@@ -82,7 +84,7 @@ jobs:
         run: scripts/ci/setup-esp-idf.sh "${{ matrix.esp_targets }}" "${{ matrix.qemu_tools }}"
 
       - name: Run QEMU smoke test
-        run: scripts/ci/qemu-smoke.sh "${{ matrix.target }}" smoke
+        run: tests/qemu/run-smoke.sh "${{ matrix.target }}"
 
       - name: Upload QEMU logs
         if: always()
