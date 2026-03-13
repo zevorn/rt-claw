@@ -26,6 +26,26 @@
 #include "feishu.h"
 #endif
 
+static void ai_boot_test_thread(void *arg)
+{
+    (void)arg;
+    char *buf = claw_malloc(512);
+    if (!buf) {
+        return;
+    }
+
+    claw_log_raw("  [boot] Testing AI connection ...\n");
+    if (ai_chat_raw("Report your status in one short sentence. "
+                    "Include your name, platform, and that "
+                    "you are online.",
+                    buf, 512) == CLAW_OK) {
+        claw_log_raw("  [boot] AI> %s\n", buf);
+    } else {
+        claw_log_raw("  [boot] AI test failed: %s\n", buf);
+    }
+    claw_free(buf);
+}
+
 int claw_init(void)
 {
     claw_log_raw("\n");
@@ -64,22 +84,8 @@ int claw_init(void)
     feishu_start();
 #endif
 
-    /* AI connectivity test */
-    {
-        char *buf = claw_malloc(512);
-        if (buf) {
-            claw_log_raw("  [boot] Testing AI connection ...\n");
-            if (ai_chat_raw("Report your status in one short sentence. "
-                            "Include your name, platform, and that "
-                            "you are online.",
-                            buf, 512) == CLAW_OK) {
-                claw_log_raw("  [boot] AI> %s\n", buf);
-            } else {
-                claw_log_raw("  [boot] AI test failed: %s\n", buf);
-            }
-            claw_free(buf);
-        }
-    }
+    /* AI connectivity test — run async to avoid blocking boot */
+    claw_thread_create("ai_test", ai_boot_test_thread, NULL, 4096, 20);
 
     return CLAW_OK;
 }
