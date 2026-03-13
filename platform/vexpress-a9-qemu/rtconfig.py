@@ -53,12 +53,12 @@ if PLATFORM == 'gcc':
 
     CXXFLAGS= DEVICE + CFPFLAGS + ' -Wall -fdiagnostics-color=always'
     CLAW_FEATURE_FLAGS = ' -DCLAW_PLATFORM_RTTHREAD' \
-                         ' -DCONFIG_CLAW_SWARM_ENABLE' \
-                         ' -DCONFIG_CLAW_SCHED_ENABLE' \
-                         ' -DCONFIG_CLAW_SKILL_ENABLE' \
-                         ' -DCONFIG_CLAW_TOOL_GPIO' \
-                         ' -DCONFIG_CLAW_TOOL_SYSTEM' \
-                         ' -DCONFIG_CLAW_TOOL_SCHED'
+                         ' -DCONFIG_RTCLAW_SWARM_ENABLE' \
+                         ' -DCONFIG_RTCLAW_SCHED_ENABLE' \
+                         ' -DCONFIG_RTCLAW_SKILL_ENABLE' \
+                         ' -DCONFIG_RTCLAW_TOOL_GPIO' \
+                         ' -DCONFIG_RTCLAW_TOOL_SYSTEM' \
+                         ' -DCONFIG_RTCLAW_TOOL_SCHED'
     CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -std=gnu99 -D_POSIX_SOURCE' + CLAW_FEATURE_FLAGS + ' -fdiagnostics-color=always'
     AFLAGS  = DEVICE + ' -c' + AFPFLAGS + ' -x assembler-with-cpp'
     LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T '+ LINK_SCRIPT + ' -lsupc++ -lgcc -static'

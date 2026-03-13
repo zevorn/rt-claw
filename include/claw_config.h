@@ -4,7 +4,7 @@
  *
  * Global compile-time configuration for rt-claw.
  *
- * Feature flags (CONFIG_CLAW_*_ENABLE, CONFIG_CLAW_TOOL_*) are NOT defined
+ * Feature flags (CONFIG_RTCLAW_*_ENABLE, CONFIG_RTCLAW_TOOL_*) are NOT defined
  * here.  Each platform enables them via its own build config:
  *   - ESP-IDF:   Kconfig -> sdkconfig -> compiler flags
  *   - RT-Thread:  CFLAGS in rtconfig.py
@@ -37,20 +37,28 @@
 #define CLAW_SCHED_THREAD_PRIO      10
 
 /* AI engine defaults — override per-platform via build flags */
-#ifndef CONFIG_CLAW_AI_API_KEY
-#define CONFIG_CLAW_AI_API_KEY      ""
+#ifndef CONFIG_RTCLAW_AI_API_KEY
+#define CONFIG_RTCLAW_AI_API_KEY      ""
 #endif
-#ifndef CONFIG_CLAW_AI_API_URL
-#define CONFIG_CLAW_AI_API_URL      "http://10.0.2.2:8888/v1/messages"
+#ifndef CONFIG_RTCLAW_AI_API_URL
+#define CONFIG_RTCLAW_AI_API_URL      "http://10.0.2.2:8888/v1/messages"
 #endif
-#ifndef CONFIG_CLAW_AI_MODEL
-#define CONFIG_CLAW_AI_MODEL        "claude-opus-4-6"
+#ifndef CONFIG_RTCLAW_AI_MODEL
+#define CONFIG_RTCLAW_AI_MODEL        "claude-opus-4-6"
 #endif
-#ifndef CONFIG_CLAW_AI_MAX_TOKENS
-#define CONFIG_CLAW_AI_MAX_TOKENS   1024
+#ifndef CONFIG_RTCLAW_AI_MAX_TOKENS
+#define CONFIG_RTCLAW_AI_MAX_TOKENS   1024
 #endif
-#ifndef CONFIG_CLAW_AI_MEMORY_MAX_MSGS
-#define CONFIG_CLAW_AI_MEMORY_MAX_MSGS 20
+#ifndef CONFIG_RTCLAW_AI_MEMORY_MAX_MSGS
+#define CONFIG_RTCLAW_AI_MEMORY_MAX_MSGS 20
+#endif
+
+/* Feishu (Lark) IM defaults — override via env or build flags */
+#ifndef CONFIG_RTCLAW_FEISHU_APP_ID
+#define CONFIG_RTCLAW_FEISHU_APP_ID   ""
+#endif
+#ifndef CONFIG_RTCLAW_FEISHU_APP_SECRET
+#define CONFIG_RTCLAW_FEISHU_APP_SECRET ""
 #endif
 
 #endif /* CLAW_CONFIG_H */

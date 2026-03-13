@@ -14,16 +14,16 @@
 
 #include <stdio.h>
 
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
 #include "core/scheduler.h"
 #endif
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
 #include "services/swarm/swarm.h"
 #endif
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
 #include "services/ai/ai_skill.h"
 #endif
-#ifdef CONFIG_CLAW_FEISHU_ENABLE
+#ifdef CONFIG_RTCLAW_FEISHU_ENABLE
 #include "services/im/feishu.h"
 #endif
 
@@ -36,22 +36,22 @@
  */
 static const claw_service_t s_services[] = {
     { "gateway",     gateway_init,      NULL,          NULL },
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
     { "sched",       sched_init,        NULL,          NULL },
 #endif
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
     { "swarm",       swarm_init,        swarm_start,   NULL },
 #endif
     { "net",         net_service_init,  NULL,          NULL },
-#ifdef CONFIG_CLAW_LCD_ENABLE
+#ifdef CONFIG_RTCLAW_LCD_ENABLE
     { "lcd",         claw_lcd_init,     NULL,          NULL },
 #endif
     { "tools",       claw_tools_init,   NULL,          NULL },
     { "ai_engine",   ai_engine_init,    NULL,          NULL },
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
     { "ai_skill",    ai_skill_init,     NULL,          NULL },
 #endif
-#ifdef CONFIG_CLAW_FEISHU_ENABLE
+#ifdef CONFIG_RTCLAW_FEISHU_ENABLE
     { "feishu",      feishu_init,       feishu_start,  NULL },
 #endif
 };

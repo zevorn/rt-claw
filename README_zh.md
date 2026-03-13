@@ -134,22 +134,41 @@ idf.py -C platform/esp32c3-qemu set-target esp32c3
 
 **4. 配置 API 密钥**
 
+方式 A — 环境变量（所有平台通用）：
+
+```bash
+export RTCLAW_AI_API_KEY='<你的 API 密钥>'
+export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+```
+
+方式 B — ESP-IDF menuconfig：
+
 ```bash
 idf.py -C platform/esp32c3-qemu menuconfig
 # 路径：Component config → rt-claw Configuration → AI Engine
-#   - LLM API Key:          <你的 API 密钥>
-#   - LLM API endpoint URL: https://api.anthropic.com/v1/messages
-#   - LLM model name:       claude-sonnet-4-6
+```
+
+方式 C — Meson 选项：
+
+```bash
+meson configure build/esp32c3-qemu -Dai_api_key='<你的 API 密钥>'
 ```
 
 **5.（可选）配置飞书机器人**
 
+方式 A — 环境变量：
+
+```bash
+export RTCLAW_FEISHU_APP_ID='<你的 App ID>'
+export RTCLAW_FEISHU_APP_SECRET='<你的 App Secret>'
+```
+
+方式 B — ESP-IDF menuconfig：
+
 ```bash
 idf.py -C platform/esp32c3-qemu menuconfig
 # 路径：Component config → rt-claw Configuration → Feishu (Lark) Integration
-#   - Enable Feishu IM integration: [*]
-#   - Feishu App ID:     <你的 App ID>
-#   - Feishu App Secret: <你的 App Secret>
 ```
 
 在[飞书开放平台](https://open.feishu.cn)创建应用，开启**事件订阅 → 长连接**模式，
@@ -174,13 +193,11 @@ idf.py -C platform/esp32c3-qemu -p /dev/ttyUSB0 flash monitor
 ```bash
 # 依赖：arm-none-eabi-gcc, qemu-system-arm, scons, meson, ninja
 
+# 通过环境变量配置（构建时读取）
+export RTCLAW_AI_API_KEY='<your-key>'
+
 # 统一构建
 make vexpress-a9-qemu
-
-# 配置 API 密钥（可选）
-meson configure build/vexpress-a9-qemu -Dai_api_key='<your-key>'
-meson compile -C build/vexpress-a9-qemu
-scons -C platform/vexpress-a9-qemu -j$(nproc)
 
 # 启动 API 代理（RT-Thread 无 TLS，代理转发 HTTP→HTTPS）
 python3 scripts/api-proxy.py https://api.anthropic.com &

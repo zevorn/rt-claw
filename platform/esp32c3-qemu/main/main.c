@@ -18,19 +18,19 @@
 #include "esp_log.h"
 #endif
 
-#ifdef CONFIG_CLAW_SHELL_ENABLE
+#ifdef CONFIG_RTCLAW_SHELL_ENABLE
 #include "services/ai/ai_memory.h"
 #include "driver/uart.h"
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
 #include "services/ai/ai_skill.h"
 #endif
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
 #include "core/scheduler.h"
 #endif
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
 #include "services/swarm/swarm.h"
 #endif
-#endif /* CONFIG_CLAW_SHELL_ENABLE */
+#endif /* CONFIG_RTCLAW_SHELL_ENABLE */
 
 #define TAG         "main"
 #define REPLY_SIZE  4096
@@ -45,7 +45,7 @@
 #define CLR_CYAN    "\033[0;36m"
 #define CLR_MAGENTA "\033[0;35m"
 
-#ifdef CONFIG_CLAW_SHELL_ENABLE
+#ifdef CONFIG_RTCLAW_SHELL_ENABLE
 
 static char *s_reply;
 
@@ -124,13 +124,13 @@ static void cmd_help(void)
     printf("  /log [on|off]            Toggle log output\n");
     printf("  /history                 Show conversation message count\n");
     printf("  /clear                   Clear conversation memory\n");
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
     printf("  /skill [name] [args]     List or execute a skill\n");
 #endif
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
     printf("  /sched                   List scheduled tasks\n");
 #endif
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
     printf("  /nodes                   Show swarm node table\n");
 #endif
     printf("  /remember <key> <val>    Save to long-term memory\n");
@@ -150,14 +150,14 @@ static void cmd_clear(void)
     printf("Conversation memory cleared.\n");
 }
 
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
 static void cmd_sched(void)
 {
     sched_list();
 }
 #endif
 
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
 static void cmd_skill(int argc, char **argv)
 {
     if (argc < 2) {
@@ -242,7 +242,7 @@ static void cmd_log(int argc, char **argv)
     printf("Log output: %s\n", claw_log_get_enabled() ? "ON" : "OFF");
 }
 
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
 static void cmd_nodes(void)
 {
     swarm_list_nodes();
@@ -269,11 +269,11 @@ static void dispatch_command(char *line)
         cmd_history();
     } else if (strcmp(cmd, "/clear") == 0) {
         cmd_clear();
-#ifdef CONFIG_CLAW_SCHED_ENABLE
+#ifdef CONFIG_RTCLAW_SCHED_ENABLE
     } else if (strcmp(cmd, "/sched") == 0) {
         cmd_sched();
 #endif
-#ifdef CONFIG_CLAW_SKILL_ENABLE
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
     } else if (strcmp(cmd, "/skill") == 0) {
         cmd_skill(argc, argv);
 #endif
@@ -283,7 +283,7 @@ static void dispatch_command(char *line)
         cmd_forget(argc, argv);
     } else if (strcmp(cmd, "/memories") == 0) {
         cmd_memories();
-#ifdef CONFIG_CLAW_SWARM_ENABLE
+#ifdef CONFIG_RTCLAW_SWARM_ENABLE
     } else if (strcmp(cmd, "/nodes") == 0) {
         cmd_nodes();
 #endif
@@ -388,7 +388,7 @@ static void shell_loop(void)
     }
 }
 
-#endif /* CONFIG_CLAW_SHELL_ENABLE */
+#endif /* CONFIG_RTCLAW_SHELL_ENABLE */
 
 void app_main(void)
 {
@@ -401,7 +401,7 @@ void app_main(void)
         nvs_flash_init();
     }
 
-#ifdef CONFIG_CLAW_SHELL_ENABLE
+#ifdef CONFIG_RTCLAW_SHELL_ENABLE
     /* Shell mode: suppress log by default; use /log on to enable */
     esp_log_level_set("*", ESP_LOG_NONE);
 #else
@@ -412,7 +412,7 @@ void app_main(void)
 
     claw_init();
 
-#ifdef CONFIG_CLAW_SHELL_ENABLE
+#ifdef CONFIG_RTCLAW_SHELL_ENABLE
     shell_loop();
 #endif
 

@@ -19,25 +19,25 @@ src_files = files(
 # Feature flags
 feature_defs = platform_defs
 if get_option('swarm')
-    feature_defs += '-DCONFIG_CLAW_SWARM_ENABLE'
+    feature_defs += '-DCONFIG_RTCLAW_SWARM_ENABLE'
 endif
 if get_option('sched')
-    feature_defs += '-DCONFIG_CLAW_SCHED_ENABLE'
+    feature_defs += '-DCONFIG_RTCLAW_SCHED_ENABLE'
 endif
 if get_option('skill')
-    feature_defs += '-DCONFIG_CLAW_SKILL_ENABLE'
+    feature_defs += '-DCONFIG_RTCLAW_SKILL_ENABLE'
 endif
 if get_option('tool_gpio')
-    feature_defs += '-DCONFIG_CLAW_TOOL_GPIO'
+    feature_defs += '-DCONFIG_RTCLAW_TOOL_GPIO'
 endif
 if get_option('tool_system')
-    feature_defs += '-DCONFIG_CLAW_TOOL_SYSTEM'
+    feature_defs += '-DCONFIG_RTCLAW_TOOL_SYSTEM'
 endif
 if get_option('tool_sched')
-    feature_defs += '-DCONFIG_CLAW_TOOL_SCHED'
+    feature_defs += '-DCONFIG_RTCLAW_TOOL_SCHED'
 endif
 if get_option('tool_net')
-    feature_defs += '-DCONFIG_CLAW_TOOL_NET'
+    feature_defs += '-DCONFIG_RTCLAW_TOOL_NET'
 endif
 
 rtclaw_lib = static_library('rtclaw', src_files,

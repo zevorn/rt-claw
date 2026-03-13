@@ -27,7 +27,7 @@ static int        s_count;
 
 static void register_builtins(void)
 {
-#ifdef CONFIG_CLAW_TOOL_LCD
+#ifdef CONFIG_RTCLAW_TOOL_LCD
     if (claw_lcd_available()) {
         ai_skill_register("draw",
             "Draw on LCD display",
@@ -35,7 +35,7 @@ static void register_builtins(void)
     }
 #endif
 
-#ifdef CONFIG_CLAW_TOOL_SYSTEM
+#ifdef CONFIG_RTCLAW_TOOL_SYSTEM
     ai_skill_register("monitor",
         "Check system health",
         "Check system health via system_info and memory_info tools, "

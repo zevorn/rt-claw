@@ -18,19 +18,19 @@ int claw_tools_init(void)
     memset(s_tools, 0, sizeof(s_tools));
     s_tool_count = 0;
 
-#ifdef CONFIG_CLAW_TOOL_GPIO
+#ifdef CONFIG_RTCLAW_TOOL_GPIO
     claw_tools_register_gpio();
 #endif
-#ifdef CONFIG_CLAW_TOOL_SYSTEM
+#ifdef CONFIG_RTCLAW_TOOL_SYSTEM
     claw_tools_register_system();
 #endif
-#ifdef CONFIG_CLAW_TOOL_LCD
+#ifdef CONFIG_RTCLAW_TOOL_LCD
     claw_tools_register_lcd();
 #endif
-#ifdef CONFIG_CLAW_TOOL_SCHED
+#ifdef CONFIG_RTCLAW_TOOL_SCHED
     claw_tools_register_sched();
 #endif
-#ifdef CONFIG_CLAW_TOOL_NET
+#ifdef CONFIG_RTCLAW_TOOL_NET
     claw_tools_register_net();
 #endif
 

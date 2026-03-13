@@ -138,22 +138,41 @@ LCD, skills, and boot-time AI connectivity test.
 
 **4. Configure API key**
 
+Option A — environment variables (all platforms):
+
+```bash
+export RTCLAW_AI_API_KEY='<your-api-key>'
+export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+```
+
+Option B — ESP-IDF menuconfig:
+
 ```bash
 idf.py -C platform/esp32c3-qemu menuconfig
 # Navigate: Component config → rt-claw Configuration → AI Engine
-#   - LLM API Key:          <your-api-key>
-#   - LLM API endpoint URL: https://api.anthropic.com/v1/messages
-#   - LLM model name:       claude-sonnet-4-6
+```
+
+Option C — Meson option:
+
+```bash
+meson configure build/esp32c3-qemu -Dai_api_key='<your-api-key>'
 ```
 
 **5. (Optional) Configure Feishu bot**
 
+Option A — environment variables:
+
+```bash
+export RTCLAW_FEISHU_APP_ID='<your-app-id>'
+export RTCLAW_FEISHU_APP_SECRET='<your-app-secret>'
+```
+
+Option B — ESP-IDF menuconfig:
+
 ```bash
 idf.py -C platform/esp32c3-qemu menuconfig
 # Navigate: Component config → rt-claw Configuration → Feishu (Lark) Integration
-#   - Enable Feishu IM integration: [*]
-#   - Feishu App ID:     <your-app-id>
-#   - Feishu App Secret: <your-app-secret>
 ```
 
 Create an app on [Feishu Open Platform](https://open.feishu.cn), enable
@@ -179,13 +198,11 @@ idf.py -C platform/esp32c3-qemu -p /dev/ttyUSB0 flash monitor
 ```bash
 # Prerequisites: arm-none-eabi-gcc, qemu-system-arm, scons, meson, ninja
 
+# Configure via env vars (picked up at build time)
+export RTCLAW_AI_API_KEY='<your-key>'
+
 # Unified build
 make vexpress-a9-qemu
-
-# Configure API key (optional)
-meson configure build/vexpress-a9-qemu -Dai_api_key='<your-key>'
-meson compile -C build/vexpress-a9-qemu
-scons -C platform/vexpress-a9-qemu -j$(nproc)
 
 # Start API proxy (RT-Thread has no TLS, proxy forwards HTTP->HTTPS)
 python3 scripts/api-proxy.py https://api.anthropic.com &

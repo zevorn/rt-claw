@@ -87,6 +87,33 @@ def main():
         '-D_POSIX_READER_WRITER_LOCKS',
     ])
 
+    """ Override CONFIG_* from environment variables.
+        Generate an override header included AFTER sdkconfig.h so that
+        #undef + #define cleanly replaces sdkconfig values. """
+    env_config_map = {
+        'RTCLAW_AI_API_KEY':       'CONFIG_RTCLAW_AI_API_KEY',
+        'RTCLAW_AI_API_URL':       'CONFIG_RTCLAW_AI_API_URL',
+        'RTCLAW_AI_MODEL':         'CONFIG_RTCLAW_AI_MODEL',
+        'RTCLAW_FEISHU_APP_ID':    'CONFIG_RTCLAW_FEISHU_APP_ID',
+        'RTCLAW_FEISHU_APP_SECRET': 'CONFIG_RTCLAW_FEISHU_APP_SECRET',
+    }
+    overrides = []
+    for env_name, macro in env_config_map.items():
+        val = os.environ.get(env_name, '')
+        if val:
+            overrides.append((macro, val))
+
+    if overrides:
+        override_h = os.path.join(ESP_BUILD_DIR, 'config', 'env_override.h')
+        os.makedirs(os.path.dirname(override_h), exist_ok=True)
+        with open(override_h, 'w') as oh:
+            oh.write('/* Auto-generated — env var overrides for sdkconfig */\n')
+            for macro, val in overrides:
+                oh.write(f'#undef {macro}\n')
+                oh.write(f'#define {macro} "{val}"\n')
+        c_args.extend(['-include', override_h])
+        print(f'  Env overrides: {override_h} ({len(overrides)} values)')
+
     """ Add ESP-IDF include paths as system includes """
     for inc in idf_includes:
         c_args.append(f'-isystem')

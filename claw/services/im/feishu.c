@@ -28,15 +28,15 @@
 
 #include "sdkconfig.h"
 
-#ifdef CONFIG_CLAW_FEISHU_ENABLE
+#ifdef CONFIG_RTCLAW_FEISHU_ENABLE
 
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_websocket_client.h"
 #include "cJSON.h"
 
-#define FEISHU_APP_ID       CONFIG_CLAW_FEISHU_APP_ID
-#define FEISHU_APP_SECRET   CONFIG_CLAW_FEISHU_APP_SECRET
+#define FEISHU_APP_ID       CONFIG_RTCLAW_FEISHU_APP_ID
+#define FEISHU_APP_SECRET   CONFIG_RTCLAW_FEISHU_APP_SECRET
 
 #define WS_EP_URL    "https://open.feishu.cn/callback/ws/endpoint"
 #define TOKEN_URL \
@@ -1058,12 +1058,12 @@ int feishu_start(void)
     return CLAW_OK;
 }
 
-#else /* !CONFIG_CLAW_FEISHU_ENABLE */
+#else /* !CONFIG_RTCLAW_FEISHU_ENABLE */
 
 int feishu_init(void)  { return 0; }
 int feishu_start(void) { return 0; }
 
-#endif /* CONFIG_CLAW_FEISHU_ENABLE */
+#endif /* CONFIG_RTCLAW_FEISHU_ENABLE */
 
 #else /* !CLAW_PLATFORM_ESP_IDF */
 

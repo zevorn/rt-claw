@@ -23,8 +23,8 @@
 #include "sdkconfig.h"
 #endif
 
-#ifdef CONFIG_CLAW_AI_MEMORY_MAX_MSGS
-#define MEM_MAX_MSGS    CONFIG_CLAW_AI_MEMORY_MAX_MSGS
+#ifdef CONFIG_RTCLAW_AI_MEMORY_MAX_MSGS
+#define MEM_MAX_MSGS    CONFIG_RTCLAW_AI_MEMORY_MAX_MSGS
 #else
 #define MEM_MAX_MSGS    20
 #endif

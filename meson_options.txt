@@ -19,8 +19,12 @@ option('tool_net', type: 'boolean', value: true,
     description: 'Enable network (HTTP) tool')
 
 option('ai_api_key', type: 'string', value: '',
-    description: 'AI API key (overrides CONFIG_CLAW_AI_API_KEY)')
+    description: 'AI API key (overrides CONFIG_RTCLAW_AI_API_KEY)')
 option('ai_api_url', type: 'string', value: '',
-    description: 'AI API URL (overrides CONFIG_CLAW_AI_API_URL)')
+    description: 'AI API URL (overrides CONFIG_RTCLAW_AI_API_URL)')
 option('ai_model', type: 'string', value: '',
-    description: 'AI model name (overrides CONFIG_CLAW_AI_MODEL)')
+    description: 'AI model name (overrides CONFIG_RTCLAW_AI_MODEL)')
+option('feishu_app_id', type: 'string', value: '',
+    description: 'Feishu App ID (overrides CONFIG_RTCLAW_FEISHU_APP_ID)')
+option('feishu_app_secret', type: 'string', value: '',
+    description: 'Feishu App Secret (overrides CONFIG_RTCLAW_FEISHU_APP_SECRET)')

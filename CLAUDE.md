@@ -29,6 +29,20 @@ meson setup build/esp32s3-qemu --cross-file platform/esp32s3-qemu/cross.ini
 meson compile -C build/esp32s3-qemu
 ```
 
+## Configuration (env vars)
+
+All platforms support environment variables for credentials (read at build time):
+
+```bash
+export RTCLAW_AI_API_KEY='sk-...'         # AI API key
+export RTCLAW_AI_API_URL='https://...'    # API endpoint
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'  # Model name
+export RTCLAW_FEISHU_APP_ID='cli_...'     # Feishu App ID
+export RTCLAW_FEISHU_APP_SECRET='...'     # Feishu App Secret
+```
+
+Priority: meson option (`-Dai_api_key=...`) > env var > ESP-IDF menuconfig/sdkconfig > `claw_config.h` default.
+
 ## Run
 
 ```bash

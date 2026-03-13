@@ -23,7 +23,7 @@ set(CLAW_REQUIRES
     esp_hw_support
 )
 
-if(CONFIG_CLAW_LCD_ENABLE)
+if(CONFIG_RTCLAW_LCD_ENABLE)
     list(APPEND CLAW_REQUIRES esp_lcd)
 endif()
 

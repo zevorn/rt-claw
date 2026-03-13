@@ -49,6 +49,7 @@ packages/
 
 # Auto-generated
 **/automac.h
+**/env_override.h
 sd.bin
 platform/esp32c3-qemu/cross.ini
 platform/esp32s3-qemu/cross.ini
