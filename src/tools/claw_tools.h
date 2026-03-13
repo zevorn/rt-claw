@@ -63,6 +63,14 @@ const claw_tool_t *claw_tool_find(const char *name);
 cJSON *claw_tools_to_json(void);
 
 /**
+ * Build cJSON array of tool definitions, excluding names that start
+ * with the given prefix.  Used by background AI calls (scheduled tasks,
+ * skills) to omit slow I/O tools like lcd_*.
+ * Caller must cJSON_Delete() the result.
+ */
+cJSON *claw_tools_to_json_exclude(const char *prefix);
+
+/**
  * Register built-in GPIO tools.
  */
 void claw_tools_register_gpio(void);

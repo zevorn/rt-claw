@@ -86,13 +86,26 @@ const claw_tool_t *claw_tool_find(const char *name)
 
 cJSON *claw_tools_to_json(void)
 {
+    return claw_tools_to_json_exclude(NULL);
+}
+
+cJSON *claw_tools_to_json_exclude(const char *prefix)
+{
     cJSON *arr = cJSON_CreateArray();
     if (!arr) {
         return NULL;
     }
 
+    size_t prefix_len = prefix ? strlen(prefix) : 0;
+
     for (int i = 0; i < s_tool_count; i++) {
         const claw_tool_t *t = &s_tools[i];
+
+        if (prefix_len > 0 &&
+            strncmp(t->name, prefix, prefix_len) == 0) {
+            continue;
+        }
+
         cJSON *tool = cJSON_CreateObject();
         cJSON_AddStringToObject(tool, "name", t->name);
         cJSON_AddStringToObject(tool, "description", t->description);

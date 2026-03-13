@@ -646,7 +646,11 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
         return CLAW_ERROR;
     }
 
-    claw_mutex_lock(s_api_lock, CLAW_WAIT_FOREVER);
+    if (claw_mutex_lock(s_api_lock, 5000) != CLAW_OK) {
+        snprintf(reply, reply_size,
+                 "[AI is busy processing another task, please retry]");
+        return CLAW_ERROR;
+    }
 
     ai_memory_add_message("user", user_msg);
 
@@ -704,7 +708,11 @@ int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
         return CLAW_ERROR;
     }
 
-    claw_mutex_lock(s_api_lock, CLAW_WAIT_FOREVER);
+    if (claw_mutex_lock(s_api_lock, 5000) != CLAW_OK) {
+        snprintf(reply, reply_size,
+                 "[AI is busy processing another task, please retry]");
+        return CLAW_ERROR;
+    }
 
     char *sys_prompt = build_system_prompt();
     if (!sys_prompt) {
@@ -718,7 +726,12 @@ int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
     cJSON_AddStringToObject(user_m, "content", prompt);
     cJSON_AddItemToArray(messages, user_m);
 
-    cJSON *tools = claw_tools_to_json();
+    /*
+     * Exclude LCD tools — raw calls run in background contexts
+     * (scheduled tasks, skills) where MMIO framebuffer writes
+     * would block for minutes on QEMU.
+     */
+    cJSON *tools = claw_tools_to_json_exclude("lcd_");
 
     int ret = ai_chat_with_messages(sys_prompt, messages, tools,
                                      reply, reply_size);
