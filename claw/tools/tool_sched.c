@@ -30,6 +30,7 @@
 #define WORKER_PRIO      11
 
 typedef struct {
+    char name[24];
     char prompt[SCHED_PROMPT_MAX];
     char reply[SCHED_REPLY_MAX];
     int  in_use;
@@ -82,11 +83,11 @@ static sched_ai_ctx_t *ctx_alloc(void)
     return NULL;
 }
 
-static void ctx_free_by_prompt(const char *prompt)
+static void ctx_free_by_name(const char *name)
 {
     for (int i = 0; i < SCHED_AI_MAX; i++) {
         if (s_ctx[i].in_use &&
-            strcmp(s_ctx[i].prompt, prompt) == 0) {
+            strcmp(s_ctx[i].name, name) == 0) {
             s_ctx[i].in_use = 0;
             return;
         }
@@ -256,6 +257,7 @@ static int tool_schedule_task(const cJSON *params, cJSON *result)
         return CLAW_ERROR;
     }
 
+    snprintf(ctx->name, sizeof(ctx->name), "%s", name);
     snprintf(ctx->prompt, SCHED_PROMPT_MAX, "%s",
              prompt_j->valuestring);
 
@@ -299,7 +301,7 @@ static int tool_remove_task(const cJSON *params, cJSON *result)
         return CLAW_ERROR;
     }
 
-    ctx_free_by_prompt(name);
+    ctx_free_by_name(name);
     cJSON_AddStringToObject(result, "status", "ok");
 
     char msg[64];
