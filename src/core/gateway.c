@@ -12,6 +12,7 @@ static claw_mq_t gw_mq;
 
 static void gateway_thread_entry(void *param)
 {
+    (void)param;
     struct gateway_msg msg;
 
     CLAW_LOGI(TAG, "started");
