@@ -98,7 +98,8 @@ static esp_err_t on_http_event(esp_http_client_event_t *evt)
 
     if (evt->event_id == HTTP_EVENT_ON_DATA && ctx) {
         size_t avail = ctx->size - ctx->len - 1;
-        size_t copy = (evt->data_len < avail) ? evt->data_len : avail;
+        size_t copy = ((size_t)evt->data_len < avail)
+                      ? (size_t)evt->data_len : avail;
         if (copy > 0) {
             memcpy(ctx->buf + ctx->len, evt->data, copy);
             ctx->len += copy;
