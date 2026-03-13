@@ -14,16 +14,17 @@ platform_defs = []
 platform_incs = []
 
 if osal_backend == 'rtthread'
+    rtthread_bsp = get_option('rtthread_bsp')
+    rtthread_cpuport = get_option('rtthread_cpuport')
     platform_defs += ['-D_POSIX_SOURCE', '-DCLAW_PLATFORM_RTTHREAD']
     rtt = project_root / 'vendor' / 'rt-thread'
     platform_incs += include_directories(
         'vendor/os/rt-thread/include',
-        'vendor/os/rt-thread/libcpu/arm/cortex-a',
+        rtthread_cpuport,
         'vendor/os/rt-thread/components/legacy',
         'vendor/os/rt-thread/components/finsh',
         'vendor/os/rt-thread/components/net/lwip/port',
         'vendor/os/rt-thread/components/net/lwip/port/netif',
-        'platform/vexpress-a9-qemu/drivers',
         'vendor/os/rt-thread/components/libc/compilers/common/include',
         'vendor/os/rt-thread/components/libc/compilers/newlib',
         'vendor/os/rt-thread/components/libc/posix/io/poll',
@@ -36,7 +37,8 @@ if osal_backend == 'rtthread'
         'vendor/os/rt-thread/components/net/netdev/include',
         'vendor/os/rt-thread/components/net/lwip/lwip-2.1.2/src/include',
         'vendor/os/rt-thread/components/net/lwip/lwip-2.1.2/src/include/netif',
-        'platform/vexpress-a9-qemu',
+        rtthread_bsp,
+        rtthread_bsp / 'drivers',
         is_system: true,
     )
 elif osal_backend == 'freertos'

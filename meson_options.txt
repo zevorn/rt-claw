@@ -2,6 +2,11 @@ option('osal', type: 'combo',
     choices: ['rtthread', 'freertos', 'none'],
     value: 'none',
     description: 'OSAL backend (none = library only, no OSAL compiled)')
+option('rtthread_bsp', type: 'string', value: 'platform/vexpress-a9-qemu',
+    description: 'RT-Thread BSP directory for rtconfig.h/lwipopts.h')
+option('rtthread_cpuport', type: 'string',
+    value: 'vendor/os/rt-thread/libcpu/arm/cortex-a',
+    description: 'RT-Thread cpuport include directory')
 
 option('swarm', type: 'boolean', value: true,
     description: 'Enable swarm service')

@@ -172,20 +172,39 @@ int net_service_init(void)
 
 #elif defined(CLAW_PLATFORM_RTTHREAD)
 
+#include "claw/platform_net.h"
+
 #include <rtthread.h>
 #include <netif/ethernetif.h>
 #include "lwip/ip4_addr.h"
-#include "drv_smc911x.h"
+
+const char *claw_platform_net_device_name(void) __attribute__((weak));
+void claw_platform_net_prepare(void) __attribute__((weak));
+
+const char *claw_platform_net_device_name(void)
+{
+    return "e0";
+}
+
+void claw_platform_net_prepare(void)
+{
+}
 
 static void net_link_thread(void *arg)
 {
     (void)arg;
-    smc911x_link_up();
+    claw_platform_net_prepare();
 }
 
 int net_service_init(void)
 {
-    CLAW_LOGI(TAG, "waiting for network interface ...");
+    const char *dev_name = claw_platform_net_device_name();
+
+    if (!dev_name || dev_name[0] == '\0') {
+        dev_name = "e0";
+    }
+
+    CLAW_LOGI(TAG, "waiting for network interface %s ...", dev_name);
 
     /*
      * RT-Thread + lwIP auto-initializes the NIC via INIT_APP_EXPORT.
@@ -196,9 +215,9 @@ int net_service_init(void)
     int timeout = 15;
 
     while (timeout > 0) {
-        dev = rt_device_find("e0");
+        dev = rt_device_find(dev_name);
         if (dev) {
-            CLAW_LOGI(TAG, "network interface e0 found");
+            CLAW_LOGI(TAG, "network interface %s found", dev_name);
             break;
         }
         claw_thread_delay_ms(1000);
@@ -206,7 +225,8 @@ int net_service_init(void)
     }
 
     if (!dev) {
-        CLAW_LOGW(TAG, "no network interface found (continuing without net)");
+        CLAW_LOGW(TAG, "no network interface %s found (continuing without net)",
+                  dev_name);
         return CLAW_OK;
     }
 
