@@ -27,7 +27,7 @@ case "$platform" in
         setup_esp_idf
         prepare_profile "$platform" feishu
         build_target "$platform"
-        run_esp_qemu "$platform" 240 0
+        run_esp_qemu "$platform" 420 0
         ;;
     *)
         echo "Unsupported online platform: ${platform}" >&2
@@ -37,7 +37,19 @@ esac
 
 "${SCRIPT_DIR}/assert-log.sh" "$log_file" \
     "Testing AI connection" \
-    "[boot] AI>" \
     "ready to receive messages"
 
-echo "Online log: ${log_file}"
+if grep -Fq "[boot] AI>" "$log_file"; then
+    echo "Online log: ${log_file}"
+    exit 0
+fi
+
+if grep -Fq "[boot] AI test failed:" "$log_file"; then
+    echo "AI boot test failed during online validation" >&2
+    tail -n 200 "$log_file" >&2
+    exit 1
+fi
+
+echo "Missing AI boot result in online validation log" >&2
+tail -n 200 "$log_file" >&2
+exit 1
