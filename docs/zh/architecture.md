@@ -13,10 +13,10 @@ rt-claw 将 OpenClaw 个人助手概念引入嵌入式 RTOS 设备。
 
 ## OSAL — 操作系统抽象层
 
-关键架构决策：所有 rt-claw 核心代码仅依赖 `claw_os.h`。
+关键架构决策：所有 rt-claw 核心代码仅依赖 `osal/claw_os.h`。
 
 ```
-claw/*.c  --->  #include "claw_os.h"  (编译时接口)
+claw/*.c  --->  #include "osal/claw_os.h"  (编译时接口)
                         |
           +-------------+-------------+
           |                           |

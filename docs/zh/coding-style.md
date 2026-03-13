@@ -109,10 +109,10 @@ if (ret == CLAW_OK) {    /* 好 — 读起来自然 */
 ## 头文件包含顺序
 
 ```c
-#include "claw_os.h"     /* OSAL 头文件优先（claw/ 中的源文件） */
+#include "osal/claw_os.h"  /* OSAL 头文件优先（claw/ 中的源文件） */
 #include <stdint.h>       /* 然后系统 / 标准头文件 */
 #include <string.h>
-#include "core/gateway.h" /* 最后项目头文件 */
+#include "claw/core/gateway.h" /* 最后项目头文件 */
 ```
 
 OSAL 实现文件（`osal/freertos/`、`osal/rtthread/`）中，
@@ -120,7 +120,7 @@ RTOS 头文件在 OSAL 头文件之前：
 
 ```c
 #include <rtthread.h>     /* RTOS header */
-#include "claw_os.h"      /* OSAL interface */
+#include "osal/claw_os.h"  /* OSAL interface */
 ```
 
 ## C 标准
@@ -177,7 +177,7 @@ RTOS 头文件在 OSAL 头文件之前：
 scripts/check-patch.sh
 
 # 检查指定文件
-scripts/check-patch.sh --file claw/core/gateway.c include/claw_os.h
+scripts/check-patch.sh --file claw/core/gateway.c include/osal/claw_os.h
 
 # 仅检查暂存区变更
 scripts/check-patch.sh --staged

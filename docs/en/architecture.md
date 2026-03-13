@@ -13,10 +13,10 @@ on FreeRTOS (ESP-IDF) and RT-Thread with zero modification.
 
 ## OSAL — OS Abstraction Layer
 
-The key architectural decision: all rt-claw core code depends only on `claw_os.h`.
+The key architectural decision: all rt-claw core code depends only on `osal/claw_os.h`.
 
 ```
-claw/*.c  --->  #include "claw_os.h"  (compile-time interface)
+claw/*.c  --->  #include "osal/claw_os.h"  (compile-time interface)
                         |
           +-------------+-------------+
           |                           |

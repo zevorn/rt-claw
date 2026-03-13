@@ -66,7 +66,7 @@ scenario without writing, compiling, or flashing embedded code again.
 |                rt-claw Application                |
 |  gateway | swarm | net | ai_engine | tools | lcd  |
 +---------------------------------------------------+
-|               claw_os.h  (OSAL API)               |
+|            osal/claw_os.h  (OSAL API)             |
 +-----------------+---------------------------------+
 | FreeRTOS (IDF)  |          RT-Thread              |
 +-----------------+---------------------------------+
@@ -299,13 +299,17 @@ rt-claw/
 ├── meson.build                  # Meson build definition (cross-compiles claw + osal)
 ├── meson_options.txt            # Meson build options (osal backend, features, AI config)
 ├── Makefile                     # Unified build entry (make esp32c3-qemu / make vexpress-a9-qemu)
-├── include/                     # Unified public headers
-│   ├── claw_os.h               #   OSAL API
-│   ├── claw_net.h              #   Network abstraction
-│   ├── claw_config.h           #   Project configuration
-│   ├── core/                   #   Gateway, scheduler, service interface
-│   ├── services/               #   AI, net, swarm, IM service headers
-│   └── tools/                  #   Tool Use framework headers
+├── include/                     # Unified public headers (aligned with claw/ and osal/)
+│   ├── claw/                   #   Public headers for claw/
+│   │   ├── claw_config.h       #     Project configuration
+│   │   ├── claw_init.h         #     Boot entry API
+│   │   ├── core/               #     Gateway, scheduler, service interface
+│   │   ├── services/           #     AI, net, swarm, IM service headers
+│   │   ├── shell/              #     Shared shell command headers
+│   │   └── tools/              #     Tool Use framework headers
+│   └── osal/                   #   Public headers for osal/
+│       ├── claw_os.h           #     OSAL API
+│       └── claw_net.h          #     Network abstraction
 ├── osal/                        # OS Abstraction Layer
 │   ├── freertos/                #   FreeRTOS implementation
 │   └── rtthread/                #   RT-Thread implementation
