@@ -32,6 +32,13 @@ Rules for all AI agents working on rt-claw. Read CLAUDE.md first for build, styl
 - Do not add any AI/Claude co-author lines.
 - One logical change per commit.
 
+## Secrets & Credentials
+
+- **Never commit** API keys, tokens, passwords, or any credentials to the repository.
+- Secrets belong in `sdkconfig` (gitignored), environment variables, or local config files excluded by `.gitignore`.
+- If a file contains secrets, ensure it is listed in `.gitignore` before staging.
+- When reviewing staged changes (`git diff --cached`), check for hardcoded keys — reject the commit if any are found.
+
 ## Do NOT
 
 - Add unit test frameworks, CI/CD pipelines, or automation without explicit request.
@@ -39,3 +46,4 @@ Rules for all AI agents working on rt-claw. Read CLAUDE.md first for build, styl
 - Use `//` comments in C code.
 - Create `.md` documentation files unless explicitly asked.
 - Guess or fabricate API behavior — read the source first.
+- Commit files containing plaintext secrets (API keys, app IDs, tokens, etc.).
