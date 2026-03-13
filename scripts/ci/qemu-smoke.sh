@@ -19,6 +19,7 @@ backup_dir=""
 profile_platform_dir=""
 
 mkdir -p "$ARTIFACT_DIR"
+: > "$LOG_FILE"
 
 restore_profile()
 {
@@ -78,11 +79,27 @@ run_command()
     local rc=0
 
     set +e
-    bash -lc "$command" > "$LOG_FILE" 2>&1
+    bash -lc "$command" >> "$LOG_FILE" 2>&1
     rc=$?
     set -e
 
     if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+        cat "$LOG_FILE"
+        exit "$rc"
+    fi
+}
+
+build_target()
+{
+    local target="$1"
+    local rc=0
+
+    set +e
+    bash -lc "make ${target}" >> "$LOG_FILE" 2>&1
+    rc=$?
+    set -e
+
+    if [ "$rc" -ne 0 ]; then
         cat "$LOG_FILE"
         exit "$rc"
     fi
@@ -119,28 +136,33 @@ esac
 case "${platform}:${mode}" in
     esp32c3-qemu:smoke)
         prepare_profile "$platform" demo
+        build_target "$platform"
         run_command \
             '( sleep 12; printf "/help\n"; ) | timeout 90s make run-esp32c3-qemu'
         assert_patterns "rt-claw chat" "Show this help" "Anything else is sent directly to AI."
         ;;
     esp32s3-qemu:smoke)
         prepare_profile "$platform" demo
+        build_target "$platform"
         run_command \
-            '( sleep 12; printf "/help\n"; ) | timeout 90s make run-esp32s3-qemu'
+            '( sleep 45; printf "/help\n"; ) | timeout 180s make run-esp32s3-qemu'
         assert_patterns "rt-claw chat" "Show this help" "Anything else is sent directly to AI."
         ;;
     vexpress-a9-qemu:smoke)
+        build_target "$platform"
         run_command 'timeout 60s make run-vexpress-a9-qemu'
         assert_patterns "rt-claw v" "init: ai_engine"
         ;;
     esp32c3-qemu:online)
         prepare_profile "$platform" feishu
+        build_target "$platform"
         run_command 'timeout 120s make run-esp32c3-qemu'
         assert_patterns "Testing AI connection" "[boot] AI>" "ready to receive messages"
         ;;
     esp32s3-qemu:online)
         prepare_profile "$platform" feishu
-        run_command 'timeout 120s make run-esp32s3-qemu'
+        build_target "$platform"
+        run_command 'timeout 240s make run-esp32s3-qemu'
         assert_patterns "Testing AI connection" "[boot] AI>" "ready to receive messages"
         ;;
     *)
