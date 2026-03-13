@@ -8,6 +8,7 @@
 #include "claw_os.h"
 #include "ai_skill.h"
 #include "ai_engine.h"
+#include "claw_tools.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -27,9 +28,11 @@ static int        s_count;
 static void register_builtins(void)
 {
 #ifdef CONFIG_CLAW_TOOL_LCD
-    ai_skill_register("draw",
-        "Draw on LCD display",
-        "Draw the following on the LCD display using lcd_* tools: %s");
+    if (claw_lcd_available()) {
+        ai_skill_register("draw",
+            "Draw on LCD display",
+            "Draw the following on the LCD display using lcd_* tools: %s");
+    }
 #endif
 
 #ifdef CONFIG_CLAW_TOOL_SYSTEM
