@@ -951,6 +951,7 @@ static int connect_ws(void)
     esp_websocket_client_config_t ws_cfg = {
         .uri = url_obj->valuestring,
         .buffer_size = 4096,
+        .task_stack = 8192,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
