@@ -290,6 +290,10 @@ static int pb_encode_header(uint8_t *buf, int cap,
     uint8_t inner[128];
     int ip = 0;
 
+    if (klen + vlen + 10 > (int)sizeof(inner)) {
+        return 0;
+    }
+
     ip += pb_encode_tag(inner + ip, 1, PB_LEN);
     ip += pb_encode_varint(inner + ip, klen);
     memcpy(inner + ip, k, klen);
