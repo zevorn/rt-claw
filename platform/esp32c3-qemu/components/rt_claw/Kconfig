@@ -26,6 +26,14 @@ menu "rt-claw Configuration"
             default 1024
             range 64 4096
 
+        config CLAW_AI_CONTEXT_SIZE
+            int "AI response buffer size (bytes)"
+            default 8192
+            range 4096 65536
+            help
+                Size of the HTTP response buffer for AI API calls.
+                Larger values allow longer AI responses but use more RAM.
+
         config CLAW_AI_MEMORY_MAX_MSGS
             int "Max conversation memory messages"
             default 20
