@@ -91,12 +91,16 @@ TimerHandle_t t = xTimerCreate(name, pdMS_TO_TICKS(period_ms),
 **建议：** 在 OSAL 中增加最小 HTTP 客户端 API，将传输逻辑下沉到
 `osal/` 目录。
 
-#### P2-2：Gateway 是空壳路由器
+#### P2-2：Gateway 是空壳路由器 ✅
 
 **问题：** `gateway.c` 收到消息只打日志，不做路由。无 handler 注册、
 无分发表、无订阅模式。服务之间直接调用，绕过 Gateway。
 
-**建议：** 简化为事件总线 + 可选 handler 回调。
+**已解决：** 采用方案 2 — Gateway 改为轻量事件总线，提供
+`gateway_subscribe(type, handler, arg)` 注册接口和按类型分发。
+移除未使用的 `src_channel` / `dst_channel` 字段。
+`CLAW_GW_MAX_HANDLERS` 移至 `claw_config.h` 支持平台级调整。
+静态 handler 表（无堆分配），适合资源受限设备。
 
 #### P2-3：无统一服务接口
 

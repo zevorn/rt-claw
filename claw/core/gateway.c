@@ -8,10 +8,6 @@
 
 #define TAG "gateway"
 
-#ifndef CLAW_GW_MAX_HANDLERS
-#define CLAW_GW_MAX_HANDLERS 8
-#endif
-
 typedef struct {
     enum gateway_msg_type type;
     gateway_handler_t     handler;
@@ -46,9 +42,7 @@ static void gateway_thread_entry(void *param)
     while (1) {
         if (claw_mq_recv(gw_mq, &msg, sizeof(msg),
                           CLAW_WAIT_FOREVER) == CLAW_OK) {
-            CLAW_LOGD(TAG, "msg type=%d src=%d dst=%d len=%d",
-                      msg.type, msg.src_channel,
-                      msg.dst_channel, msg.len);
+            CLAW_LOGD(TAG, "msg type=%d len=%d", msg.type, msg.len);
             dispatch(&msg);
         }
     }

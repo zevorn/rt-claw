@@ -21,8 +21,6 @@ enum gateway_msg_type {
 
 struct gateway_msg {
     enum gateway_msg_type type;
-    uint16_t src_channel;
-    uint16_t dst_channel;
     uint16_t len;
     uint8_t  payload[CLAW_GW_MSG_MAX_LEN];
 };

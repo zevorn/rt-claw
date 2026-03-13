@@ -118,20 +118,19 @@ int claw_http_post(const char *url, const char *headers[],
 
 Implement per-platform in `osal/freertos/` and `osal/rtthread/`.
 
-#### P2-2: Gateway Is a No-Op Router
+#### P2-2: Gateway Is a No-Op Router ✅
 
 **Problem:** `gateway.c` receives messages via its queue but only logs
 them. No handler registration, no dispatch table, no subscriber pattern.
 Services bypass it completely — `feishu.c` calls `ai_chat()` directly.
 The `dst_channel` field in `struct gateway_msg` is unused.
 
-**Options:**
-1. Implement channel handler registration + dispatch
-2. Simplify Gateway to an event bus / audit log
-3. Remove Gateway entirely until routing is actually needed
-
-**Recommendation:** Option 2 for now — rename to event bus, add optional
-handler callbacks, keep the audit trail.
+**Resolution:** Adopted Option 2 — gateway is now a lightweight event
+bus with `gateway_subscribe(type, handler, arg)` for handler registration
+and type-based dispatch. Removed unused `src_channel` / `dst_channel`
+fields. `CLAW_GW_MAX_HANDLERS` moved to `claw_config.h` for per-platform
+tuning. Static handler table (no heap allocation) suits
+resource-constrained devices.
 
 #### P2-3: No Unified Service Interface
 

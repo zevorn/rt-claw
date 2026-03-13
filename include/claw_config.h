@@ -18,6 +18,7 @@
 /* Gateway */
 #define CLAW_GW_MSG_POOL_SIZE   16
 #define CLAW_GW_MSG_MAX_LEN     256
+#define CLAW_GW_MAX_HANDLERS    8
 #define CLAW_GW_THREAD_STACK    4096
 #define CLAW_GW_THREAD_PRIO     15
 
