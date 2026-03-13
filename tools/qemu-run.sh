@@ -15,12 +15,16 @@
 #   -g           Enable GDB server (debug mode, port 1234)
 #   --graphics   Enable LCD display window (esp32c3 only)
 #   -h           Show this help
+#
+# Shell completion:
+#   eval "$(tools/qemu-run.sh --setup-completion)"
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+MACHINES="qemu-a9 esp32c3"
 MACHINE=""
 GDB_MODE=0
 GRAPHICS=0
@@ -30,11 +34,52 @@ usage() {
     exit "${1:-0}"
 }
 
+# ---- shell completion ----
+
+setup_completion() {
+    cat <<'COMP_EOF'
+# bash completion for qemu-run.sh
+_qemu_run() {
+    local cur prev opts machines
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    machines="qemu-a9 esp32c3"
+    opts="-m -g --graphics -h --help"
+
+    case "$prev" in
+        -m) COMPREPLY=( $(compgen -W "$machines" -- "$cur") ); return ;;
+    esac
+
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+    else
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+    fi
+}
+complete -F _qemu_run qemu-run.sh
+complete -F _qemu_run tools/qemu-run.sh
+complete -F _qemu_run ./tools/qemu-run.sh
+
+# zsh compatibility
+if [ -n "$ZSH_VERSION" ]; then
+    autoload -U +X bashcompinit 2>/dev/null && bashcompinit
+    complete -F _qemu_run qemu-run.sh
+    complete -F _qemu_run tools/qemu-run.sh
+    complete -F _qemu_run ./tools/qemu-run.sh
+fi
+COMP_EOF
+    exit 0
+}
+
+# ---- argument parsing ----
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -m)       MACHINE="$2"; shift 2 ;;
         -g)       GDB_MODE=1; shift ;;
         --graphics) GRAPHICS=1; shift ;;
+        --setup-completion) setup_completion ;;
         -h|--help) usage 0 ;;
         *)  echo "Unknown option: $1"; usage 1 ;;
     esac
