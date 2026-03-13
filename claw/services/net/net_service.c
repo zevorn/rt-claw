@@ -12,7 +12,12 @@
 
 #define TAG "net"
 
-#ifdef CLAW_PLATFORM_ESP_IDF
+#if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_ETH_ENABLED)
+/*
+ * QEMU Ethernet path — OpenCores MAC + hardcoded DNS.
+ * Real hardware uses WiFi (initialized in platform main.c),
+ * so this block is compiled only when Ethernet is enabled.
+ */
 
 #include "esp_netif.h"
 #include "esp_eth.h"
@@ -52,7 +57,8 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
     if (event_id == IP_EVENT_ETH_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         CLAW_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->ip_info.ip));
-        CLAW_LOGI(TAG, "netmask: " IPSTR, IP2STR(&event->ip_info.netmask));
+        CLAW_LOGI(TAG, "netmask: " IPSTR,
+                  IP2STR(&event->ip_info.netmask));
         CLAW_LOGI(TAG, "gateway: " IPSTR, IP2STR(&event->ip_info.gw));
         claw_sem_give(s_got_ip_sem);
     }
@@ -80,12 +86,13 @@ static int eth_init(void)
     esp_eth_config_t eth_cfg = ETH_DEFAULT_CONFIG(mac, phy);
     esp_eth_handle_t eth_handle = NULL;
     ESP_ERROR_CHECK(esp_eth_driver_install(&eth_cfg, &eth_handle));
-    ESP_ERROR_CHECK(esp_netif_attach(netif, esp_eth_new_netif_glue(eth_handle)));
+    ESP_ERROR_CHECK(esp_netif_attach(netif,
+                    esp_eth_new_netif_glue(eth_handle)));
 
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID,
-                                               &eth_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP,
-                                               &ip_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(
+        ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(
+        IP_EVENT, IP_EVENT_ETH_GOT_IP, &ip_event_handler, NULL));
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
     return CLAW_OK;
 }
@@ -108,9 +115,11 @@ static int http_get_test(const char *url)
     if (err == ESP_OK) {
         int status = esp_http_client_get_status_code(client);
         int len = esp_http_client_get_content_length(client);
-        CLAW_LOGI(TAG, "HTTP status=%d, content_length=%d", status, len);
+        CLAW_LOGI(TAG, "HTTP status=%d, content_length=%d",
+                  status, len);
     } else {
-        CLAW_LOGE(TAG, "HTTP GET failed: %s", esp_err_to_name(err));
+        CLAW_LOGE(TAG, "HTTP GET failed: %s",
+                  esp_err_to_name(err));
     }
 
     esp_http_client_cleanup(client);
@@ -147,6 +156,17 @@ int net_service_init(void)
     http_get_test("http://www.baidu.com");
 
     CLAW_LOGI(TAG, "network service ready");
+    return CLAW_OK;
+}
+
+#elif defined(CLAW_PLATFORM_ESP_IDF)
+/*
+ * ESP-IDF without Ethernet (WiFi-only, real hardware).
+ * Network is initialized by platform main.c (wifi_manager).
+ */
+int net_service_init(void)
+{
+    CLAW_LOGI(TAG, "network service ready (WiFi managed by platform)");
     return CLAW_OK;
 }
 

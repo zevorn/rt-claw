@@ -14,7 +14,7 @@
 
 #define TAG "tool_lcd"
 
-#ifdef CLAW_PLATFORM_ESP_IDF
+#if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_RTCLAW_LCD_ENABLE)
 
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_qemu_rgb.h"
