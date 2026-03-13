@@ -31,7 +31,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             "Content-Type": self.headers.get("Content-Type", "application/json"),
             "x-api-key": self.headers.get("x-api-key", ""),
             "anthropic-version": self.headers.get("anthropic-version", "2023-06-01"),
-            "User-Agent": "curl/8.0",
+            "User-Agent": "curl/8.18.0",
         }
 
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
