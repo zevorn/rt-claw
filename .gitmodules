@@ -1,6 +1,7 @@
 [submodule "vendor/rt-thread"]
 	path = vendor/rt-thread
 	url = https://github.com/RT-Thread/rt-thread.git
+	branch = v5.2.2
 [submodule "vendor/freertos"]
 	path = vendor/freertos
 	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
