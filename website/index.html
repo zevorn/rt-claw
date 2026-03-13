@@ -804,6 +804,13 @@
                 <div class="flash-panel-body">
                     <div class="flash-config">
                         <div class="flash-field">
+                            <label>Platform</label>
+                            <select id="flash-platform">
+                                <option value="esp32s3" selected>ESP32-S3 (WiFi + PSRAM)</option>
+                                <option value="esp32c3">ESP32-C3 (RISC-V)</option>
+                            </select>
+                        </div>
+                        <div class="flash-field">
                             <label>Baud Rate</label>
                             <select id="flash-baudrate">
                                 <option value="921600" selected>921600</option>
@@ -906,8 +913,10 @@
 <script type="module">
 import { ESPLoader, Transport } from "https://unpkg.com/esptool-js/bundle.js";
 
-const FIRMWARE_BASE = 'firmware/';
-const MANIFEST_URL = FIRMWARE_BASE + 'manifest.json';
+const PLATFORM_CHIPS = {
+    esp32s3: 'ESP32S3',
+    esp32c3: 'ESP32C3',
+};
 
 const flashBtn = document.getElementById('flash-btn');
 const flashEraseBtn = document.getElementById('flash-erase-btn');
@@ -968,41 +977,47 @@ window.flashFirmware = async function() {
             terminal: espTerminal,
         });
 
+        /* 2b. Detect chip */
         flashBtn.innerHTML = 'Detecting chip...';
         const chip = await flashLoader.main();
         espTerminal.writeLine('Detected: ' + chip);
 
-        /* 3. Fetch firmware manifest */
+        /* 3. Verify chip matches selected platform */
+        const platform = document.getElementById('flash-platform').value;
+        const expectedChip = PLATFORM_CHIPS[platform];
+        const chipNorm = chip.toUpperCase().replace(/[-_ ()]/g, '');
+        if (!chipNorm.includes(expectedChip)) {
+            throw new Error(
+                'Chip mismatch: detected ' + chip +
+                ' but selected platform is ' + platform.toUpperCase() +
+                '. Please select the correct platform and try again.'
+            );
+        }
+
+        /* 4. Fetch firmware manifest */
+        const firmwareBase = 'firmware/' + platform + '/';
         flashBtn.innerHTML = 'Downloading firmware...';
-        espTerminal.writeLine('Fetching firmware manifest...');
+        espTerminal.writeLine('Fetching firmware for ' + platform + '...');
 
         let manifest;
         try {
-            const resp = await fetch(MANIFEST_URL);
+            const resp = await fetch(firmwareBase + 'manifest.json');
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             manifest = await resp.json();
         } catch (e) {
             throw new Error(
-                'Firmware not available yet. CI has not built it.\n' +
-                'Build locally: make esp32s3 && make flash-esp32s3'
+                'Firmware not available for ' + platform + '.\n' +
+                'CI may not have built it yet.\n' +
+                'Build locally: make ' + platform + ' && make flash-' + platform
             );
         }
 
-        /* 4. Find matching build for detected chip */
-        const chipUpper = chip.toUpperCase().replace(/-/g, '');
-        const build = manifest.builds.find(function(b) {
-            return chipUpper.includes(b.chipFamily.toUpperCase().replace(/-/g, ''));
-        });
-        if (!build) {
-            throw new Error('No firmware for ' + chip + '. Available: ' +
-                manifest.builds.map(function(b) { return b.chipFamily; }).join(', '));
-        }
-
         /* 5. Download firmware parts */
+        const build = manifest.builds[0];
         const fileArray = [];
         for (const part of build.parts) {
             espTerminal.writeLine('Downloading ' + part.path + '...');
-            const partResp = await fetch(FIRMWARE_BASE + part.path);
+            const partResp = await fetch(firmwareBase + part.path);
             if (!partResp.ok) throw new Error('Failed to download ' + part.path);
             const data = new Uint8Array(await partResp.arrayBuffer());
             fileArray.push({ data: data, address: part.offset });
