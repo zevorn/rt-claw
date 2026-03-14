@@ -33,6 +33,7 @@
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_websocket_client.h"
+#include "esp_system.h"
 #include "cJSON.h"
 
 #define FEISHU_CRED_MAX     128
@@ -53,6 +54,7 @@ static char s_app_secret[FEISHU_CRED_MAX];
 #define WS_RECONNECT_MS     5000
 #define TOKEN_REFRESH_MS    (90 * 60 * 1000)
 #define HTTP_TIMEOUT_MS     15000
+#define TOKEN_MAX_RETRIES   30
 
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
@@ -502,15 +504,11 @@ static void get_auth_header(char *out, size_t size)
 /*  Send reply to Feishu via REST API                                  */
 /* ------------------------------------------------------------------ */
 
-static int send_reply(const char *chat_id, const char *text)
-{
-    char auth[TOKEN_BUF_SIZE + 16];
-    get_auth_header(auth, sizeof(auth));
+#define FEISHU_MAX_MSG_LEN  4000
 
-    /*
-     * Use interactive card with markdown element so that tables,
-     * code blocks, bold text etc. render correctly in Feishu.
-     */
+static int send_one_card(const char *chat_id, const char *auth,
+                         const char *text)
+{
     cJSON *card = cJSON_CreateObject();
     cJSON *elements = cJSON_AddArrayToObject(card, "elements");
     cJSON *md_elem = cJSON_CreateObject();
@@ -536,7 +534,8 @@ static int send_reply(const char *chat_id, const char *text)
     }
 
     char url[128];
-    snprintf(url, sizeof(url), "%s?receive_id_type=chat_id", MSG_SEND_URL);
+    snprintf(url, sizeof(url), "%s?receive_id_type=chat_id",
+             MSG_SEND_URL);
 
     char resp[1024];
     int ret = http_post_json(url, auth, body_str, resp, sizeof(resp));
@@ -546,6 +545,56 @@ static int send_reply(const char *chat_id, const char *text)
         CLAW_LOGE(TAG, "send reply failed: %.200s", resp);
     }
     return ret;
+}
+
+/*
+ * Send reply with auto-chunking.  Messages longer than
+ * FEISHU_MAX_MSG_LEN are split at the last newline before
+ * the limit to avoid breaking mid-sentence.
+ */
+static int send_reply(const char *chat_id, const char *text)
+{
+    char auth[TOKEN_BUF_SIZE + 16];
+    get_auth_header(auth, sizeof(auth));
+
+    size_t total = strlen(text);
+    if (total <= FEISHU_MAX_MSG_LEN) {
+        return send_one_card(chat_id, auth, text);
+    }
+
+    const char *p = text;
+    size_t remaining = total;
+    int part = 1;
+
+    while (remaining > 0) {
+        size_t chunk = remaining;
+        if (chunk > FEISHU_MAX_MSG_LEN) {
+            chunk = FEISHU_MAX_MSG_LEN;
+            /* Split at last newline to keep text clean */
+            for (size_t i = chunk; i > chunk / 2; i--) {
+                if (p[i] == '\n') {
+                    chunk = i + 1;
+                    break;
+                }
+            }
+        }
+
+        /* Build chunk with null terminator */
+        char saved = p[chunk];
+        ((char *)p)[chunk] = '\0';
+        CLAW_LOGI(TAG, "send part %d (%d bytes)", part, (int)chunk);
+        int ret = send_one_card(chat_id, auth, p);
+        ((char *)p)[chunk] = saved;
+
+        if (ret != CLAW_OK) {
+            return ret;
+        }
+
+        p += chunk;
+        remaining -= chunk;
+        part++;
+    }
+    return CLAW_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -579,6 +628,10 @@ static void add_reaction(const char *message_id, const char *emoji_type)
     }
 }
 
+/* Forward declaration — defined after outbound_thread */
+static void enqueue_reply(const char *chat_id, const char *msg_id,
+                          const char *text);
+
 /* ------------------------------------------------------------------ */
 /*  Scheduled-task reply callback — routes results back to Feishu      */
 /* ------------------------------------------------------------------ */
@@ -586,7 +639,7 @@ static void add_reaction(const char *message_id, const char *emoji_type)
 static void sched_reply_to_feishu(const char *target, const char *text)
 {
     if (target && target[0] != '\0' && text && text[0] != '\0') {
-        send_reply(target, text);
+        enqueue_reply(target, NULL, text);
     }
 }
 
@@ -613,7 +666,8 @@ typedef struct {
 /* Outbound: from AI worker to HTTP sender */
 typedef struct {
     char chat_id[CHAT_ID_MAX];
-    char *text;     /* heap-allocated, consumer frees */
+    char msg_id[MSG_ID_MAX]; /* original msg — for typing reaction */
+    char *text;              /* heap-allocated, consumer frees */
 } feishu_outbound_t;
 
 static claw_mq_t s_inbound_q;
@@ -639,13 +693,15 @@ static void outbound_thread(void *arg)
                   (unsigned long)claw_tick_ms(), msg.text,
                   strlen(msg.text) > 80 ? "..." : "");
         send_reply(msg.chat_id, msg.text);
-        CLAW_LOGI(TAG, "[%lu ms] >>> sent",
-                  (unsigned long)claw_tick_ms());
+        CLAW_LOGI(TAG, "[%lu ms] >>> sent (heap=%u)",
+                  (unsigned long)claw_tick_ms(),
+                  (unsigned)esp_get_free_heap_size());
         claw_free(msg.text);
     }
 }
 
-static void enqueue_reply(const char *chat_id, const char *text)
+static void enqueue_reply(const char *chat_id, const char *msg_id,
+                          const char *text)
 {
     size_t len = strlen(text);
     char *copy = claw_malloc(len + 1);
@@ -657,6 +713,8 @@ static void enqueue_reply(const char *chat_id, const char *text)
 
     feishu_outbound_t msg;
     snprintf(msg.chat_id, sizeof(msg.chat_id), "%s", chat_id);
+    snprintf(msg.msg_id, sizeof(msg.msg_id), "%s",
+             msg_id ? msg_id : "");
     msg.text = copy;
 
     if (claw_mq_send(s_outbound_q, &msg, sizeof(msg), 1000)
@@ -685,7 +743,7 @@ static void ai_worker_thread(void *arg)
             continue;
         }
 
-        /* React with "Typing" emoji */
+        /* Immediate typing indicator — before AI call */
         if (in.msg_id[0] != '\0') {
             add_reaction(in.msg_id, "Typing");
         }
@@ -701,19 +759,31 @@ static void ai_worker_thread(void *arg)
             " or structured text instead.");
         sched_set_reply_context(sched_reply_to_feishu, in.chat_id);
 
-        CLAW_LOGI(TAG, "[%lu ms] ... ai_chat: \"%s\"",
-                  (unsigned long)claw_tick_ms(), in.text);
+        CLAW_LOGI(TAG, "[%lu ms] ai_chat: \"%s\" (heap=%u)",
+                  (unsigned long)claw_tick_ms(), in.text,
+                  (unsigned)esp_get_free_heap_size());
         int ret = ai_chat(in.text, reply, REPLY_BUF_SIZE);
-        CLAW_LOGI(TAG, "[%lu ms] ... ai_chat ret=%d",
-                  (unsigned long)claw_tick_ms(), ret);
+        CLAW_LOGI(TAG, "[%lu ms] ai_chat ret=%d (heap=%u)",
+                  (unsigned long)claw_tick_ms(), ret,
+                  (unsigned)esp_get_free_heap_size());
 
         ai_set_channel_hint(NULL);
         sched_set_reply_context(NULL, NULL);
 
         if (ret == CLAW_OK && reply[0] != '\0') {
-            enqueue_reply(in.chat_id, reply);
+            enqueue_reply(in.chat_id, in.msg_id, reply);
         } else {
-            enqueue_reply(in.chat_id, "[rt-claw] AI engine error");
+            /*
+             * Forward the actual error message from ai_chat()
+             * so the user sees what went wrong (e.g. "API request
+             * failed", "no API key", "AI is busy").
+             */
+            if (reply[0] != '\0') {
+                enqueue_reply(in.chat_id, in.msg_id, reply);
+            } else {
+                enqueue_reply(in.chat_id, in.msg_id,
+                              "[rt-claw] AI engine error");
+            }
         }
     }
 }
@@ -987,6 +1057,8 @@ static int connect_ws(void)
         .buffer_size = 4096,
         .task_stack = 8192,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        .reconnect_timeout_ms = WS_RECONNECT_MS,
+        .network_timeout_ms = 10000,
     };
 
     s_ws_client = esp_websocket_client_init(&ws_cfg);
@@ -1019,7 +1091,15 @@ static void feishu_thread(void *arg)
     CLAW_LOGI(TAG, "service starting (app_id=%s)", s_app_id);
 
     /* Fetch tenant token first (needed for sending replies) */
+    int retries = 0;
+
     while (refresh_token() != CLAW_OK) {
+        retries++;
+        if (retries >= TOKEN_MAX_RETRIES) {
+            CLAW_LOGE(TAG, "token fetch failed after %d retries, "
+                      "giving up", retries);
+            return;
+        }
         CLAW_LOGW(TAG, "token fetch failed, retry in 10s");
         claw_thread_delay_ms(10000);
     }
