@@ -39,6 +39,7 @@ typedef struct __attribute__((packed)) {
     char     prompt[SCHED_PROMPT_MAX];
     uint32_t interval_s;
     int32_t  count;
+    char     reply_target[REPLY_TARGET_MAX];
 } sched_persist_t;
 
 typedef struct {
@@ -128,10 +129,18 @@ static void ai_worker_thread(void *arg)
         }
 
         /*
-         * Set channel hint so the agent knows where output goes.
-         * reply_fn set → messaging channel (Feishu, etc.),
-         * otherwise → serial console.
+         * Late-bind reply function for NVS-restored tasks.
+         * On boot, reply_fn is NULL because function pointers
+         * cannot be serialized.  If reply_target is set (from
+         * NVS) and the IM channel has registered a callback
+         * via sched_set_reply_context(), use it.
          */
+        if (!ctx->reply_fn && ctx->reply_target[0] != '\0') {
+            claw_mutex_lock(s_rctx_lock, CLAW_WAIT_FOREVER);
+            ctx->reply_fn = s_rctx_fn;
+            claw_mutex_unlock(s_rctx_lock);
+        }
+
         if (ctx->reply_fn) {
             ai_set_channel_hint(
                 " This is a scheduled background task."
@@ -267,6 +276,8 @@ static int sched_nvs_save(void)
         snprintf(rec.prompt, sizeof(rec.prompt), "%s", s_ctx[i].prompt);
         rec.interval_s = s_ctx[i].interval_s;
         rec.count = s_ctx[i].count;
+        snprintf(rec.reply_target, sizeof(rec.reply_target),
+                 "%s", s_ctx[i].reply_target);
 
         char key[8];
         snprintf(key, sizeof(key), "t%d", idx);
@@ -314,8 +325,9 @@ static void sched_nvs_restore(void)
 
         snprintf(ctx->name, sizeof(ctx->name), "%s", rec.name);
         snprintf(ctx->prompt, SCHED_PROMPT_MAX, "%s", rec.prompt);
-        ctx->reply_fn = NULL;
-        ctx->reply_target[0] = '\0';
+        ctx->reply_fn = NULL;  /* late-bound at execution time */
+        snprintf(ctx->reply_target, REPLY_TARGET_MAX,
+                 "%s", rec.reply_target);
 
         /* Restore with original interval or default 60s */
         uint32_t interval_s = rec.interval_s > 0 ? rec.interval_s : 60;
