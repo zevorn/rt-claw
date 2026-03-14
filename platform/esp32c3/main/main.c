@@ -44,11 +44,15 @@ static void find_completions(const char *prefix, int prefix_len,
 
 static void redraw_from(const char *buf, int len, int cursor)
 {
-    /* Print chars from cursor to end, then clear trailing garbage */
-    claw_console_write(buf + cursor, len - cursor);
+    int tail = len - cursor;
+
+    if (tail > 0) {
+        claw_console_write(buf + cursor, tail);
+    }
+    /* Clear one trailing char (covers deleted character) */
     claw_console_write(" ", 1);
     /* Move cursor back to correct position */
-    for (int i = 0; i < len - cursor + 1; i++) {
+    for (int i = 0; i < tail + 1; i++) {
         claw_console_write("\b", 1);
     }
 }
@@ -134,6 +138,23 @@ static int shell_read_line(char *buf, int size)
                 continue;
             }
 
+            /* Numeric sequences: ESC [ <digit> ~ */
+            if (seq[1] >= '0' && seq[1] <= '9') {
+                uint8_t tilde;
+                claw_console_read(&tilde, 1, 50);
+                if (seq[1] == '3' && tilde == '~') {
+                    /* Delete key */
+                    if (cursor < len) {
+                        memmove(buf + cursor, buf + cursor + 1,
+                                len - cursor - 1);
+                        len--;
+                        redraw_from(buf, len, cursor);
+                    }
+                }
+                /* Other numeric sequences silently consumed */
+                continue;
+            }
+
             switch (seq[1]) {
             case 'D': /* Left arrow */
                 if (cursor > 0) {
@@ -159,18 +180,6 @@ static int shell_read_line(char *buf, int size)
                     claw_console_write("\033[C", 3);
                 }
                 break;
-            case '3': {
-                /* Delete key: ESC [ 3 ~ */
-                uint8_t tilde;
-                claw_console_read(&tilde, 1, 50);
-                if (cursor < len) {
-                    memmove(buf + cursor, buf + cursor + 1,
-                            len - cursor - 1);
-                    len--;
-                    redraw_from(buf, len, cursor);
-                }
-                break;
-            }
             default:
                 break;
             }
