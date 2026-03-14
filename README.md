@@ -210,12 +210,12 @@ sudo pacman -S --needed libgcrypt glib2 pixman sdl2 libslirp \
 source $HOME/esp/esp-idf/export.sh
 
 # Pick one:
-cp platform/esp32c3-qemu/sdkconfig.defaults.demo \
-   platform/esp32c3-qemu/sdkconfig.defaults        # Quick Demo
-# cp platform/esp32c3-qemu/sdkconfig.defaults.feishu \
-#    platform/esp32c3-qemu/sdkconfig.defaults       # Feishu Bot
+cp platform/esp32c3/boards/qemu/sdkconfig.defaults.demo \
+   platform/esp32c3/boards/qemu/sdkconfig.defaults        # Quick Demo
+# cp platform/esp32c3/boards/qemu/sdkconfig.defaults.feishu \
+#    platform/esp32c3/boards/qemu/sdkconfig.defaults       # Feishu Bot
 
-idf.py -C platform/esp32c3-qemu set-target esp32c3
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu set-target esp32c3
 ```
 
 All presets include: AI engine, Tool Use, swarm heartbeat, scheduler,
@@ -234,14 +234,14 @@ export RTCLAW_AI_MODEL='claude-sonnet-4-6'
 Option B — ESP-IDF menuconfig:
 
 ```bash
-idf.py -C platform/esp32c3-qemu menuconfig
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
 # Navigate: Component config → rt-claw Configuration → AI Engine
 ```
 
 Option C — Meson option:
 
 ```bash
-meson configure build/esp32c3-qemu -Dai_api_key='<your-api-key>'
+meson configure build/esp32c3-qemu/meson -Dai_api_key='<your-api-key>'
 ```
 
 **5. (Optional) Configure Feishu bot**
@@ -256,7 +256,7 @@ export RTCLAW_FEISHU_APP_SECRET='<your-app-secret>'
 Option B — ESP-IDF menuconfig:
 
 ```bash
-idf.py -C platform/esp32c3-qemu menuconfig
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
 # Navigate: Component config → rt-claw Configuration → Feishu (Lark) Integration
 ```
 
@@ -269,13 +269,13 @@ on boot — no public IP required.
 
 ```bash
 # Unified build (recommended)
-make esp32c3-qemu
+make build-esp32c3-qemu
 
 # Run on QEMU
 make run-esp32c3-qemu
 
 # Or flash to real hardware (untested)
-idf.py -C platform/esp32c3-qemu -p /dev/ttyUSB0 flash monitor
+idf.py -C platform/esp32c3 -p /dev/ttyUSB0 flash monitor
 ```
 
 ### QEMU vexpress-a9 (RT-Thread)
@@ -302,7 +302,7 @@ make run-vexpress-a9-qemu
 rt-claw/
 ├── meson.build                  # Meson build definition (cross-compiles claw + osal)
 ├── meson_options.txt            # Meson build options (osal backend, features, AI config)
-├── Makefile                     # Unified build entry (make esp32c3-qemu / make vexpress-a9-qemu)
+├── Makefile                     # Unified build entry (make build-esp32c3-qemu / make vexpress-a9-qemu)
 ├── include/                     # Unified public headers (aligned with claw/ and osal/)
 │   ├── claw/                   #   Public headers for claw/
 │   │   ├── claw_config.h       #     Project configuration
@@ -324,10 +324,13 @@ rt-claw/
 │   ├── services/net/           #   Network service
 │   ├── services/swarm/         #   Swarm intelligence
 │   └── tools/                  #   Tool Use framework (GPIO, system, LCD)
+├── drivers/
+│   └── net/espressif/          # Shared Espressif WiFi driver
 ├── platform/
-│   ├── esp32c3-qemu/           # ESP32-C3 QEMU (ESP-IDF, Meson + CMake)
-│   ├── esp32s3-qemu/           # ESP32-S3 QEMU (ESP-IDF, Meson + CMake)
-│   └── vexpress-a9-qemu/      # RT-Thread BSP (Meson + SCons)
+│   ├── common/espressif/       # Shared Espressif board helpers (WiFi init)
+│   ├── esp32c3/                # ESP32-C3 unified platform (boards/qemu/devkit/xiaozhi/)
+│   ├── esp32s3/                # ESP32-S3 unified platform (boards/qemu/default/)
+│   └── vexpress-a9/            # RT-Thread BSP (Meson + SCons)
 ├── vendor/
 │   ├── lib/cjson/              # cJSON library
 │   └── os/

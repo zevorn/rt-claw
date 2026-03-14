@@ -71,7 +71,7 @@ LLM API 客户端，支持 Tool Use：
 
 ## 平台
 
-### ESP32-C3（platform/esp32c3-qemu/）
+### ESP32-C3（platform/esp32c3/）
 
 - CPU：RISC-V 32 位（rv32imc），160MHz
 - RAM：400KB SRAM（约 240KB 可用于应用）
@@ -81,7 +81,7 @@ LLM API 客户端，支持 Tool Use：
 - 构建：Meson（交叉编译）+ CMake/idf.py（链接 + 烧录）
 - QEMU：Espressif 分支（qemu-riscv32），仅 UART（无 WiFi 仿真）
 
-### vexpress-a9 QEMU（platform/vexpress-a9-qemu/）
+### vexpress-a9 QEMU（platform/vexpress-a9/）
 
 - CPU：ARM Cortex-A9（双核）
 - RTOS：RT-Thread

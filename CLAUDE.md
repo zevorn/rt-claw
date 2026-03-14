@@ -10,25 +10,26 @@ All outputs go to `build/<platform>/`.
 
 ```bash
 # Unified entry (from project root)
-make vexpress-a9-qemu                           # Meson + SCons → build/vexpress-a9-qemu/
-make esp32c3-qemu                      # Meson + idf.py (requires ESP-IDF)
-make esp32s3-qemu                      # Meson + idf.py (requires ESP-IDF)
-make esp32c3                           # Meson + idf.py (real hardware)
+make build-esp32c3-qemu                # ESP32-C3 QEMU (default)
+make build-esp32c3-xiaozhi             # ESP32-C3 xiaozhi 16MB board
+make build-esp32c3-devkit              # ESP32-C3 generic 4MB devkit
+make vexpress-a9-qemu                  # Meson + SCons → build/vexpress-a9-qemu/
+make build-esp32s3-qemu                # Meson + idf.py (requires ESP-IDF)
 make esp32s3                           # Meson + idf.py (real hardware)
 
 # Meson only (libraries)
-meson setup build/vexpress-a9-qemu --cross-file platform/vexpress-a9-qemu/cross.ini
+meson setup build/vexpress-a9-qemu --cross-file platform/vexpress-a9/cross.ini
 meson compile -C build/vexpress-a9-qemu
 
 # ESP32-C3: auto-generated cross.ini from ESP-IDF config
-python3 scripts/gen-esp32c3-cross.py
-meson setup build/esp32c3-qemu --cross-file platform/esp32c3-qemu/cross.ini
-meson compile -C build/esp32c3-qemu
+python3 scripts/gen-esp32c3-cross.py qemu
+meson setup build/esp32c3-qemu/meson --cross-file build/esp32c3-qemu/cross.ini
+meson compile -C build/esp32c3-qemu/meson
 
 # ESP32-S3: auto-generated cross.ini from ESP-IDF config
-python3 scripts/gen-esp32s3-cross.py
-meson setup build/esp32s3-qemu --cross-file platform/esp32s3-qemu/cross.ini
-meson compile -C build/esp32s3-qemu
+python3 scripts/gen-esp32s3-cross.py qemu
+meson setup build/esp32s3-qemu/meson --cross-file build/esp32s3-qemu/cross.ini
+meson compile -C build/esp32s3-qemu/meson
 ```
 
 ## Configuration (env vars)
@@ -52,19 +53,17 @@ Priority: meson option (`-Dai_api_key=...`) > env var > ESP-IDF menuconfig/sdkco
 make run-vexpress-a9-qemu              # build + launch QEMU
 make run-vexpress-a9-qemu GDB=1       # debug mode (GDB port 1234)
 
-# ESP32-C3 QEMU (requires ESP-IDF)
-make run-esp32c3-qemu                  # build + launch QEMU
-make run-esp32c3-qemu GRAPHICS=1      # with LCD display window
-make run-esp32c3-qemu GDB=1           # debug mode (GDB port 1234)
+# ESP32-C3 (board = qemu | devkit | xiaozhi)
+make run-esp32c3-qemu                 # build + launch QEMU simulator
+make run-esp32c3-qemu GDB=1          # debug mode (GDB port 1234)
+make run-esp32c3-qemu GRAPHICS=1     # with LCD display window
+make flash-esp32c3-xiaozhi            # build + flash xiaozhi
+make run-esp32c3-xiaozhi              # serial monitor (hardware)
 
-# ESP32-S3 QEMU (requires ESP-IDF)
+# ESP32-S3 (board = qemu | default)
 make run-esp32s3-qemu                  # build + launch QEMU
 make run-esp32s3-qemu GRAPHICS=1      # with LCD display window
 make run-esp32s3-qemu GDB=1           # debug mode (GDB port 1234)
-
-# ESP32-C3 real hardware
-make flash-esp32c3                     # build + flash firmware
-make monitor-esp32c3                   # serial monitor
 
 # ESP32-S3 real hardware
 make flash-esp32s3                     # build + flash firmware
@@ -90,7 +89,7 @@ Format: `subsystem: short description` (max 76 chars), body wrapped at 76 chars.
 
 Every commit **must** include `Signed-off-by` (`git commit -s`).
 
-Subsystem prefixes: `osal`, `gateway`, `swarm`, `net`, `ai`, `platform`, `build`, `docs`, `tools`, `scripts`, `main`.
+Subsystem prefixes: `osal`, `gateway`, `swarm`, `net`, `ai`, `platform`, `build`, `docs`, `tools`, `scripts`, `main`, `drivers`.
 
 ## Checks
 
@@ -124,7 +123,9 @@ No unit test framework yet. Verify changes by:
 | `meson.build` | Root Meson project (cross-compiles claw/ + osal/) |
 | `meson_options.txt` | Build options (osal backend, feature flags) |
 | `build/<platform>/` | Build outputs (gitignored) |
-| `include/` | Unified public headers (claw_os.h, claw_net.h, etc.) |
+| `include/` | Unified public headers (claw_os.h, claw_net.h, claw_board.h, etc.) |
+| `include/drivers/` | Driver public headers (mirror of drivers/ structure) |
+| `drivers/net/espressif/` | Espressif WiFi driver (shared across C3/S3) |
 | `osal/freertos/` | FreeRTOS OSAL implementation |
 | `osal/rtthread/` | RT-Thread OSAL implementation |
 | `vendor/lib/cjson/` | cJSON library |
@@ -135,11 +136,12 @@ No unit test framework yet. Verify changes by:
 | `claw/core/gateway.c` | Message router |
 | `claw/services/{ai,net,swarm}/` | Service modules |
 | `claw/tools/` | Tool Use framework |
-| `platform/esp32c3-qemu/` | ESP32-C3 QEMU ESP-IDF project + auto-gen cross-file |
-| `platform/esp32s3-qemu/` | ESP32-S3 QEMU ESP-IDF project + auto-gen cross-file |
-| `platform/esp32c3/` | ESP32-C3 real hardware (WiFi) |
-| `platform/esp32s3/` | ESP32-S3 real hardware (WiFi + PSRAM) |
-| `platform/vexpress-a9-qemu/` | RT-Thread BSP + Meson cross-file |
+| `platform/common/espressif/` | Shared Espressif board helpers (WiFi init + shell) |
+| `platform/esp32c3/` | ESP32-C3 unified ESP-IDF project (all boards) |
+| `platform/esp32c3/boards/` | Board-specific configs (qemu, devkit, xiaozhi) |
+| `platform/esp32s3/` | ESP32-S3 unified ESP-IDF project (all boards) |
+| `platform/esp32s3/boards/` | Board-specific configs (qemu, default) |
+| `platform/vexpress-a9/` | RT-Thread BSP + Meson cross-file |
 | `scripts/gen-esp32c3-cross.py` | Generate ESP32-C3 Meson cross-file |
 | `scripts/gen-esp32s3-cross.py` | Generate ESP32-S3 Meson cross-file |
 | `scripts/api-proxy.py` | HTTP→HTTPS proxy for QEMU without TLS |

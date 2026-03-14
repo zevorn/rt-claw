@@ -207,12 +207,12 @@ sudo pacman -S --needed libgcrypt glib2 pixman sdl2 libslirp \
 source $HOME/esp/esp-idf/export.sh
 
 # 选择一个预设：
-cp platform/esp32c3-qemu/sdkconfig.defaults.demo \
-   platform/esp32c3-qemu/sdkconfig.defaults        # 快速体验
-# cp platform/esp32c3-qemu/sdkconfig.defaults.feishu \
-#    platform/esp32c3-qemu/sdkconfig.defaults       # 飞书机器人
+cp platform/esp32c3/boards/qemu/sdkconfig.defaults.demo \
+   platform/esp32c3/boards/qemu/sdkconfig.defaults        # 快速体验
+# cp platform/esp32c3/boards/qemu/sdkconfig.defaults.feishu \
+#    platform/esp32c3/boards/qemu/sdkconfig.defaults       # 飞书机器人
 
-idf.py -C platform/esp32c3-qemu set-target esp32c3
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu set-target esp32c3
 ```
 
 所有预设均包含：AI 引擎、Tool Use、蜂群心跳、调度器、LCD、技能系统、上电 AI 连接测试。
@@ -230,14 +230,14 @@ export RTCLAW_AI_MODEL='claude-sonnet-4-6'
 方式 B — ESP-IDF menuconfig：
 
 ```bash
-idf.py -C platform/esp32c3-qemu menuconfig
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
 # 路径：Component config → rt-claw Configuration → AI Engine
 ```
 
 方式 C — Meson 选项：
 
 ```bash
-meson configure build/esp32c3-qemu -Dai_api_key='<你的 API 密钥>'
+meson configure build/esp32c3-qemu/meson -Dai_api_key='<你的 API 密钥>'
 ```
 
 **5.（可选）配置飞书机器人**
@@ -252,7 +252,7 @@ export RTCLAW_FEISHU_APP_SECRET='<你的 App Secret>'
 方式 B — ESP-IDF menuconfig：
 
 ```bash
-idf.py -C platform/esp32c3-qemu menuconfig
+idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
 # 路径：Component config → rt-claw Configuration → Feishu (Lark) Integration
 ```
 
@@ -264,13 +264,13 @@ idf.py -C platform/esp32c3-qemu menuconfig
 
 ```bash
 # 统一构建（推荐）
-make esp32c3-qemu
+make build-esp32c3-qemu
 
 # 在 QEMU 上运行
 make run-esp32c3-qemu
 
 # 或烧录到真实硬件（未测试）
-idf.py -C platform/esp32c3-qemu -p /dev/ttyUSB0 flash monitor
+idf.py -C platform/esp32c3 -p /dev/ttyUSB0 flash monitor
 ```
 
 ### QEMU vexpress-a9 (RT-Thread)
@@ -297,7 +297,7 @@ make run-vexpress-a9-qemu
 rt-claw/
 ├── meson.build                  # Meson 构建定义（交叉编译 claw + osal）
 ├── meson_options.txt            # Meson 构建选项（OSAL 后端、功能开关、AI 配置）
-├── Makefile                     # 统一构建入口（make esp32c3-qemu / make vexpress-a9-qemu）
+├── Makefile                     # 统一构建入口（make build-esp32c3-qemu / make vexpress-a9-qemu）
 ├── include/                     # 统一公共头文件（与 claw/、osal/ 目录对齐）
 │   ├── claw/                   #   claw/ 对应的公共头文件
 │   │   ├── claw_config.h       #     项目配置
@@ -319,10 +319,13 @@ rt-claw/
 │   ├── services/net/           #   网络服务
 │   ├── services/swarm/         #   蜂群智能
 │   └── tools/                  #   Tool Use 框架（GPIO、系统信息、LCD）
+├── drivers/
+│   └── net/espressif/          # 共享 Espressif WiFi 驱动
 ├── platform/
-│   ├── esp32c3-qemu/           # ESP32-C3 QEMU（ESP-IDF, Meson + CMake）
-│   ├── esp32s3-qemu/           # ESP32-S3 QEMU（ESP-IDF, Meson + CMake）
-│   └── vexpress-a9-qemu/      # RT-Thread BSP（Meson + SCons）
+│   ├── common/espressif/       # 共享 Espressif 板辅助（WiFi 初始化）
+│   ├── esp32c3/                # ESP32-C3 统一平台（boards/qemu/devkit/xiaozhi/）
+│   ├── esp32s3/                # ESP32-S3 统一平台（boards/qemu/default/）
+│   └── vexpress-a9/            # RT-Thread BSP（Meson + SCons）
 ├── vendor/
 │   ├── lib/cjson/              # cJSON 库
 │   └── os/

@@ -7,6 +7,7 @@ on:
       - 'claw/**'
       - 'osal/**'
       - 'include/**'
+      - 'drivers/**'
       - 'platform/**'
       - 'scripts/**'
       - 'Makefile'
@@ -18,6 +19,7 @@ on:
       - 'claw/**'
       - 'osal/**'
       - 'include/**'
+      - 'drivers/**'
       - 'platform/**'
       - 'scripts/**'
       - 'Makefile'
@@ -41,14 +43,19 @@ jobs:
       matrix:
         include:
           - target: vexpress-a9-qemu
+            make_target: vexpress-a9-qemu
             esp_targets: ""
-          - target: esp32c3
+          - target: esp32c3-devkit
+            make_target: build-esp32c3-devkit
             esp_targets: esp32c3
           - target: esp32c3-qemu
+            make_target: build-esp32c3-qemu
             esp_targets: esp32c3
           - target: esp32s3-qemu
+            make_target: build-esp32s3-qemu
             esp_targets: esp32s3
-          - target: esp32s3
+          - target: esp32s3-default
+            make_target: build-esp32s3-default
             esp_targets: esp32s3
 
     steps:
@@ -81,11 +88,11 @@ jobs:
         if: ${{ matrix.esp_targets != '' }}
         run: |
           source ~/esp/esp-idf/export.sh
-          make ${{ matrix.target }}
+          make ${{ matrix.make_target }}
 
       - name: Build RT-Thread target
         if: ${{ matrix.esp_targets == '' }}
-        run: make ${{ matrix.target }}
+        run: make ${{ matrix.make_target }}
 
       - name: Prepare artifact bundle
         run: |
@@ -98,42 +105,42 @@ jobs:
               cp build/vexpress-a9-qemu/rtthread.elf "${OUT_DIR}/"
               cp build/vexpress-a9-qemu/rtthread.map "${OUT_DIR}/"
               ;;
-            esp32c3)
-              cp platform/esp32c3/build/bootloader/bootloader.bin "${OUT_DIR}/"
-              cp platform/esp32c3/build/partition_table/partition-table.bin "${OUT_DIR}/"
-              cp platform/esp32c3/build/rt-claw.bin "${OUT_DIR}/firmware.bin"
-              cp platform/esp32c3/build/flash_args "${OUT_DIR}/"
+            esp32c3-devkit)
+              cp build/esp32c3-devkit/idf/bootloader/bootloader.bin "${OUT_DIR}/"
+              cp build/esp32c3-devkit/idf/partition_table/partition-table.bin "${OUT_DIR}/"
+              cp build/esp32c3-devkit/idf/rt-claw.bin "${OUT_DIR}/firmware.bin"
+              cp build/esp32c3-devkit/idf/flash_args "${OUT_DIR}/"
               ;;
             esp32c3-qemu)
               source ~/esp/esp-idf/export.sh
-              cp platform/esp32c3-qemu/build/bootloader/bootloader.bin "${OUT_DIR}/"
-              cp platform/esp32c3-qemu/build/partition_table/partition-table.bin "${OUT_DIR}/"
-              cp platform/esp32c3-qemu/build/rt-claw.bin "${OUT_DIR}/firmware.bin"
-              cp platform/esp32c3-qemu/build/flash_args "${OUT_DIR}/"
+              cp build/esp32c3-qemu/idf/bootloader/bootloader.bin "${OUT_DIR}/"
+              cp build/esp32c3-qemu/idf/partition_table/partition-table.bin "${OUT_DIR}/"
+              cp build/esp32c3-qemu/idf/rt-claw.bin "${OUT_DIR}/firmware.bin"
+              cp build/esp32c3-qemu/idf/flash_args "${OUT_DIR}/"
               (
-                cd platform/esp32c3-qemu/build
+                cd build/esp32c3-qemu/idf
                 esptool.py --chip esp32c3 merge_bin --fill-flash-size 4MB \
                   -o "${OUT_DIR}/flash_image.bin" @flash_args
               )
               ;;
             esp32s3-qemu)
               source ~/esp/esp-idf/export.sh
-              cp platform/esp32s3-qemu/build/bootloader/bootloader.bin "${OUT_DIR}/"
-              cp platform/esp32s3-qemu/build/partition_table/partition-table.bin "${OUT_DIR}/"
-              cp platform/esp32s3-qemu/build/rt-claw.bin "${OUT_DIR}/firmware.bin"
-              cp platform/esp32s3-qemu/build/flash_args "${OUT_DIR}/"
+              cp build/esp32s3-qemu/idf/bootloader/bootloader.bin "${OUT_DIR}/"
+              cp build/esp32s3-qemu/idf/partition_table/partition-table.bin "${OUT_DIR}/"
+              cp build/esp32s3-qemu/idf/rt-claw.bin "${OUT_DIR}/firmware.bin"
+              cp build/esp32s3-qemu/idf/flash_args "${OUT_DIR}/"
               (
-                cd platform/esp32s3-qemu/build
+                cd build/esp32s3-qemu/idf
                 esptool.py --chip esp32s3 merge_bin --fill-flash-size 4MB \
                   -o "${OUT_DIR}/flash_image.bin" @flash_args
               )
               ;;
-            esp32s3)
-              cp platform/esp32s3/build/bootloader/bootloader.bin "${OUT_DIR}/"
-              cp platform/esp32s3/build/partition_table/partition-table.bin "${OUT_DIR}/"
-              cp platform/esp32s3/build/ota_data_initial.bin "${OUT_DIR}/"
-              cp platform/esp32s3/build/rt-claw.bin "${OUT_DIR}/firmware.bin"
-              cp platform/esp32s3/build/flash_args "${OUT_DIR}/"
+            esp32s3-default)
+              cp build/esp32s3-default/idf/bootloader/bootloader.bin "${OUT_DIR}/"
+              cp build/esp32s3-default/idf/partition_table/partition-table.bin "${OUT_DIR}/"
+              cp build/esp32s3-default/idf/ota_data_initial.bin "${OUT_DIR}/"
+              cp build/esp32s3-default/idf/rt-claw.bin "${OUT_DIR}/firmware.bin"
+              cp build/esp32s3-default/idf/flash_args "${OUT_DIR}/"
               ;;
           esac
 

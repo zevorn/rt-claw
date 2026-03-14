@@ -4,15 +4,16 @@
 # Generate Meson cross-file for ESP32-C3 from ESP-IDF build config.
 #
 # Prerequisites:
-#   cd platform/<platform> && idf.py set-target esp32c3
+#   cd platform/esp32c3 && idf.py -B <build-dir> -DRTCLAW_BOARD=<board> set-target esp32c3
 #
 # Usage:
-#   python3 scripts/gen-esp32c3-cross.py [platform-dir]
+#   python3 scripts/gen-esp32c3-cross.py [board]
 #
-# platform-dir defaults to "esp32c3-qemu".
+# board defaults to "qemu".
 # Examples:
 #   python3 scripts/gen-esp32c3-cross.py              # QEMU
-#   python3 scripts/gen-esp32c3-cross.py esp32c3       # real hardware
+#   python3 scripts/gen-esp32c3-cross.py devkit        # devkit board
+#   python3 scripts/gen-esp32c3-cross.py xiaozhi       # xiaozhi board
 
 import json
 import os
@@ -21,19 +22,21 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-PLATFORM_DIR = sys.argv[1] if len(sys.argv) > 1 else 'esp32c3-qemu'
+BOARD = sys.argv[1] if len(sys.argv) > 1 else 'qemu'
 
-ESP_BUILD_DIR = os.path.join(PROJECT_ROOT, 'platform', PLATFORM_DIR, 'build')
-CC_JSON = os.path.join(ESP_BUILD_DIR, 'compile_commands.json')
-CROSS_INI = os.path.join(PROJECT_ROOT, 'platform', PLATFORM_DIR, 'cross.ini')
-SDKCONFIG_H = os.path.join(ESP_BUILD_DIR, 'config', 'sdkconfig.h')
+BOARD_BUILD_DIR = os.path.join(PROJECT_ROOT, 'build', f'esp32c3-{BOARD}')
+IDF_BUILD_DIR = os.path.join(BOARD_BUILD_DIR, 'idf')
+CC_JSON = os.path.join(IDF_BUILD_DIR, 'compile_commands.json')
+CROSS_INI = os.path.join(BOARD_BUILD_DIR, 'cross.ini')
+SDKCONFIG_H = os.path.join(IDF_BUILD_DIR, 'config', 'sdkconfig.h')
 
 
 def main():
     if not os.path.exists(CC_JSON):
         print(f'Error: {CC_JSON} not found.', file=sys.stderr)
         print('Run first:', file=sys.stderr)
-        print(f'  cd platform/{PLATFORM_DIR} && idf.py set-target esp32c3',
+        print(f'  cd platform/esp32c3 && idf.py -B {IDF_BUILD_DIR} '
+              f'-DRTCLAW_BOARD={BOARD} set-target esp32c3',
               file=sys.stderr)
         return 1
 
@@ -112,7 +115,7 @@ def main():
             overrides.append((macro, val))
 
     if overrides:
-        override_h = os.path.join(ESP_BUILD_DIR, 'config', 'env_override.h')
+        override_h = os.path.join(IDF_BUILD_DIR, 'config', 'env_override.h')
         os.makedirs(os.path.dirname(override_h), exist_ok=True)
         with open(override_h, 'w') as oh:
             oh.write('/* Auto-generated — env var overrides for sdkconfig */\n')
@@ -128,8 +131,10 @@ def main():
         c_args.append(inc)
 
     """ Write cross.ini """
+    os.makedirs(os.path.dirname(CROSS_INI), exist_ok=True)
     with open(CROSS_INI, 'w') as f:
         f.write('# Auto-generated Meson cross-file for ESP32-C3 (ESP-IDF)\n')
+        f.write(f'# Board: {BOARD}\n')
         f.write('# Regenerate: python3 scripts/gen-esp32c3-cross.py\n')
         f.write('# DO NOT edit manually or commit to git.\n\n')
 
@@ -164,6 +169,7 @@ def main():
         f.write('tool_sched = false\n')
 
     print(f'Generated: {CROSS_INI}')
+    print(f'  Board:     {BOARD}')
     print(f'  Compiler:  {compiler}')
     print(f'  Includes:  {len(idf_includes)} ESP-IDF paths')
     print(f'  sdkconfig: {SDKCONFIG_H}')

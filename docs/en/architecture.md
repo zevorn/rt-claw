@@ -72,7 +72,7 @@ LLM API client with Tool Use support:
 
 ## Platforms
 
-### ESP32-C3 (platform/esp32c3-qemu/)
+### ESP32-C3 (platform/esp32c3/)
 
 - CPU: RISC-V 32-bit (rv32imc), 160MHz
 - RAM: 400KB SRAM (~240KB available for app)
@@ -82,7 +82,7 @@ LLM API client with Tool Use support:
 - Build: Meson (cross-compile) + CMake/idf.py (link + flash)
 - QEMU: Espressif fork (qemu-riscv32), UART only (no WiFi sim)
 
-### vexpress-a9 QEMU (platform/vexpress-a9-qemu/)
+### vexpress-a9 QEMU (platform/vexpress-a9/)
 
 - CPU: ARM Cortex-A9 (dual-core)
 - RTOS: RT-Thread

@@ -15,29 +15,28 @@ GRAPHICS ?= 0
 help:
 	@echo "rt-claw build system"
 	@echo ""
-	@echo "Build (QEMU):"
-	@echo "  make vexpress-a9-qemu      Build for QEMU vexpress-a9 (RT-Thread)"
-	@echo "  make esp32c3-qemu          Build for ESP32-C3 QEMU (ESP-IDF)"
-	@echo "  make esp32s3-qemu          Build for ESP32-S3 QEMU (ESP-IDF)"
+	@echo "ESP32-C3 (board = qemu | devkit | xiaozhi):"
+	@echo "  make build-esp32c3-qemu         Build for QEMU (default)"
+	@echo "  make build-esp32c3-devkit    Build for devkit (4MB)"
+	@echo "  make build-esp32c3-xiaozhi      Build for xiaozhi (16MB)"
+	@echo "  make run-esp32c3-qemu           Build + launch QEMU simulator"
+	@echo "  make run-esp32c3-<board>         Serial monitor (hardware)"
+	@echo "  make flash-esp32c3-<board>       Build + flash (hardware)"
 	@echo ""
-	@echo "Build (real hardware):"
-	@echo "  make esp32c3               Build for ESP32-C3 real hardware"
-	@echo "  make esp32s3               Build for ESP32-S3 real hardware"
+	@echo "ESP32-S3 (board = qemu | default):"
+	@echo "  make build-esp32s3-qemu         Build ESP32-S3 QEMU"
+	@echo "  make run-esp32s3-qemu           Build + launch ESP32-S3 QEMU"
+	@echo "  make build-esp32s3              Build ESP32-S3 real hardware"
+	@echo "  make flash-esp32s3              Flash ESP32-S3"
+	@echo "  make monitor-esp32s3            Serial monitor ESP32-S3"
 	@echo ""
-	@echo "Run QEMU (build + launch):"
-	@echo "  make run-vexpress-a9-qemu"
-	@echo "  make run-esp32c3-qemu"
-	@echo "  make run-esp32s3-qemu"
+	@echo "vexpress-a9 (RT-Thread):"
+	@echo "  make vexpress-a9-qemu           Build QEMU vexpress-a9"
+	@echo "  make run-vexpress-a9-qemu       Build + launch vexpress-a9"
 	@echo ""
-	@echo "Flash + monitor (real hardware):"
-	@echo "  make flash-esp32c3         Flash firmware to ESP32-C3"
-	@echo "  make monitor-esp32c3       Serial monitor for ESP32-C3"
-	@echo "  make flash-esp32s3         Flash firmware to ESP32-S3"
-	@echo "  make monitor-esp32s3       Serial monitor for ESP32-S3"
-	@echo ""
-	@echo "Run options (pass as variables):"
-	@echo "  make run-esp32c3-qemu GDB=1        Debug mode (GDB port 1234)"
-	@echo "  make run-esp32c3-qemu GRAPHICS=1   LCD display window"
+	@echo "Options:"
+	@echo "  GDB=1       Debug mode (GDB port 1234)"
+	@echo "  GRAPHICS=1  LCD display window (QEMU only)"
 	@echo ""
 	@echo "Clean:"
 	@echo "  make clean                 Clean all build artifacts"
@@ -48,8 +47,8 @@ help:
 
 # --- QEMU vexpress-a9 (RT-Thread) ---
 MESON_BUILDDIR_A9 := $(BUILD_DIR)/vexpress-a9-qemu
-CROSS_FILE_A9     := platform/vexpress-a9-qemu/cross.ini
-A9_PLATFORM       := platform/vexpress-a9-qemu
+CROSS_FILE_A9     := platform/vexpress-a9/cross.ini
+A9_PLATFORM       := platform/vexpress-a9
 
 .PHONY: vexpress-a9-qemu
 vexpress-a9-qemu:
@@ -83,184 +82,219 @@ run-vexpress-a9-qemu: vexpress-a9-qemu
 		-nic user,model=lan9118 \
 		$(if $(filter 1,$(GDB)),-S -s)
 
-# --- ESP32-C3 QEMU (ESP-IDF) ---
+# --- ESP32-C3 unified targets ---
 # Prerequisite: source $$HOME/esp/esp-idf/export.sh
-MESON_BUILDDIR_C3 := $(BUILD_DIR)/esp32c3-qemu
-CROSS_FILE_C3     := platform/esp32c3-qemu/cross.ini
-ESP_C3_PLATFORM   := platform/esp32c3-qemu
+#
+# All boards share platform/esp32c3/ as the single ESP-IDF project.
+# Board-specific config lives in platform/esp32c3/boards/<board>/.
+#
+# Each board gets its own build directory:
+#   build/esp32c3-<board>/
+#     meson/       Meson output (libclaw.a, libosal.a)
+#     idf/         ESP-IDF output (firmware, sdkconfig, etc.)
+#     cross.ini    Auto-generated Meson cross-file
+#
+# Boards:
+#   qemu       QEMU virtual devkit (default, 4MB, OpenCores Ethernet)
+#   devkit     Generic 4MB devkit (WiFi)
+#   xiaozhi    XiaoZhi 16MB board (WiFi, OTA)
+#
+ESP_C3_DIR := platform/esp32c3
 
-.PHONY: esp32c3-qemu
-esp32c3-qemu:
-	@if [ ! -f $(ESP_C3_PLATFORM)/sdkconfig ]; then \
-		rm -rf $(ESP_C3_PLATFORM)/build; \
-		cd $(ESP_C3_PLATFORM) && idf.py set-target esp32c3; \
-	fi
-	@if [ ! -f $(ESP_C3_PLATFORM)/build/compile_commands.json ]; then \
-		cd $(ESP_C3_PLATFORM) && idf.py reconfigure; \
-	fi
-	python3 scripts/gen-esp32c3-cross.py
-	@if [ ! -f $(MESON_BUILDDIR_C3)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_C3) --cross-file $(CROSS_FILE_C3); \
-	fi
-	meson compile -C $(MESON_BUILDDIR_C3)
-	cd $(ESP_C3_PLATFORM) && idf.py reconfigure && idf.py build
-	@echo "Output: $(ESP_C3_PLATFORM)/build/rt-claw.bin"
+# Default aliases
+.PHONY: build-esp32c3 run-esp32c3
+build-esp32c3: build-esp32c3-qemu
+run-esp32c3: run-esp32c3-qemu
+
+# ---- All boards: build ----
+
+.PHONY: build-esp32c3-qemu build-esp32c3-devkit build-esp32c3-xiaozhi
+build-esp32c3-qemu:    C3_BOARD = qemu
+build-esp32c3-qemu:    _c3-build
+build-esp32c3-devkit:  C3_BOARD = devkit
+build-esp32c3-devkit:  _c3-build
+build-esp32c3-xiaozhi: C3_BOARD = xiaozhi
+build-esp32c3-xiaozhi: _c3-build
+
+# ---- QEMU: run (build + launch simulator) ----
 
 .PHONY: run-esp32c3-qemu
-run-esp32c3-qemu: esp32c3-qemu
+run-esp32c3-qemu: build-esp32c3-qemu
 	@echo ">>> Generating merged flash image ..."
-	cd $(ESP_C3_PLATFORM)/build && esptool.py --chip esp32c3 merge_bin \
+	cd $(BUILD_DIR)/esp32c3-qemu/idf && esptool.py --chip esp32c3 merge_bin \
 		--fill-flash-size 4MB -o flash_image.bin @flash_args
 	@if [ "$(GDB)" = "1" ]; then \
 		echo "Starting QEMU in debug mode (GDB port 1234)..."; \
-		echo "Connect: riscv32-esp-elf-gdb $(ESP_C3_PLATFORM)/build/rt-claw.elf -ex 'target remote :1234'"; \
+		echo "Connect: riscv32-esp-elf-gdb $(BUILD_DIR)/esp32c3-qemu/idf/rt-claw.elf -ex 'target remote :1234'"; \
 	fi
 	@echo ">>> Starting QEMU (ESP32-C3, icount=1) ..."
 	qemu-system-riscv32 \
 		$(if $(filter 1,$(GRAPHICS)),,-nographic) \
 		-icount 1 \
 		-machine esp32c3 \
-		-drive file=$(ESP_C3_PLATFORM)/build/flash_image.bin,if=mtd,format=raw \
+		-drive file=$(BUILD_DIR)/esp32c3-qemu/idf/flash_image.bin,if=mtd,format=raw \
 		-global driver=timer.esp32c3.timg,property=wdt_disable,value=true \
 		-nic user,model=open_eth \
 		$(if $(filter 1,$(GDB)),-S -s)
 
-# --- ESP32-S3 QEMU (ESP-IDF) ---
+# ---- QEMU: flash (not supported) ----
+
+.PHONY: flash-esp32c3-qemu
+flash-esp32c3-qemu:
+	@echo "Error: flash is not supported for QEMU. Use 'make run-esp32c3-qemu' instead."
+	@exit 1
+
+# ---- Hardware boards: flash + run ----
+
+.PHONY: flash-esp32c3-devkit flash-esp32c3-xiaozhi
+flash-esp32c3-devkit:  build-esp32c3-devkit
+	cd $(ESP_C3_DIR) && idf.py -B $(BUILD_DIR)/esp32c3-devkit/idf flash
+flash-esp32c3-xiaozhi: build-esp32c3-xiaozhi
+	cd $(ESP_C3_DIR) && idf.py -B $(BUILD_DIR)/esp32c3-xiaozhi/idf flash
+
+.PHONY: run-esp32c3-devkit run-esp32c3-xiaozhi
+run-esp32c3-devkit:
+	cd $(ESP_C3_DIR) && idf.py -B $(BUILD_DIR)/esp32c3-devkit/idf monitor
+run-esp32c3-xiaozhi:
+	cd $(ESP_C3_DIR) && idf.py -B $(BUILD_DIR)/esp32c3-xiaozhi/idf monitor
+
+# ---- Internal: shared build logic for all ESP32-C3 boards ----
+
+.PHONY: _c3-build
+_c3-build:
+	@if [ ! -f $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf/build.ninja ]; then \
+		cd $(ESP_C3_DIR) && idf.py \
+			-B $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(C3_BOARD) set-target esp32c3; \
+	fi
+	@if [ ! -f $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf/compile_commands.json ]; then \
+		cd $(ESP_C3_DIR) && idf.py \
+			-B $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(C3_BOARD) reconfigure; \
+	fi
+	python3 scripts/gen-esp32c3-cross.py $(C3_BOARD)
+	@if [ ! -f $(BUILD_DIR)/esp32c3-$(C3_BOARD)/meson/build.ninja ]; then \
+		meson setup $(BUILD_DIR)/esp32c3-$(C3_BOARD)/meson \
+			--cross-file $(BUILD_DIR)/esp32c3-$(C3_BOARD)/cross.ini; \
+	fi
+	meson compile -C $(BUILD_DIR)/esp32c3-$(C3_BOARD)/meson
+	cd $(ESP_C3_DIR) && idf.py \
+		-B $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(C3_BOARD) reconfigure && \
+	idf.py \
+		-B $(BUILD_DIR)/esp32c3-$(C3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(C3_BOARD) build
+	@echo "Output: $(BUILD_DIR)/esp32c3-$(C3_BOARD)/"
+
+# --- ESP32-S3 unified targets ---
 # Prerequisite: source $$HOME/esp/esp-idf/export.sh
-MESON_BUILDDIR_S3 := $(BUILD_DIR)/esp32s3-qemu
-CROSS_FILE_S3     := platform/esp32s3-qemu/cross.ini
-ESP_S3_PLATFORM   := platform/esp32s3-qemu
+#
+# All boards share platform/esp32s3/ as the single ESP-IDF project.
+# Board-specific config lives in platform/esp32s3/boards/<board>/.
+#
+# Boards:
+#   qemu       QEMU virtual devkit (4MB, OpenCores Ethernet)
+#   default    Real hardware (16MB, WiFi + PSRAM)
+#
+ESP_S3_DIR := platform/esp32s3
 
 # Espressif QEMU xtensa binary (not in PATH by default after export.sh)
 QEMU_XTENSA := $(HOME)/.espressif/tools/qemu-xtensa/esp_develop_9.0.0_20240606/qemu/bin/qemu-system-xtensa
 
-.PHONY: esp32s3-qemu
-esp32s3-qemu:
-	@if [ ! -f $(ESP_S3_PLATFORM)/sdkconfig ]; then \
-		rm -rf $(ESP_S3_PLATFORM)/build; \
-		cd $(ESP_S3_PLATFORM) && idf.py set-target esp32s3; \
-	fi
-	@if [ ! -f $(ESP_S3_PLATFORM)/build/compile_commands.json ]; then \
-		cd $(ESP_S3_PLATFORM) && idf.py reconfigure; \
-	fi
-	python3 scripts/gen-esp32s3-cross.py
-	@if [ ! -f $(MESON_BUILDDIR_S3)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_S3) --cross-file $(CROSS_FILE_S3); \
-	fi
-	meson compile -C $(MESON_BUILDDIR_S3)
-	cd $(ESP_S3_PLATFORM) && idf.py reconfigure && idf.py build
-	@echo "Output: $(ESP_S3_PLATFORM)/build/rt-claw.bin"
+# Default aliases
+.PHONY: build-esp32s3 esp32s3-qemu
+build-esp32s3: build-esp32s3-default
+
+# ---- All boards: build ----
+
+.PHONY: build-esp32s3-qemu build-esp32s3-default
+build-esp32s3-qemu:    S3_BOARD = qemu
+build-esp32s3-qemu:    _s3-build
+build-esp32s3-default: S3_BOARD = default
+build-esp32s3-default: _s3-build
+
+# Backwards-compatible alias
+esp32s3-qemu: build-esp32s3-qemu
+.PHONY: esp32s3
+esp32s3: build-esp32s3-default
+
+# ---- QEMU: run (build + launch simulator) ----
 
 .PHONY: run-esp32s3-qemu
-run-esp32s3-qemu: esp32s3-qemu
+run-esp32s3-qemu: build-esp32s3-qemu
 	@echo ">>> Generating merged flash image ..."
-	cd $(ESP_S3_PLATFORM)/build && esptool.py --chip esp32s3 merge_bin \
+	cd $(BUILD_DIR)/esp32s3-qemu/idf && esptool.py --chip esp32s3 merge_bin \
 		--fill-flash-size 4MB -o flash_image.bin @flash_args
 	@if [ "$(GDB)" = "1" ]; then \
 		echo "Starting QEMU in debug mode (GDB port 1234)..."; \
-		echo "Connect: xtensa-esp32s3-elf-gdb $(ESP_S3_PLATFORM)/build/rt-claw.elf -ex 'target remote :1234'"; \
+		echo "Connect: xtensa-esp32s3-elf-gdb $(BUILD_DIR)/esp32s3-qemu/idf/rt-claw.elf -ex 'target remote :1234'"; \
 	fi
 	@echo ">>> Starting QEMU (ESP32-S3, icount=1) ..."
 	$(QEMU_XTENSA) \
 		$(if $(filter 1,$(GRAPHICS)),,-nographic) \
 		-icount 1 \
 		-machine esp32s3 \
-		-drive file=$(ESP_S3_PLATFORM)/build/flash_image.bin,if=mtd,format=raw \
+		-drive file=$(BUILD_DIR)/esp32s3-qemu/idf/flash_image.bin,if=mtd,format=raw \
 		-nic user,model=open_eth \
 		$(if $(filter 1,$(GDB)),-S -s)
 
-# --- ESP32-C3 real hardware (ESP-IDF + WiFi) ---
-# Prerequisite: source $$HOME/esp/esp-idf/export.sh
-MESON_BUILDDIR_C3_HW := $(BUILD_DIR)/esp32c3
-CROSS_FILE_C3_HW     := platform/esp32c3/cross.ini
-ESP_C3_HW_PLATFORM   := platform/esp32c3
-
-.PHONY: esp32c3
-esp32c3:
-	@if [ ! -f $(ESP_C3_HW_PLATFORM)/sdkconfig ]; then \
-		rm -rf $(ESP_C3_HW_PLATFORM)/build; \
-		cd $(ESP_C3_HW_PLATFORM) && idf.py set-target esp32c3; \
-	fi
-	@if [ ! -f $(ESP_C3_HW_PLATFORM)/build/compile_commands.json ]; then \
-		cd $(ESP_C3_HW_PLATFORM) && idf.py reconfigure; \
-	fi
-	python3 scripts/gen-esp32c3-cross.py esp32c3
-	@if [ ! -f $(MESON_BUILDDIR_C3_HW)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_C3_HW) --cross-file $(CROSS_FILE_C3_HW); \
-	fi
-	meson compile -C $(MESON_BUILDDIR_C3_HW)
-	cd $(ESP_C3_HW_PLATFORM) && idf.py reconfigure && idf.py build
-	@echo "Output: $(ESP_C3_HW_PLATFORM)/build/rt-claw.bin"
-
-.PHONY: flash-esp32c3
-flash-esp32c3: esp32c3
-	cd $(ESP_C3_HW_PLATFORM) && idf.py flash
-
-.PHONY: monitor-esp32c3
-monitor-esp32c3:
-	cd $(ESP_C3_HW_PLATFORM) && idf.py monitor
-
-.PHONY: clean-esp32c3
-clean-esp32c3:
-	rm -rf $(BUILD_DIR)/esp32c3
-	rm -f platform/esp32c3/cross.ini
-
-# --- ESP32-S3 real hardware (ESP-IDF + WiFi) ---
-# Prerequisite: source $$HOME/esp/esp-idf/export.sh
-MESON_BUILDDIR_S3_HW := $(BUILD_DIR)/esp32s3
-CROSS_FILE_S3_HW     := platform/esp32s3/cross.ini
-ESP_S3_HW_PLATFORM   := platform/esp32s3
-
-.PHONY: esp32s3
-esp32s3:
-	@if [ ! -f $(ESP_S3_HW_PLATFORM)/sdkconfig ]; then \
-		rm -rf $(ESP_S3_HW_PLATFORM)/build; \
-		cd $(ESP_S3_HW_PLATFORM) && idf.py set-target esp32s3; \
-	fi
-	@if [ ! -f $(ESP_S3_HW_PLATFORM)/build/compile_commands.json ]; then \
-		cd $(ESP_S3_HW_PLATFORM) && idf.py reconfigure; \
-	fi
-	python3 scripts/gen-esp32s3-cross.py esp32s3
-	@if [ ! -f $(MESON_BUILDDIR_S3_HW)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_S3_HW) --cross-file $(CROSS_FILE_S3_HW); \
-	fi
-	meson compile -C $(MESON_BUILDDIR_S3_HW)
-	cd $(ESP_S3_HW_PLATFORM) && idf.py reconfigure && idf.py build
-	@echo "Output: $(ESP_S3_HW_PLATFORM)/build/rt-claw.bin"
+# ---- Hardware: flash + monitor ----
 
 .PHONY: flash-esp32s3
-flash-esp32s3: esp32s3
-	cd $(ESP_S3_HW_PLATFORM) && idf.py flash
+flash-esp32s3: build-esp32s3-default
+	cd $(ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/esp32s3-default/idf flash
 
 .PHONY: monitor-esp32s3
 monitor-esp32s3:
-	cd $(ESP_S3_HW_PLATFORM) && idf.py monitor
+	cd $(ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/esp32s3-default/idf monitor
 
-.PHONY: clean-esp32s3
-clean-esp32s3:
-	rm -rf $(BUILD_DIR)/esp32s3
-	rm -f platform/esp32s3/cross.ini
+# ---- Internal: shared build logic for all ESP32-S3 boards ----
+
+.PHONY: _s3-build
+_s3-build:
+	@if [ ! -f $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf/build.ninja ]; then \
+		cd $(ESP_S3_DIR) && idf.py \
+			-B $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(S3_BOARD) set-target esp32s3; \
+	fi
+	@if [ ! -f $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf/compile_commands.json ]; then \
+		cd $(ESP_S3_DIR) && idf.py \
+			-B $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(S3_BOARD) reconfigure; \
+	fi
+	python3 scripts/gen-esp32s3-cross.py $(S3_BOARD)
+	@if [ ! -f $(BUILD_DIR)/esp32s3-$(S3_BOARD)/meson/build.ninja ]; then \
+		meson setup $(BUILD_DIR)/esp32s3-$(S3_BOARD)/meson \
+			--cross-file $(BUILD_DIR)/esp32s3-$(S3_BOARD)/cross.ini; \
+	fi
+	meson compile -C $(BUILD_DIR)/esp32s3-$(S3_BOARD)/meson
+	cd $(ESP_S3_DIR) && idf.py \
+		-B $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(S3_BOARD) reconfigure && \
+	idf.py \
+		-B $(BUILD_DIR)/esp32s3-$(S3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(S3_BOARD) build
+	@echo "Output: $(BUILD_DIR)/esp32s3-$(S3_BOARD)/"
 
 # --- Clean ---
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
-	cd platform/vexpress-a9-qemu && scons -c 2>/dev/null || true
+	cd platform/vexpress-a9 && scons -c 2>/dev/null || true
 
-.PHONY: clean-vexpress-a9-qemu
-clean-vexpress-a9-qemu:
+.PHONY: clean-esp32c3
+clean-esp32c3:
+	rm -rf $(BUILD_DIR)/esp32c3-*
+
+.PHONY: clean-vexpress-a9
+clean-vexpress-a9:
 	rm -rf $(BUILD_DIR)/vexpress-a9-qemu
-	cd platform/vexpress-a9-qemu && scons -c 2>/dev/null || true
+	cd platform/vexpress-a9 && scons -c 2>/dev/null || true
 
-.PHONY: clean-esp32c3-qemu
-clean-esp32c3-qemu:
-	rm -rf $(BUILD_DIR)/esp32c3-qemu
-	rm -f platform/esp32c3-qemu/cross.ini
-
-.PHONY: clean-esp32s3-qemu
-clean-esp32s3-qemu:
-	rm -rf $(BUILD_DIR)/esp32s3-qemu
-	rm -f platform/esp32s3-qemu/cross.ini
+.PHONY: clean-esp32s3
+clean-esp32s3:
+	rm -rf $(BUILD_DIR)/esp32s3-*
 
 # --- Checks ---
 .PHONY: check

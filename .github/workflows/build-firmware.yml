@@ -7,8 +7,10 @@ on:
       - 'claw/**'
       - 'osal/**'
       - 'include/**'
+      - 'drivers/**'
       - 'platform/esp32c3/**'
       - 'platform/esp32s3/**'
+      - 'platform/common/**'
       - 'scripts/**'
       - 'Makefile'
       - 'meson.build'
@@ -33,12 +35,14 @@ jobs:
       matrix:
         include:
           - target: esp32c3
-            platform_dir: platform/esp32c3
+            make_target: build-esp32c3-devkit
+            build_dir: build/esp32c3-devkit/idf
             esp_targets: esp32c3
             chip_family: ESP32-C3
             artifact_name: esp32c3-firmware
           - target: esp32s3
-            platform_dir: platform/esp32s3
+            make_target: esp32s3
+            build_dir: build/esp32s3-default/idf
             esp_targets: esp32s3
             chip_family: ESP32-S3
             artifact_name: esp32s3-firmware
@@ -68,13 +72,13 @@ jobs:
       - name: Build hardware firmware
         run: |
           source ~/esp/esp-idf/export.sh
-          make ${{ matrix.target }}
+          make ${{ matrix.make_target }}
 
       - name: Prepare firmware artifacts
         run: |
           RTCLAW_FIRMWARE_VERSION="${{ github.sha }}" \
             scripts/ci/package-esp-firmware.sh \
-            "${{ matrix.platform_dir }}" "${{ matrix.chip_family }}" firmware-out "RT-Claw"
+            "${{ matrix.build_dir }}" "${{ matrix.chip_family }}" firmware-out "RT-Claw"
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4

@@ -3,16 +3,16 @@
 set -euo pipefail
 
 if [ $# -lt 3 ] || [ $# -gt 4 ]; then
-    echo "Usage: $0 <platform-dir> <chip-family> <output-dir> [name]" >&2
+    echo "Usage: $0 <build-dir> <chip-family> <output-dir> [name]" >&2
+    echo "  build-dir: IDF build output (contains flash_args)" >&2
     exit 1
 fi
 
-platform_dir="$1"
+build_dir="$1"
 chip_family="$2"
 output_dir="$3"
 name="${4:-RT-Claw}"
 
-build_dir="${platform_dir}/build"
 flash_args="${build_dir}/flash_args"
 version="${RTCLAW_FIRMWARE_VERSION:-dev}"
 parts_file="$(mktemp)"

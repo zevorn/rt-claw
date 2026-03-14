@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ARTIFACT_DIR="${RTCLAW_CI_ARTIFACT_DIR:-${PROJECT_ROOT}/ci-artifacts}"
 
 backup_dir=""
-profile_platform_dir=""
+profile_defaults_path=""
 log_file=""
 
 init_log()
@@ -22,21 +22,14 @@ init_log()
 
 restore_profile()
 {
-    if [ -z "$backup_dir" ] || [ -z "$profile_platform_dir" ]; then
+    if [ -z "$backup_dir" ] || [ -z "$profile_defaults_path" ]; then
         return
     fi
 
     if [ -f "${backup_dir}/sdkconfig.defaults" ]; then
-        cp "${backup_dir}/sdkconfig.defaults" \
-            "${profile_platform_dir}/sdkconfig.defaults"
+        cp "${backup_dir}/sdkconfig.defaults" "$profile_defaults_path"
     else
-        rm -f "${profile_platform_dir}/sdkconfig.defaults"
-    fi
-
-    if [ -f "${backup_dir}/sdkconfig" ]; then
-        cp "${backup_dir}/sdkconfig" "${profile_platform_dir}/sdkconfig"
-    else
-        rm -f "${profile_platform_dir}/sdkconfig"
+        rm -f "$profile_defaults_path"
     fi
 
     rm -rf "$backup_dir"
@@ -48,9 +41,25 @@ prepare_profile()
     local profile="$2"
     local defaults
     local profile_file
+    local idf_build_dir
 
-    profile_platform_dir="${PROJECT_ROOT}/platform/${target}"
-    defaults="${profile_platform_dir}/sdkconfig.defaults"
+    case "$target" in
+        esp32c3-*)
+            local board="${target#esp32c3-}"
+            defaults="${PROJECT_ROOT}/platform/esp32c3/boards/${board}/sdkconfig.defaults"
+            idf_build_dir="${PROJECT_ROOT}/build/${target}/idf"
+            ;;
+        esp32s3-*)
+            local board="${target#esp32s3-}"
+            defaults="${PROJECT_ROOT}/platform/esp32s3/boards/${board}/sdkconfig.defaults"
+            idf_build_dir="${PROJECT_ROOT}/build/${target}/idf"
+            ;;
+        *)
+            defaults="${PROJECT_ROOT}/platform/${target}/sdkconfig.defaults"
+            idf_build_dir="${PROJECT_ROOT}/platform/${target}/build"
+            ;;
+    esac
+
     profile_file="${defaults}.${profile}"
 
     if [ ! -f "$profile_file" ]; then
@@ -59,17 +68,16 @@ prepare_profile()
     fi
 
     backup_dir="$(mktemp -d)"
+    profile_defaults_path="$defaults"
 
     if [ -f "$defaults" ]; then
         cp "$defaults" "${backup_dir}/sdkconfig.defaults"
     fi
 
-    if [ -f "${profile_platform_dir}/sdkconfig" ]; then
-        cp "${profile_platform_dir}/sdkconfig" "${backup_dir}/sdkconfig"
-    fi
-
     cp "$profile_file" "$defaults"
-    rm -f "${profile_platform_dir}/sdkconfig"
+
+    # Clean IDF build to force reconfigure with new defaults
+    rm -rf "$idf_build_dir"
 }
 
 run_and_log()
@@ -107,10 +115,23 @@ command_timed_out()
 build_target()
 {
     local target="$1"
+    local make_target
     local rc=0
 
+    case "$target" in
+        esp32c3-*)
+            make_target="build-${target}"
+            ;;
+        esp32s3-*)
+            make_target="build-${target}"
+            ;;
+        *)
+            make_target="${target}"
+            ;;
+    esac
+
     set +e
-    bash -lc "make ${target}" >> "$log_file" 2>&1
+    bash -lc "make ${make_target}" >> "$log_file" 2>&1
     rc=$?
     set -e
 
@@ -131,24 +152,42 @@ setup_esp_idf()
     source "$HOME/esp/esp-idf/export.sh"
 }
 
+# Resolve IDF build directory for a given target
+_esp_idf_build_dir()
+{
+    local target="$1"
+
+    case "$target" in
+        esp32c3-*|esp32s3-*)
+            echo "${PROJECT_ROOT}/build/${target}/idf"
+            ;;
+        *)
+            echo "Unsupported ESP target: ${target}" >&2
+            return 1
+            ;;
+    esac
+}
+
 run_esp_qemu()
 {
     local target="$1"
     local timeout_secs="$2"
     local input_delay="$3"
     local input_text="${4:-}"
-    local build_dir="${PROJECT_ROOT}/platform/${target}/build"
+    local build_dir
     local qemu_bin
     local merge_cmd
     local run_cmd
 
+    build_dir="$(_esp_idf_build_dir "$target")"
+
     case "$target" in
-        esp32c3-qemu)
+        esp32c3-*)
             merge_cmd="cd ${build_dir} && esptool.py --chip esp32c3 merge_bin --fill-flash-size 4MB -o flash_image.bin @flash_args"
             qemu_bin="qemu-system-riscv32"
             run_cmd="${qemu_bin} -nographic -icount 1 -machine esp32c3 -drive file=${build_dir}/flash_image.bin,if=mtd,format=raw -global driver=timer.esp32c3.timg,property=wdt_disable,value=true -nic user,model=open_eth"
             ;;
-        esp32s3-qemu)
+        esp32s3-*)
             merge_cmd="cd ${build_dir} && esptool.py --chip esp32s3 merge_bin --fill-flash-size 4MB -o flash_image.bin @flash_args"
             qemu_bin="${HOME}/.espressif/tools/qemu-xtensa/esp_develop_9.0.0_20240606/qemu/bin/qemu-system-xtensa"
             run_cmd="${qemu_bin} -nographic -icount 1 -machine esp32s3 -drive file=${build_dir}/flash_image.bin,if=mtd,format=raw -nic user,model=open_eth"
@@ -175,7 +214,7 @@ run_esp_qemu_until_log()
     local timeout_secs="$2"
     local success_pattern="$3"
     local failure_pattern="${4:-}"
-    local build_dir="${PROJECT_ROOT}/platform/${target}/build"
+    local build_dir
     local qemu_bin
     local merge_cmd
     local run_cmd
@@ -183,13 +222,15 @@ run_esp_qemu_until_log()
     local timeout_pid=0
     local start_ts
 
+    build_dir="$(_esp_idf_build_dir "$target")"
+
     case "$target" in
-        esp32c3-qemu)
+        esp32c3-*)
             merge_cmd="cd ${build_dir} && esptool.py --chip esp32c3 merge_bin --fill-flash-size 4MB -o flash_image.bin @flash_args"
             qemu_bin="qemu-system-riscv32"
             run_cmd="${qemu_bin} -nographic -icount 1 -machine esp32c3 -drive file=${build_dir}/flash_image.bin,if=mtd,format=raw -global driver=timer.esp32c3.timg,property=wdt_disable,value=true -nic user,model=open_eth"
             ;;
-        esp32s3-qemu)
+        esp32s3-*)
             merge_cmd="cd ${build_dir} && esptool.py --chip esp32s3 merge_bin --fill-flash-size 4MB -o flash_image.bin @flash_args"
             qemu_bin="${HOME}/.espressif/tools/qemu-xtensa/esp_develop_9.0.0_20240606/qemu/bin/qemu-system-xtensa"
             run_cmd="${qemu_bin} -nographic -icount 1 -machine esp32s3 -drive file=${build_dir}/flash_image.bin,if=mtd,format=raw -nic user,model=open_eth"
@@ -249,7 +290,7 @@ run_esp_qemu_until_log()
 run_vexpress_qemu()
 {
     local timeout_secs="$1"
-    local a9_platform="${PROJECT_ROOT}/platform/vexpress-a9-qemu"
+    local a9_platform="${PROJECT_ROOT}/platform/vexpress-a9"
     local a9_build_dir="${PROJECT_ROOT}/build/vexpress-a9-qemu"
 
     if [ ! -f "${a9_platform}/sd.bin" ]; then
