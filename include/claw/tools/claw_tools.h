@@ -11,7 +11,7 @@
 #include "osal/claw_os.h"
 #include "cJSON.h"
 
-#define CLAW_TOOL_MAX       16
+#define CLAW_TOOL_MAX       24
 #define CLAW_TOOL_NAME_MAX  32
 
 /*

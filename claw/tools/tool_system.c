@@ -13,6 +13,108 @@
 
 #define TAG "tool_sys"
 
+/* ---- Long-term memory tools (platform-independent) ---- */
+
+static int tool_save_memory(const cJSON *params, cJSON *result)
+{
+    cJSON *key_j = cJSON_GetObjectItem(params, "key");
+    cJSON *val_j = cJSON_GetObjectItem(params, "value");
+
+    if (!key_j || !cJSON_IsString(key_j) ||
+        !val_j || !cJSON_IsString(val_j)) {
+        cJSON_AddStringToObject(result, "error",
+                                "missing key or value");
+        return CLAW_ERROR;
+    }
+
+    if (ai_ltm_save(key_j->valuestring,
+                     val_j->valuestring) != CLAW_OK) {
+        cJSON_AddStringToObject(result, "error",
+                                "memory full or save failed");
+        return CLAW_ERROR;
+    }
+
+    cJSON_AddStringToObject(result, "status", "ok");
+    char msg[96];
+    snprintf(msg, sizeof(msg), "saved: %s = %s",
+             key_j->valuestring, val_j->valuestring);
+    cJSON_AddStringToObject(result, "message", msg);
+    return CLAW_OK;
+}
+
+static int tool_delete_memory(const cJSON *params, cJSON *result)
+{
+    cJSON *key_j = cJSON_GetObjectItem(params, "key");
+
+    if (!key_j || !cJSON_IsString(key_j)) {
+        cJSON_AddStringToObject(result, "error", "missing key");
+        return CLAW_ERROR;
+    }
+
+    if (ai_ltm_delete(key_j->valuestring) != CLAW_OK) {
+        cJSON_AddStringToObject(result, "error", "key not found");
+        return CLAW_ERROR;
+    }
+
+    cJSON_AddStringToObject(result, "status", "ok");
+    char msg[64];
+    snprintf(msg, sizeof(msg), "deleted: %s", key_j->valuestring);
+    cJSON_AddStringToObject(result, "message", msg);
+    return CLAW_OK;
+}
+
+static int tool_list_memories(const cJSON *params, cJSON *result)
+{
+    (void)params;
+    cJSON_AddStringToObject(result, "status", "ok");
+    cJSON_AddNumberToObject(result, "count", ai_ltm_count());
+
+    char *ctx = ai_ltm_build_context();
+    if (ctx) {
+        cJSON_AddStringToObject(result, "memories", ctx);
+        claw_free(ctx);
+    } else {
+        cJSON_AddStringToObject(result, "memories", "(empty)");
+    }
+    return CLAW_OK;
+}
+
+static const char schema_save_memory[] =
+    "{\"type\":\"object\","
+    "\"properties\":{"
+    "\"key\":{\"type\":\"string\","
+    "\"description\":\"Memory key (e.g. user_name, preference)\"},"
+    "\"value\":{\"type\":\"string\","
+    "\"description\":\"Value to remember\"}},"
+    "\"required\":[\"key\",\"value\"]}";
+
+static const char schema_delete_memory[] =
+    "{\"type\":\"object\","
+    "\"properties\":{"
+    "\"key\":{\"type\":\"string\","
+    "\"description\":\"Memory key to delete\"}},"
+    "\"required\":[\"key\"]}";
+
+static void register_memory_tools(void)
+{
+    static const char se[] =
+        "{\"type\":\"object\",\"properties\":{}}";
+
+    claw_tool_register("save_memory",
+        "Save a fact to long-term memory (persists across reboots). "
+        "Use when the user asks you to remember something: their "
+        "name, preferences, important facts, nicknames, etc.",
+        schema_save_memory, tool_save_memory);
+
+    claw_tool_register("delete_memory",
+        "Delete a fact from long-term memory by key.",
+        schema_delete_memory, tool_delete_memory);
+
+    claw_tool_register("list_memories",
+        "List all facts stored in long-term memory.",
+        se, tool_list_memories);
+}
+
 #ifdef CLAW_PLATFORM_ESP_IDF
 
 #include "esp_system.h"
@@ -131,9 +233,10 @@ void claw_tools_register_system(void)
 
     claw_tool_register("clear_history",
         "Clear the conversation history to free memory. "
-        "Use when memory is low or the conversation is too long. "
-        "This removes all previous messages from context.",
+        "Use when memory is low or the conversation is too long.",
         schema_empty, tool_clear_history);
+
+    register_memory_tools();
 
     claw_tool_register("system_restart",
         "Restart the system. Use with caution — "
@@ -212,6 +315,8 @@ void claw_tools_register_system(void)
     claw_tool_register("clear_history",
         "Clear the conversation history to free memory.",
         schema_empty, tool_clear_history);
+
+    register_memory_tools();
 }
 
 #else /* unknown platform */
