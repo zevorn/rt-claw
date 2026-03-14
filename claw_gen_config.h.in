@@ -7,8 +7,8 @@
  * Undefined entries fall through to claw_config.h defaults.
  */
 
-#ifndef CLAW_CONFIG_GENERATED_H
-#define CLAW_CONFIG_GENERATED_H
+#ifndef CLAW_GEN_CONFIG_H
+#define CLAW_GEN_CONFIG_H
 
 /* AI Engine */
 #mesondefine CONFIG_RTCLAW_AI_API_KEY
@@ -22,4 +22,4 @@
 #mesondefine CONFIG_RTCLAW_FEISHU_APP_ID
 #mesondefine CONFIG_RTCLAW_FEISHU_APP_SECRET
 
-#endif /* CLAW_CONFIG_GENERATED_H */
+#endif /* CLAW_GEN_CONFIG_H */

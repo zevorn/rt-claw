@@ -31,7 +31,7 @@
  * defaults below.
  */
 #ifdef CLAW_HAS_GENERATED_CONFIG
-#include "claw_config_generated.h"
+#include "claw_gen_config.h"
 #endif
 
 #define RT_CLAW_VERSION         "0.1.0"

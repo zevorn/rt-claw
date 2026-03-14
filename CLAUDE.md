@@ -51,7 +51,7 @@ meson configure build/<platform>/meson -Dai_api_key='sk-...'
 
 Priority: meson option (`-Dai_api_key=...`) > env var (`RTCLAW_AI_API_KEY`) > `claw_config.h` default.
 
-Meson generates `claw_config_generated.h` in the build directory with the resolved values.
+Meson generates `claw_gen_config.h` in the build directory with the resolved values.
 
 ## Run
 
@@ -144,7 +144,7 @@ No unit test framework yet. Verify changes by:
 | `vendor/os/rt-thread/` | RT-Thread (submodule) |
 | `claw/claw_init.c` | Boot entry point |
 | `claw_config.h` | Unified compile-time configuration (project root) |
-| `claw_config_generated.h.in` | Meson template for generated config header |
+| `claw_gen_config.h.in` | Meson template for generated config header |
 | `claw/core/gateway.c` | Message router |
 | `claw/services/{ai,net,swarm,im}/` | Service modules |
 | `claw/tools/` | Tool Use framework |

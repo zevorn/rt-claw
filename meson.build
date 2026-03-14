@@ -104,8 +104,8 @@ foreach opt_name, pair : _int_overrides
 endforeach
 
 claw_config_gen = configure_file(
-    input: 'claw_config_generated.h.in',
-    output: 'claw_config_generated.h',
+    input: 'claw_gen_config.h.in',
+    output: 'claw_gen_config.h',
     configuration: conf_data,
 )
 
@@ -115,7 +115,7 @@ platform_defs += ['-DCLAW_HAS_GENERATED_CONFIG']
 # Unified header directories:
 #   - project root: claw_config.h
 #   - include/: all other public headers
-#   - build dir: claw_config_generated.h (added implicitly by Meson)
+#   - build dir: claw_gen_config.h (added implicitly by Meson)
 claw_root_inc = include_directories('.')
 claw_inc = include_directories('include')
 

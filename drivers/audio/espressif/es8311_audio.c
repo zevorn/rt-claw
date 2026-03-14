@@ -14,7 +14,12 @@
 
 #include "drivers/audio/espressif/es8311_audio.h"
 
-#ifdef CLAW_PLATFORM_ESP_IDF
+/*
+ * ES8311 requires esp_codec_dev managed component which is only
+ * available on boards that declare the dependency (e.g. xiaozhi-xmini).
+ * Fall through to stubs when the header is absent.
+ */
+#if defined(CLAW_PLATFORM_ESP_IDF) && __has_include("esp_codec_dev.h")
 
 #include "driver/i2s_std.h"
 #include "driver/i2c_master.h"
@@ -338,7 +343,7 @@ int es8311_audio_play_sound(const char *name)
     return -1;
 }
 
-#else /* non-ESP-IDF stubs */
+#else /* stubs — no esp_codec_dev or non-ESP-IDF */
 
 int  es8311_audio_init(void *bus, int pa) { (void)bus; (void)pa; return -1; }
 void es8311_audio_set_volume(int v) { (void)v; }
