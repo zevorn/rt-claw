@@ -102,6 +102,15 @@ int sched_add(const char *name, uint32_t interval_ms, int32_t count,
 
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
+    /* Reject duplicate names */
+    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
+        if (s_tasks[i].active && strcmp(s_tasks[i].name, name) == 0) {
+            claw_mutex_unlock(s_lock);
+            CLAW_LOGW(TAG, "duplicate task '%s', rejected", name);
+            return CLAW_ERROR;
+        }
+    }
+
     /* Find free slot */
     int slot = -1;
     for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
