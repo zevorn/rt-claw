@@ -1,5 +1,5 @@
 set(RT_CLAW_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
-set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32s3")
+set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32s3-${RTCLAW_BOARD}/meson")
 
 # Headers exported to dependent components (e.g. main)
 set(CLAW_INC_DIRS
@@ -9,7 +9,6 @@ set(CLAW_INC_DIRS
 # ESP-IDF component dependencies (needed for symbol resolution at link time)
 set(CLAW_REQUIRES
     freertos
-    esp_wifi
     esp_netif
     esp_event
     esp_http_client
@@ -23,9 +22,10 @@ set(CLAW_REQUIRES
     esp_hw_support
 )
 
-if(CONFIG_RTCLAW_LCD_ENABLE)
-    list(APPEND CLAW_REQUIRES esp_lcd)
-endif()
+# Unconditional: ESP-IDF processes component REQUIRES before sdkconfig
+# is available, so CONFIG_* conditionals cannot gate REQUIRES here.
+# These components always exist; unused ones add only include paths.
+list(APPEND CLAW_REQUIRES esp_eth esp_wifi esp_lcd)
 
 # Stub source so the component produces a real static library
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/rt_claw_stub.c" "/* auto-generated */\n")
@@ -54,5 +54,5 @@ if(_all_meson_objs)
     )
 else()
     message(WARNING "No Meson objects found in ${MESON_BUILD_DIR}. "
-                    "Run 'meson compile -C build/esp32s3' first.")
+                    "Run 'meson compile -C build/esp32s3-${RTCLAW_BOARD}/meson' first.")
 endif()

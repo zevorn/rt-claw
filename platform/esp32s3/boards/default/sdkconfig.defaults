@@ -39,7 +39,7 @@ CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y
 
 # ---- Partition table ----
 CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/default/partitions.csv"
 
 # ---- Console: UART primary, USB Serial/JTAG secondary ----
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y

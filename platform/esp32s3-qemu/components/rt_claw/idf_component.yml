@@ -1,5 +1,0 @@
-dependencies:
-  espressif/esp_lcd_qemu_rgb:
-    version: "^1"
-  espressif/esp_websocket_client:
-    version: "^1"

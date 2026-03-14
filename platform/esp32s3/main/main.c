@@ -2,7 +2,7 @@
  * Copyright (c) 2026, Chao Liu <chao.liu.zevorn@gmail.com>
  * SPDX-License-Identifier: MIT
  *
- * Platform entry for ESP32-S3 real hardware (WiFi + PSRAM).
+ * Platform entry for ESP32-S3 / ESP-IDF + FreeRTOS.
  * Chat-first shell: direct input goes to AI, /commands for system.
  */
 
@@ -10,7 +10,7 @@
 #include "claw/claw_init.h"
 #include "claw/services/ai/ai_engine.h"
 #include "claw/shell/shell_commands.h"
-#include "wifi_manager.h"
+#include "claw_board.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +18,6 @@
 #ifdef CLAW_PLATFORM_ESP_IDF
 #include "nvs_flash.h"
 #include "esp_log.h"
-#include "esp_wifi.h"
 #endif
 
 #ifdef CONFIG_RTCLAW_SHELL_ENABLE
@@ -51,7 +50,6 @@ static int uart_read_line(char *buf, int size)
         }
         if (ch == '\r' || ch == '\n') {
             uart_write_bytes(UART_NUM_0, "\r\n", 2);
-            /* Consume trailing \n after \r (or vice versa) */
             uint8_t trail;
             uart_read_bytes(UART_NUM_0, &trail, 1, pdMS_TO_TICKS(20));
             break;
@@ -63,7 +61,6 @@ static int uart_read_line(char *buf, int size)
                     pos--;
                 }
                 if ((uint8_t)buf[pos] >= 0xE0) {
-                    /* 3/4-byte UTF-8 (CJK, emoji): 2 columns */
                     uart_write_bytes(UART_NUM_0,
                                      "\b \b\b \b", 6);
                 } else {
@@ -79,52 +76,26 @@ static int uart_read_line(char *buf, int size)
     return pos;
 }
 
-/* ---- Platform-specific commands (WiFi) ---- */
-
-static void cmd_wifi_set(int argc, char **argv)
-{
-    if (argc < 3) {
-        printf("Usage: /wifi_set <SSID> <PASSWORD>\n");
-        return;
-    }
-    wifi_manager_set_credentials(argv[1], argv[2]);
-    printf("WiFi credentials saved. Reconnecting...\n");
-    esp_wifi_disconnect();
-}
-
-static void cmd_wifi_status(int argc, char **argv)
-{
-    (void)argc;
-    (void)argv;
-    printf("WiFi: %s\n",
-           wifi_manager_is_connected() ? "connected" : "disconnected");
-    printf("IP:   %s\n", wifi_manager_get_ip());
-}
-
-static void cmd_wifi_scan(int argc, char **argv)
-{
-    (void)argc;
-    (void)argv;
-    wifi_manager_scan_and_print();
-}
-
-/* ---- Command tables ---- */
+/* ---- Command table ---- */
 
 static void cmd_help(int argc, char **argv);
 
-static const shell_cmd_t s_platform_commands[] = {
-    SHELL_CMD("/help",        cmd_help,        "Show this help"),
-    SHELL_CMD("/wifi_set",    cmd_wifi_set,    "Save WiFi credentials"),
-    SHELL_CMD("/wifi_status", cmd_wifi_status, "Show WiFi connection"),
-    SHELL_CMD("/wifi_scan",   cmd_wifi_scan,   "Scan nearby APs"),
+static const shell_cmd_t s_builtin_commands[] = {
+    SHELL_CMD("/help", cmd_help, "Show this help"),
 };
 
 static void cmd_help(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
-    shell_print_help(s_platform_commands,
-                     SHELL_CMD_COUNT(s_platform_commands));
+    int board_cmd_count = 0;
+    const shell_cmd_t *board_cmds = board_platform_commands(&board_cmd_count);
+
+    shell_print_help(s_builtin_commands,
+                     SHELL_CMD_COUNT(s_builtin_commands));
+    if (board_cmds && board_cmd_count > 0) {
+        shell_print_help(board_cmds, board_cmd_count);
+    }
     shell_print_help(shell_common_commands,
                      shell_common_command_count());
     printf("\n  Anything else is sent directly to AI.\n");
@@ -139,11 +110,19 @@ static void dispatch_command(char *line)
     if (argc == 0) {
         return;
     }
-    if (shell_dispatch(s_platform_commands,
-                       SHELL_CMD_COUNT(s_platform_commands),
+    if (shell_dispatch(s_builtin_commands,
+                       SHELL_CMD_COUNT(s_builtin_commands),
                        argc, argv)) {
         return;
     }
+
+    int board_cmd_count = 0;
+    const shell_cmd_t *board_cmds = board_platform_commands(&board_cmd_count);
+    if (board_cmds && shell_dispatch(board_cmds, board_cmd_count,
+                                     argc, argv)) {
+        return;
+    }
+
     if (shell_dispatch(shell_common_commands,
                        shell_common_command_count(),
                        argc, argv)) {
@@ -155,7 +134,7 @@ static void dispatch_command(char *line)
 /* ---- Thinking animation ---- */
 
 static volatile int s_anim_active;
-static volatile int s_anim_phase; /* 0=thinking, 1=tool */
+static volatile int s_anim_phase;
 
 static void anim_thread_fn(void *arg)
 {
@@ -189,7 +168,6 @@ static void chat_status_cb(int status, const char *detail)
     }
 }
 
-/* Chat with AI (direct input) */
 static void do_chat(const char *msg)
 {
     s_anim_active = 1;
@@ -203,7 +181,6 @@ static void do_chat(const char *msg)
     s_anim_active = 0;
     ai_set_status_cb(NULL);
     claw_thread_delay_ms(100);
-    /* Clear animation line */
     printf("\r                              \r");
 
     if (ret == CLAW_OK) {
@@ -217,7 +194,6 @@ static void shell_loop(void)
 {
     char input[INPUT_SIZE];
 
-    /* Install UART driver (required for uart_read_bytes) */
     uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
 
     s_reply = claw_malloc(REPLY_SIZE);
@@ -230,9 +206,6 @@ static void shell_loop(void)
     printf(CLR_CYAN "  rt-claw chat" CLR_RESET
            "  (type /help for commands)\n");
     printf("  Direct input sends to AI, /command for system.\n");
-    printf("  WiFi: %s (%s)\n",
-           wifi_manager_is_connected() ? "connected" : "offline",
-           wifi_manager_get_ip());
     printf("\n");
 
     while (1) {
@@ -267,33 +240,16 @@ void app_main(void)
     }
 
 #ifdef CONFIG_RTCLAW_SHELL_ENABLE
-    /* Shell mode: suppress log by default; use /log on to enable */
     esp_log_level_set("*", ESP_LOG_NONE);
 #else
-    /* Headless mode: enable log for serial diagnostics */
     claw_log_set_enabled(1);
 #endif
 #endif
 
-    /* WiFi initialization */
-    wifi_manager_init();
-    esp_err_t wifi_err = wifi_manager_start();
-    if (wifi_err == ESP_OK) {
-        CLAW_LOGI(TAG, "waiting for WiFi (30s timeout)...");
-        if (wifi_manager_wait_connected(30000) == ESP_OK) {
-            CLAW_LOGI(TAG, "WiFi connected: %s",
-                      wifi_manager_get_ip());
-        } else {
-            CLAW_LOGW(TAG, "WiFi timeout, continuing offline");
-        }
-    } else {
-        CLAW_LOGW(TAG, "no WiFi credentials, use /wifi_set");
-    }
+    /* Board-specific initialization (WiFi, Ethernet, etc.) */
+    board_early_init();
 
-    /*
-     * Load runtime config from NVS (before claw_init so services
-     * pick up NVS values instead of compile-time defaults).
-     */
+    /* Load runtime config from NVS */
     shell_nvs_config_load();
 
     /* Boot rt-claw services */
@@ -303,7 +259,6 @@ void app_main(void)
     shell_loop();
 #endif
 
-    /* Keep main task alive */
     while (1) {
         claw_thread_delay_ms(1000);
     }
