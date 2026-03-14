@@ -33,51 +33,170 @@
 
 static char *s_reply;
 
+/* Forward declarations */
+static void cmd_help(int argc, char **argv);
+
+/* Forward declaration for tab completion (defined after cmd table) */
+static void find_completions(const char *prefix, int prefix_len,
+                             const char **match, int *match_count);
+
+/* ---- Redraw line from cursor position ---- */
+
+static void redraw_from(const char *buf, int len, int cursor)
+{
+    /* Print chars from cursor to end, then clear trailing garbage */
+    claw_console_write(buf + cursor, len - cursor);
+    claw_console_write(" ", 1);
+    /* Move cursor back to correct position */
+    for (int i = 0; i < len - cursor + 1; i++) {
+        claw_console_write("\b", 1);
+    }
+}
+
 /*
- * Read one line with raw byte echo.
- * UTF-8 multi-byte characters (Chinese etc.) pass through correctly.
+ * Read one line with insert-mode editing.
+ * Supports: left/right arrows, backspace, delete, home, end,
+ * tab completion for /commands, UTF-8 passthrough.
  */
 static int shell_read_line(char *buf, int size)
 {
-    int pos = 0;
+    int len = 0;     /* total chars in buffer */
+    int cursor = 0;  /* cursor position */
     uint8_t ch;
 
-    while (pos < size - 1) {
+    while (len < size - 1) {
         int n = claw_console_read(&ch, 1, UINT32_MAX);
-
         if (n <= 0) {
             continue;
         }
+
+        /* Enter */
         if (ch == '\r' || ch == '\n') {
             claw_console_write("\r\n", 2);
             uint8_t trail;
             claw_console_read(&trail, 1, 20);
             break;
         }
-        if (ch == '\b' || ch == 127) {
-            if (pos > 0) {
-                pos--;
-                while (pos > 0 && (buf[pos] & 0xC0) == 0x80) {
-                    pos--;
-                }
-                if ((uint8_t)buf[pos] >= 0xE0) {
-                    claw_console_write("\b \b\b \b", 6);
-                } else {
-                    claw_console_write("\b \b", 3);
+
+        /* Tab completion */
+        if (ch == '\t') {
+            if (len > 0 && buf[0] == '/') {
+                buf[len] = '\0';
+                const char *match = NULL;
+                int match_count = 0;
+                find_completions(buf, len, &match, &match_count);
+                if (match_count == 1 && match) {
+                    int mlen = (int)strlen(match);
+                    /* Clear current line */
+                    while (cursor > 0) {
+                        claw_console_write("\b \b", 3);
+                        cursor--;
+                    }
+                    for (int i = 0; i < len; i++) {
+                        claw_console_write(" ", 1);
+                    }
+                    for (int i = 0; i < len; i++) {
+                        claw_console_write("\b", 1);
+                    }
+                    /* Fill in match */
+                    memcpy(buf, match, mlen);
+                    buf[mlen] = ' ';
+                    len = mlen + 1;
+                    cursor = len;
+                    claw_console_write(buf, len);
                 }
             }
             continue;
         }
-        buf[pos++] = (char)ch;
+
+        /* Backspace */
+        if (ch == '\b' || ch == 127) {
+            if (cursor > 0) {
+                memmove(buf + cursor - 1, buf + cursor, len - cursor);
+                cursor--;
+                len--;
+                claw_console_write("\b", 1);
+                redraw_from(buf, len, cursor);
+            }
+            continue;
+        }
+
+        /* Escape sequences (arrows, home, end, delete) */
+        if (ch == 0x1B) {
+            uint8_t seq[2];
+            if (claw_console_read(&seq[0], 1, 50) <= 0) {
+                continue;
+            }
+            if (seq[0] != '[') {
+                continue;
+            }
+            if (claw_console_read(&seq[1], 1, 50) <= 0) {
+                continue;
+            }
+
+            switch (seq[1]) {
+            case 'D': /* Left arrow */
+                if (cursor > 0) {
+                    cursor--;
+                    claw_console_write("\033[D", 3);
+                }
+                break;
+            case 'C': /* Right arrow */
+                if (cursor < len) {
+                    cursor++;
+                    claw_console_write("\033[C", 3);
+                }
+                break;
+            case 'H': /* Home */
+                while (cursor > 0) {
+                    cursor--;
+                    claw_console_write("\033[D", 3);
+                }
+                break;
+            case 'F': /* End */
+                while (cursor < len) {
+                    cursor++;
+                    claw_console_write("\033[C", 3);
+                }
+                break;
+            case '3': {
+                /* Delete key: ESC [ 3 ~ */
+                uint8_t tilde;
+                claw_console_read(&tilde, 1, 50);
+                if (cursor < len) {
+                    memmove(buf + cursor, buf + cursor + 1,
+                            len - cursor - 1);
+                    len--;
+                    redraw_from(buf, len, cursor);
+                }
+                break;
+            }
+            default:
+                break;
+            }
+            continue;
+        }
+
+        /* Normal character — insert at cursor */
+        if (cursor < len) {
+            memmove(buf + cursor + 1, buf + cursor, len - cursor);
+        }
+        buf[cursor] = (char)ch;
+        len++;
+        cursor++;
+
+        /* Echo: print from new char onward, move cursor back */
         claw_console_write(&ch, 1);
+        if (cursor < len) {
+            redraw_from(buf, len, cursor);
+        }
     }
-    buf[pos] = '\0';
-    return pos;
+
+    buf[len] = '\0';
+    return len;
 }
 
 /* ---- Command table ---- */
-
-static void cmd_help(int argc, char **argv);
 
 static const shell_cmd_t s_builtin_commands[] = {
     SHELL_CMD("/help", cmd_help, "Show this help"),
@@ -98,6 +217,43 @@ static void cmd_help(int argc, char **argv)
     shell_print_help(shell_common_commands,
                      shell_common_command_count());
     printf("\n  Anything else is sent directly to AI.\n");
+}
+
+/* ---- Tab completion for /commands ---- */
+
+static void find_completions(const char *prefix, int prefix_len,
+                             const char **match, int *match_count)
+{
+    *match = NULL;
+    *match_count = 0;
+
+    const struct {
+        const shell_cmd_t *table;
+        int count;
+    } tables[] = {
+        { s_builtin_commands, SHELL_CMD_COUNT(s_builtin_commands) },
+        { shell_common_commands, shell_common_command_count() },
+    };
+    int board_count = 0;
+    const shell_cmd_t *board = board_platform_commands(&board_count);
+
+    for (int t = 0; t < 2; t++) {
+        for (int i = 0; i < tables[t].count; i++) {
+            if (strncmp(tables[t].table[i].name, prefix,
+                        prefix_len) == 0) {
+                *match = tables[t].table[i].name;
+                (*match_count)++;
+            }
+        }
+    }
+    if (board) {
+        for (int i = 0; i < board_count; i++) {
+            if (strncmp(board[i].name, prefix, prefix_len) == 0) {
+                *match = board[i].name;
+                (*match_count)++;
+            }
+        }
+    }
 }
 
 /* Dispatch a /command */
