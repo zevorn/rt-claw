@@ -217,14 +217,14 @@ void wifi_manager_scan_and_print(void)
         .show_hidden = true,
     };
 
-    ESP_LOGI(TAG, "scanning nearby APs...");
+    printf("scanning nearby APs...\n");
 
     esp_wifi_disconnect();
     vTaskDelay(pdMS_TO_TICKS(200));
 
     esp_err_t err = esp_wifi_scan_start(&scan_cfg, true);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "scan failed: %s", esp_err_to_name(err));
+        printf("scan failed: %s\n", esp_err_to_name(err));
         esp_wifi_connect();
         return;
     }
@@ -233,7 +233,7 @@ void wifi_manager_scan_and_print(void)
     esp_wifi_scan_get_ap_num(&ap_count);
 
     if (ap_count == 0) {
-        ESP_LOGW(TAG, "no APs found");
+        printf("no APs found\n");
         esp_wifi_connect();
         return;
     }
