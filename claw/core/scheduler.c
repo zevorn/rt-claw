@@ -164,13 +164,13 @@ void sched_list(void)
         }
     }
 
-    CLAW_LOGI(TAG, "tasks: %d/%d", count, CLAW_SCHED_MAX_TASKS);
+    printf("tasks: %d/%d\n", count, CLAW_SCHED_MAX_TASKS);
     for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
         if (s_tasks[i].active) {
             sched_task_t *t = &s_tasks[i];
-            CLAW_LOGI(TAG, "  [%d] %-20s  every %5ums  remaining=%d",
-                      i, t->name, (unsigned)t->interval_ms,
-                      (int)t->remaining);
+            printf("  [%d] %-20s  every %5ums  remaining=%d\n",
+                   i, t->name, (unsigned)t->interval_ms,
+                   (int)t->remaining);
         }
     }
 

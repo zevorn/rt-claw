@@ -322,11 +322,11 @@ int ai_ltm_delete(const char *key)
 
 void ai_ltm_list(void)
 {
-    CLAW_LOGI(TAG, "long-term memory: %d/%d entries",
-              s_ltm_count, LTM_MAX_ENTRIES);
+    printf("long-term memory: %d/%d entries\n",
+           s_ltm_count, LTM_MAX_ENTRIES);
     for (int i = 0; i < s_ltm_count; i++) {
-        CLAW_LOGI(TAG, "  [%d] %-24s = %.60s", i,
-                  s_ltm[i].key, s_ltm[i].value);
+        printf("  [%d] %-24s = %.60s\n", i,
+               s_ltm[i].key, s_ltm[i].value);
     }
 }
 

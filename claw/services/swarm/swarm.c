@@ -529,17 +529,19 @@ void swarm_list_nodes(void)
 {
     claw_mutex_lock(swarm_lock, CLAW_WAIT_FOREVER);
 
-    CLAW_LOGI(TAG, "nodes: %d/%d (self=0x%08x)",
-              node_count, CLAW_SWARM_MAX_NODES, (unsigned)s_self_id);
+    printf("nodes: %d/%d (self=0x%08x)\n",
+           node_count, CLAW_SWARM_MAX_NODES, (unsigned)s_self_id);
 
     for (int i = 0; i < CLAW_SWARM_MAX_NODES; i++) {
         if (nodes[i].state != SWARM_NODE_OFFLINE) {
             const char *state_str =
                 (nodes[i].id == s_self_id) ? "self" :
                 (nodes[i].state == SWARM_NODE_ONLINE) ? "online" : "disc";
-            CLAW_LOGI(TAG, "  [%d] id=0x%08x  %-6s  load=%d%%  up=%us",
-                      i, (unsigned)nodes[i].id, state_str,
-                      nodes[i].load, (unsigned)nodes[i].uptime_s);
+            printf("  [%d] id=0x%08x  %-6s  cap=0x%02x  "
+                   "load=%d%%  up=%us\n",
+                   i, (unsigned)nodes[i].id, state_str,
+                   nodes[i].capabilities,
+                   nodes[i].load, (unsigned)nodes[i].uptime_s);
         }
     }
 

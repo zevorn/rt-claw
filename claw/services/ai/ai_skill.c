@@ -253,11 +253,11 @@ const char *ai_skill_find(const char *name)
 
 void ai_skill_list(void)
 {
-    CLAW_LOGI(TAG, "skills: %d/%d", s_count, SKILL_MAX);
+    printf("skills: %d/%d\n", s_count, SKILL_MAX);
     for (int i = 0; i < s_count; i++) {
         ai_skill_t *s = &s_skills[i];
-        CLAW_LOGI(TAG, "  %-12s  %s%s", s->name, s->description,
-                  s->builtin ? " (built-in)" : "");
+        printf("  %-12s  %s%s\n", s->name, s->description,
+               s->builtin ? " (built-in)" : "");
     }
 }
 
