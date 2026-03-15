@@ -1557,11 +1557,12 @@ async function serialConnect() {
 async function serialReadLoop() {
     while (serialPort && serialPort.readable && serialKeepReading) {
         serialReader = serialPort.readable.getReader();
+        var utf8Decoder = new TextDecoder('utf-8', { fatal: false });
         try {
             while (true) {
                 var result = await serialReader.read();
                 if (result.done) break;
-                serialAppendAnsi(new TextDecoder().decode(result.value));
+                serialAppendAnsi(utf8Decoder.decode(result.value, { stream: true }));
             }
         } catch (e) {
             if (serialKeepReading) {
@@ -1622,6 +1623,11 @@ function serialClear() {
         serialOutput.textContent = curLang3 === 'zh' ? '\u70B9\u51FB\u201C\u8FDE\u63A5\u201D\u6253\u5F00\u4E32\u53E3...' : 'Click "Connect" to open a serial port...';
     }
 }
+
+/* ── Release serial port on page unload ── */
+window.addEventListener('beforeunload', function() {
+    if (serialPort) serialDisconnect();
+});
 
 /* ── Expand (cover flash panel) ── */
 function serialExpand() {
