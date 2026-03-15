@@ -70,19 +70,19 @@ scenario without writing, compiling, or flashing embedded code again.
 | gateway | net | swarm | ai_engine | shell | sched | feishu   |
 +--------------------------------------------------------------+
 |                      skills (AI Skills)                      |
-|            (one skill composes multiple tools)               |
+|             (one skill composes multiple tools)              |
 +--------------------------------------------------------------+
-|                     tools (Tool Use)                         |
+|                       tools (Tool Use)                       |
 | gpio | system | lcd | audio | http | scheduler | memory      |
 +--------------------------------------------------------------+
-|                   drivers (Hardware BSP)                     |
+|                    drivers (Hardware BSP)                    |
 | WiFi | ES8311 | SSD1306 | serial | LCD framebuffer           |
 +--------------------------------------------------------------+
-|               osal/claw_os.h  (OSAL API)                     |
+|                  osal/claw_os.h (OSAL API)                   |
 +-------------------+------------------------------------------+
-| FreeRTOS (IDF)    |             RT-Thread                    |
+| FreeRTOS (IDF)    |                RT-Thread                 |
 +-------------------+------------------------------------------+
-| ESP32-C3 / S3     |  QEMU vexpress-a9                        |
+| ESP32-C3 / S3     |             QEMU vexpress-a9             |
 +-------------------+------------------------------------------+
 ```
 
