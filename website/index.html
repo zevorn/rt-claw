@@ -495,20 +495,11 @@
             transition: background 0.2s;
         }
         .serial-input-bar button:hover { background: rgba(245, 158, 11, 0.1); }
-        .serial-input-bar.hidden { display: none; }
-        .serial-output:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
-        .serial-output .serial-cursor {
-            display: inline-block; width: 0.55em; height: 1.1em;
-            background: #d4d4d4; vertical-align: text-bottom;
-            animation: cursor-blink 1s step-end infinite;
+        .serial-panel.expanded {
+            grid-column: 1 / -1;
         }
-        @keyframes cursor-blink { 50% { opacity: 0; } }
-        .serial-panel.fullscreen {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 300; border-radius: 0; display: flex; flex-direction: column;
-        }
-        .serial-panel.fullscreen .serial-output {
-            height: auto; flex: 1;
+        .serial-panel.expanded .serial-output {
+            height: 500px;
         }
         .serial-msg-success { color: #4ade80; }
         .serial-msg-error { color: #f87171; }
@@ -941,8 +932,7 @@
                         <button class="serial-ctrl-btn" id="serial-connect-btn" onclick="serialToggle()" data-en="Connect" data-zh="连接">Connect</button>
                         <button class="serial-ctrl-btn" onclick="serialReset()" data-en="Reset" data-zh="重置">Reset</button>
                         <button class="serial-ctrl-btn" onclick="serialClear()" data-en="Clear" data-zh="清除">Clear</button>
-                        <button class="serial-ctrl-btn" id="serial-mode-btn" onclick="serialToggleMode()" title="Switch input mode">Line</button>
-                        <button class="serial-ctrl-btn" onclick="serialFullscreen()" title="Fullscreen">&#9634;</button>
+                        <button class="serial-ctrl-btn" id="serial-expand-btn" onclick="serialExpand()" title="Expand">&#9634;</button>
                     </div>
                 </div>
                 <div class="serial-output" id="serial-output" data-en-default="Click &quot;Connect&quot; to open a serial port..." data-zh-default="点击"连接"打开串口...">Click "Connect" to open a serial port...</div>
@@ -1633,52 +1623,13 @@ function serialClear() {
     }
 }
 
-/* ── Fullscreen ── */
-function serialFullscreen() {
-    document.querySelector('.serial-panel').classList.toggle('fullscreen');
-    if (serialRawMode) serialOutput.focus();
+/* ── Expand (cover flash panel) ── */
+function serialExpand() {
+    var panel = document.querySelector('.serial-panel');
+    panel.classList.toggle('expanded');
+    var btn = document.getElementById('serial-expand-btn');
+    btn.classList.toggle('active', panel.classList.contains('expanded'));
 }
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        document.querySelector('.serial-panel').classList.remove('fullscreen');
-    }
-});
-
-/* ── Raw / Line mode toggle ── */
-var serialRawMode = false;
-var serialModeBtn = document.getElementById('serial-mode-btn');
-var serialInputBar = document.querySelector('.serial-input-bar');
-
-function serialToggleMode() {
-    serialRawMode = !serialRawMode;
-    serialModeBtn.textContent = serialRawMode ? 'Raw' : 'Line';
-    serialModeBtn.classList.toggle('active', serialRawMode);
-    serialInputBar.classList.toggle('hidden', serialRawMode);
-    if (serialRawMode) {
-        serialOutput.setAttribute('tabindex', '0');
-        serialOutput.focus();
-    } else {
-        serialOutput.removeAttribute('tabindex');
-    }
-}
-
-/* Raw mode: send keystrokes directly */
-serialOutput.addEventListener('keydown', function(e) {
-    if (!serialRawMode || !serialWriter) return;
-    e.preventDefault();
-    var data = null;
-    if (e.key === 'Enter') data = '\r';
-    else if (e.key === 'Backspace') data = '\x7f';
-    else if (e.key === 'Tab') data = '\t';
-    else if (e.ctrlKey && e.key.length === 1) {
-        var code = e.key.toUpperCase().charCodeAt(0) - 64;
-        if (code >= 0 && code <= 31) data = String.fromCharCode(code);
-    }
-    else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) data = e.key;
-    if (data) {
-        serialWriter.write(new TextEncoder().encode(data)).catch(function() {});
-    }
-});
 </script>
 
 </body>
