@@ -1,12 +1,69 @@
 /*
  * Copyright (c) 2026, Chao Liu <chao.liu.zevorn@gmail.com>
  * SPDX-License-Identifier: MIT
+ *
+ * Gateway — message routing with pipeline processing and service registry.
  */
 
 #include "osal/claw_os.h"
 #include "claw/core/gateway.h"
 
+#include <string.h>
+
 #define TAG "gateway"
+
+/* --- Service registry --- */
+
+static struct gw_service_entry s_services[GW_MAX_SERVICES];
+static int s_service_count;
+
+int gateway_register_service(const char *name, uint8_t type_mask,
+                             claw_mq_t inbox)
+{
+    if (s_service_count >= GW_MAX_SERVICES) {
+        CLAW_LOGE(TAG, "service registry full");
+        return CLAW_ERROR;
+    }
+    if (!name || !inbox) {
+        return CLAW_ERROR;
+    }
+
+    struct gw_service_entry *e = &s_services[s_service_count];
+    e->name = name;
+    e->type_mask = type_mask;
+    e->inbox = inbox;
+    s_service_count++;
+
+    CLAW_LOGI(TAG, "service registered: %s (mask=0x%02x)", name, type_mask);
+    return CLAW_OK;
+}
+
+/* --- Message dispatch --- */
+
+static void dispatch_msg(struct gateway_msg *msg)
+{
+    uint8_t bit = (uint8_t)(1 << msg->type);
+    int delivered = 0;
+
+    for (int i = 0; i < s_service_count; i++) {
+        if (s_services[i].type_mask & bit) {
+            if (claw_mq_send(s_services[i].inbox, msg, sizeof(*msg),
+                             CLAW_NO_WAIT) == CLAW_OK) {
+                delivered++;
+            } else {
+                CLAW_LOGW(TAG, "drop msg type=%d -> %s (queue full)",
+                          msg->type, s_services[i].name);
+            }
+        }
+    }
+
+    if (delivered == 0) {
+        CLAW_LOGD(TAG, "msg type=%d len=%d (no consumer)", msg->type,
+                  msg->len);
+    }
+}
+
+/* --- Gateway thread --- */
 
 static claw_mq_t gw_mq;
 
@@ -20,15 +77,16 @@ static void gateway_thread_entry(void *param)
     while (1) {
         if (claw_mq_recv(gw_mq, &msg, sizeof(msg),
                           CLAW_WAIT_FOREVER) == CLAW_OK) {
-            /* TODO: route to target node */
-            CLAW_LOGD(TAG, "msg type=%d len=%d (not routed)",
-                      msg.type, msg.len);
+            dispatch_msg(&msg);
         }
     }
 }
 
 int gateway_init(void)
 {
+    memset(s_services, 0, sizeof(s_services));
+    s_service_count = 0;
+
     gw_mq = claw_mq_create("gw_mq", sizeof(struct gateway_msg),
                              CLAW_GW_MSG_POOL_SIZE);
     if (!gw_mq) {
