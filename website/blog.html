@@ -245,7 +245,7 @@ function loadPost(name) {
     var content = document.getElementById('blog-content');
     content.innerHTML = '<p class="blog-loading">Loading...</p>';
 
-    fetch('blog/' + name + '.md')
+    fetch('docs/zh/blog/' + name + '.md')
         .then(function(r) {
             if (!r.ok) throw new Error(r.status);
             return r.text();
