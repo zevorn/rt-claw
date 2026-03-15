@@ -400,6 +400,22 @@ Join the GTOC (Gevico Open-Source Community) channels:
 - [Coding Style](docs/en/coding-style.md)
 - [Contributing](docs/en/contributing.md)
 
+## Acknowledgments
+
+Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [Nanobot](https://github.com/HKUDS/nanobot).
+ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimiclaw).
+RT-Claw reimplements the core AI agent architecture for embedded hardware — no Linux, no server, just a $1 chip.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=zevorn%2Frt-claw&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## License
 
 MIT

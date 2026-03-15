@@ -395,6 +395,22 @@ rt-claw/
 - [编码风格](docs/zh/coding-style.md)
 - [贡献指南](docs/zh/contributing.md)
 
+## 致谢
+
+受 [OpenClaw](https://github.com/openclaw/openclaw) 和 [Nanobot](https://github.com/HKUDS/nanobot) 启发。
+ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
+RT-Claw 为嵌入式硬件重新实现了核心 AI Agent 架构——无需 Linux，无需服务器，仅需一颗 1 美元的芯片。
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=zevorn%2Frt-claw&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## 许可证
 
 MIT
