@@ -12,7 +12,7 @@
 
 **RT-Claw** 就是这样一个项目——它将 LLM（大语言模型）的对话能力和 Tool Use（函数调用）能力带到了嵌入式 RTOS 上。通过 OSAL（操作系统抽象层），RT-Claw 可以无缝运行在 **RT-Thread** 和 FreeRTOS 上，核心代码零修改。
 
-本文将手把手带你在 **QEMU vexpress-a9** 上体验 RT-Claw + RT-Thread 的完整流程——无需任何硬件，只需一台 Linux 电脑。
+本文将手把手带你在 **QEMU vexpress-a9** 上体验 RT-Claw + RT-Thread 的完整流程——无需任何硬件，只需一台有 Linux 开发环境的 PC 或者使用下文提供的云原生开发环境。
 
 ## RT-Thread 简介
 
@@ -85,6 +85,8 @@ sudo pacman -S --needed git wget python cmake ninja \
 
 > 注：不需要安装 ESP-IDF，vexpress-a9 目标使用 Meson + SCons 构建。
 
+也可以在浏览器中零配置体验：打开 [CNB 云端 IDE](https://cnb.cool/gevico.online/rtclaw/rt-claw)，所有工具链已预装。
+
 ### 获取代码
 
 ```bash
@@ -132,11 +134,11 @@ python3 scripts/api-proxy.py https://api.anthropic.com &
 代理启动后会监听 `0.0.0.0:8888`。QEMU 内部的固件通过 `http://10.0.2.2:8888` 访问代理（`10.0.2.2` 是 QEMU 用户模式网络中宿主机的地址），代理再将请求转发到真实的 HTTPS API。
 
 ```
-┌──────────────┐     HTTP     ┌──────────────┐    HTTPS     ┌──────────────┐
-│  RT-Thread   │ ──────────── │  api-proxy   │ ──────────── │  Cloud LLM   │
-│  (QEMU)      │  10.0.2.2:   │  (Host)      │              │  API         │
-│              │     8888     │              │              │              │
-└──────────────┘              └──────────────┘              └──────────────┘
++--------------+     HTTP     +--------------+    HTTPS     +--------------+
+|  RT-Thread   | ------------ |  api-proxy   | ------------ |  Cloud LLM   |
+|  (QEMU)      |  10.0.2.2:   |  (Host)      |              |  API         |
+|              |     8888     |              |              |              |
++--------------+              +--------------+              +--------------+
 ```
 
 ## 运行
@@ -261,7 +263,7 @@ AI 调用 `http_request` 工具发送 GET 请求并返回结果。
 
 ## 飞书机器人集成
 
-RT-Claw 支持通过飞书（Lark）WebSocket 长连接与 AI 交互——无需公网 IP，设备启动后自动建立连接。
+RT-Claw 支持通过飞书（Lark）WebSocket 长连接与 AI 交互——无需公网 IP，设备启动后自动建立连接。下文使用 ESP32-C3 硬件演示。
 
 <p align="center">
   <img src="../../images/feishu_talk1.png" alt="飞书对话 — AI 自我介绍" width="500">
@@ -376,11 +378,17 @@ python3 scripts/api-proxy.py https://api.anthropic.com &
 make run-vexpress-a9-qemu
 ```
 
-也可以在浏览器中零配置体验：打开 [CNB 云端 IDE](https://cnb.cool/gevico.online/rtclaw/rt-claw)，所有工具链已预装。
+## 写在最后
 
-## 社区
+RT-Claw 还是一个很年轻的项目，但我们相信嵌入式 AI 的未来就在边缘——不需要昂贵的服务器，不需要复杂的部署，一颗几块钱的芯片就能成为你的智能助手。
 
-RT-Claw 是一个开源项目，欢迎参与贡献：
+如果这篇文章对你有启发，或者你觉得 RT-Claw 的方向有意思，欢迎到 GitHub 给我们点个 **Star**，这是对开源项目最大的支持和鼓励：
+
+**https://github.com/zevorn/rt-claw**
+
+我们也非常欢迎各种形式的参与——提 Issue、提 PR、分享给朋友，或者只是在社区里聊聊你的想法。
+
+### 社区
 
 - **GitHub**：[zevorn/rt-claw](https://github.com/zevorn/rt-claw)
 - **官网**：[rt-claw.com](https://www.rt-claw.com)
@@ -392,4 +400,4 @@ RT-Claw 是一个开源项目，欢迎参与贡献：
 
 ---
 
-*本文由 RT-Claw 项目作者撰写，感谢 RT-Thread 社区提供的优秀实时操作系统基础设施。*
+*本文由 RT-Claw 项目作者泽文撰写，感谢 RT-Thread 社区提供的优秀实时操作系统基础设施。*
