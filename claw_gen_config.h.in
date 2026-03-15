@@ -22,4 +22,8 @@
 #mesondefine CONFIG_RTCLAW_FEISHU_APP_ID
 #mesondefine CONFIG_RTCLAW_FEISHU_APP_SECRET
 
+/* Telegram Bot IM */
+#mesondefine CONFIG_RTCLAW_TELEGRAM_BOT_TOKEN
+#mesondefine CONFIG_RTCLAW_TELEGRAM_API_URL
+
 #endif /* CLAW_GEN_CONFIG_H */

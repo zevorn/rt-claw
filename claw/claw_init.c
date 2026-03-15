@@ -29,6 +29,9 @@
 #ifdef CONFIG_RTCLAW_FEISHU_ENABLE
 #include "claw/services/im/feishu.h"
 #endif
+#ifdef CONFIG_RTCLAW_TELEGRAM_ENABLE
+#include "claw/services/im/telegram.h"
+#endif
 
 #define TAG "init"
 
@@ -59,6 +62,9 @@ static const claw_service_t s_services[] = {
 #endif
 #ifdef CONFIG_RTCLAW_FEISHU_ENABLE
     { "feishu",      feishu_init,       feishu_start,  NULL },
+#endif
+#ifdef CONFIG_RTCLAW_TELEGRAM_ENABLE
+    { "telegram",    telegram_init,     telegram_start, NULL },
 #endif
 };
 
@@ -115,7 +121,8 @@ int claw_init(void)
      * for TLS memory on ESP32-C3 (~40KB per connection) and
      * the combined peak exceeds available heap.
      */
-#ifndef CONFIG_RTCLAW_FEISHU_ENABLE
+#if !defined(CONFIG_RTCLAW_FEISHU_ENABLE) && \
+    !defined(CONFIG_RTCLAW_TELEGRAM_ENABLE)
     if (!claw_thread_create("ai_test", ai_boot_test_thread,
                             NULL, 8192, 20)) {
         CLAW_LOGW(TAG, "ai_test thread create failed");

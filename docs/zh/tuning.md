@@ -30,6 +30,7 @@ meson configure build/<platform>/meson -Dswarm=false -Dheartbeat=false
 | CONFIG_RTCLAW_SKILL_ENABLE | on | ~4KB | 技能系统 |
 | CONFIG_RTCLAW_HEARTBEAT_ENABLE | off | ~9KB | 周期性 AI 巡检 |
 | CONFIG_RTCLAW_FEISHU_ENABLE | off | ~20KB | 飞书 IM + WebSocket + TLS |
+| CONFIG_RTCLAW_TELEGRAM_ENABLE | off | ~16KB | Telegram Bot + HTTP 长轮询 |
 | CONFIG_RTCLAW_TOOL_GPIO | on | ~2KB | GPIO 工具 |
 | CONFIG_RTCLAW_TOOL_SYSTEM | on | ~3KB | 系统信息工具 |
 | CONFIG_RTCLAW_TOOL_LCD | off | ~3KB | LCD 绘图工具 |
@@ -41,7 +42,7 @@ meson configure build/<platform>/meson -Dswarm=false -Dheartbeat=false
 适用于 ESP32-C3 上的纯 AI 聊天终端，可预留约 50KB 空间：
 
 ```
-Shell=on, Swarm=off, Sched=off, Skill=off, Heartbeat=off, Feishu=off
+Shell=on, Swarm=off, Sched=off, Skill=off, Heartbeat=off, Feishu=off, Telegram=off
 Tools: GPIO=on, System=on, others=off
 ```
 
@@ -50,7 +51,16 @@ Tools: GPIO=on, System=on, others=off
 无界面 IM 机器人，无命令行：
 
 ```
-Shell=off, Feishu=on, Swarm=off, Sched=on, Skill=on
+Shell=off, Feishu=on, Telegram=off, Swarm=off, Sched=on, Skill=on
+Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
+```
+
+### Telegram 机器人配置
+
+无界面 Telegram 机器人，无命令行：
+
+```
+Shell=off, Telegram=on, Feishu=off, Swarm=off, Sched=on, Skill=on
 Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 ```
 
@@ -110,6 +120,13 @@ Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 | Max Tokens | 1024 | RTCLAW_AI_MAX_TOKENS | ai_max_tokens |
 | Context Size | 8192 | RTCLAW_AI_CONTEXT_SIZE | ai_context_size |
 | Memory Messages | 20 | RTCLAW_AI_MEMORY_MAX_MSGS | ai_memory_max_msgs |
+
+### 构建时 Telegram 默认值
+
+| 参数 | 默认值 | 环境变量 | Meson 选项 |
+|------|--------|----------|------------|
+| Bot Token | "" | RTCLAW_TELEGRAM_BOT_TOKEN | telegram_bot_token |
+| API URL | https://api.telegram.org | RTCLAW_TELEGRAM_API_URL | telegram_api_url |
 
 ## 网络说明
 

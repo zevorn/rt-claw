@@ -34,7 +34,7 @@ meson compile -C build/esp32s3-qemu/meson
 
 ## Configuration
 
-All rt-claw business config (AI, Feishu, tuning) lives in `claw_config.h` (project root).
+All rt-claw business config (AI, Feishu, Telegram, tuning) lives in `claw_config.h` (project root).
 Credentials are set via Meson or environment variables — NOT in vendor SDK configs.
 
 ```bash
@@ -44,6 +44,7 @@ export RTCLAW_AI_API_URL='https://...'    # API endpoint
 export RTCLAW_AI_MODEL='claude-sonnet-4-6'  # Model name
 export RTCLAW_FEISHU_APP_ID='cli_...'     # Feishu App ID
 export RTCLAW_FEISHU_APP_SECRET='...'     # Feishu App Secret
+export RTCLAW_TELEGRAM_BOT_TOKEN='...'    # Telegram Bot token
 
 # Or Meson options
 meson configure build/<platform>/meson -Dai_api_key='sk-...'
@@ -96,7 +97,7 @@ Format: `subsystem: short description` (max 76 chars), body wrapped at 76 chars.
 
 Every commit **must** include `Signed-off-by` (`git commit -s`).
 
-Subsystem prefixes: `osal`, `gateway`, `swarm`, `net`, `ai`, `platform`, `build`, `docs`, `tools`, `scripts`, `main`, `drivers`, `sched`, `feishu`, `ci`, `claw`, `tests`.
+Subsystem prefixes: `osal`, `gateway`, `swarm`, `net`, `ai`, `platform`, `build`, `docs`, `tools`, `scripts`, `main`, `drivers`, `sched`, `feishu`, `telegram`, `ci`, `claw`, `tests`.
 
 ## Checks
 
@@ -128,7 +129,7 @@ No unit test framework yet. Verify changes by:
 |------|---------|
 | `Makefile` | Unified build entry point |
 | `meson.build` | Root Meson project (cross-compiles claw/ + osal/) |
-| `meson_options.txt` | Build options (osal backend, feature flags, AI/Feishu config) |
+| `meson_options.txt` | Build options (osal backend, feature flags, AI/Feishu/Telegram config) |
 | `build/<platform>/` | Build outputs (gitignored) |
 | `include/` | Unified public headers (claw_os.h, claw_net.h, claw_board.h, etc.) |
 | `include/drivers/` | Driver public headers (mirror of drivers/ structure) |

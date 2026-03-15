@@ -95,17 +95,4 @@ menu "rt-claw Configuration"
 
     endmenu
 
-    menu "Feishu (Lark) Integration"
-
-        config RTCLAW_FEISHU_ENABLE
-            bool "Enable Feishu IM integration"
-            default n
-            help
-                Connect to Feishu via WebSocket long connection.
-                Receives user messages and replies through AI engine.
-                Credentials (App ID / Secret) are configured via Meson
-                options or environment variables.  See claw_config.h.
-
-    endmenu
-
 endmenu

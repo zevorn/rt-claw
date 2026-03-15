@@ -80,7 +80,56 @@ export RTCLAW_FEISHU_APP_ID='cli_...'
 export RTCLAW_FEISHU_APP_SECRET='...'
 ```
 
-Or use Meson options: `-Dfeishu_app_id=... -Dfeishu_app_secret=...`
+Or use Meson options: `-Dfeishu=true -Dfeishu_app_id=... -Dfeishu_app_secret=...`
+
+### Telegram Bot
+
+To use the Telegram bot integration:
+
+1. Create a bot via [@BotFather](https://t.me/BotFather) on Telegram
+2. Copy the bot token (e.g. `123456:ABC-DEF...`)
+3. Export credentials:
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+```
+
+Or use Meson options: `-Dtelegram=true -Dtelegram_bot_token='...'`
+
+For QEMU testing (no TLS), start the Telegram API proxy on a separate port:
+
+```bash
+python3 scripts/api-proxy.py https://api.telegram.org 8889
+```
+
+And set the API URL to the proxy:
+
+```bash
+meson configure build/<platform>/meson \
+    -Dtelegram=true \
+    -Dtelegram_bot_token='...' \
+    -Dtelegram_api_url='http://10.0.2.2:8889'
+```
+
+**Real hardware** (ESP32-C3/S3 with WiFi) has native TLS, no proxy needed:
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+
+# ESP32-C3 xiaozhi-xmini example
+make build-esp32c3-xiaozhi-xmini
+make flash-esp32c3-xiaozhi-xmini
+make run-esp32c3-xiaozhi-xmini    # serial monitor — watch [telegram] logs
+
+# ESP32-S3 example
+make esp32s3
+make flash-esp32s3
+make monitor-esp32s3
+```
+
+After flashing, configure WiFi via `/wifi_set <SSID> <PASS>`, then reboot.
+The device connects to WiFi, starts polling Telegram, and begins receiving
+messages from your bot.
 
 ### WiFi (Hardware Boards Only)
 

@@ -92,4 +92,12 @@
 #define CONFIG_RTCLAW_FEISHU_APP_SECRET ""
 #endif
 
+/* ---- Telegram Bot IM ---- */
+#ifndef CONFIG_RTCLAW_TELEGRAM_BOT_TOKEN
+#define CONFIG_RTCLAW_TELEGRAM_BOT_TOKEN ""
+#endif
+#ifndef CONFIG_RTCLAW_TELEGRAM_API_URL
+#define CONFIG_RTCLAW_TELEGRAM_API_URL   "https://api.telegram.org"
+#endif
+
 #endif /* CLAW_CONFIG_H */

@@ -148,3 +148,32 @@ export RTCLAW_FEISHU_APP_SECRET='...'
 ```
 
 使用 `/feishu_status` 查看状态。
+
+## Telegram 集成
+
+HTTP 长轮询 — 无需公网 IP、Webhook 或端口转发。设备启动后会持续轮询
+Telegram Bot API 获取新消息。收到的消息会转发给 AI 引擎；回复通过
+sendMessage 发送回 Telegram。超过 4096 字符的消息会自动分块发送。
+
+在构建时配置 Bot Token：
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+meson configure build/<platform>/meson -Dtelegram=true
+```
+
+或通过 Meson 选项：
+
+```bash
+meson configure build/<platform>/meson \
+    -Dtelegram=true \
+    -Dtelegram_bot_token='123456:ABC-DEF...'
+```
+
+QEMU 测试时（无 TLS），需在单独终端启动 API 代理：
+
+```bash
+python3 scripts/api-proxy.py https://api.telegram.org 8889
+```
+
+并设置 `-Dtelegram_api_url='http://10.0.2.2:8889'`。

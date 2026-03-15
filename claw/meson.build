@@ -6,6 +6,7 @@ src_files = files(
     'services/ai/ai_memory.c',
     'services/ai/ai_skill.c',
     'services/im/feishu.c',
+    'services/im/telegram.c',
     'services/net/net_service.c',
     'services/swarm/swarm.c',
     'shell/shell_commands.c',
@@ -52,6 +53,12 @@ if get_option('heartbeat')
     endif
     feature_defs += '-DCONFIG_RTCLAW_HEARTBEAT_ENABLE'
     src_files += files('core/heartbeat.c')
+endif
+if get_option('feishu')
+    feature_defs += '-DCONFIG_RTCLAW_FEISHU_ENABLE'
+endif
+if get_option('telegram')
+    feature_defs += '-DCONFIG_RTCLAW_TELEGRAM_ENABLE'
 endif
 
 rtclaw_lib = static_library('rtclaw', src_files,

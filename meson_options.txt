@@ -39,8 +39,20 @@ option('ai_context_size', type: 'integer', value: 0, min: 0, max: 65536,
 option('ai_memory_max_msgs', type: 'integer', value: 0, min: 0, max: 64,
     description: 'Max conversation memory messages, 0=use default (env: RTCLAW_AI_MEMORY_MAX_MSGS)')
 
+# IM integrations — enable flags
+option('feishu', type: 'boolean', value: false,
+    description: 'Enable Feishu (Lark) IM integration')
+option('telegram', type: 'boolean', value: false,
+    description: 'Enable Telegram Bot integration')
+
 # Feishu (Lark) IM — credentials
 option('feishu_app_id', type: 'string', value: '',
     description: 'Feishu App ID (env: RTCLAW_FEISHU_APP_ID)')
 option('feishu_app_secret', type: 'string', value: '',
     description: 'Feishu App Secret (env: RTCLAW_FEISHU_APP_SECRET)')
+
+# Telegram Bot — credentials and endpoint
+option('telegram_bot_token', type: 'string', value: '',
+    description: 'Telegram Bot token (env: RTCLAW_TELEGRAM_BOT_TOKEN)')
+option('telegram_api_url', type: 'string', value: '',
+    description: 'Telegram API base URL (env: RTCLAW_TELEGRAM_API_URL)')

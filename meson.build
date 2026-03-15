@@ -62,6 +62,8 @@ _str_overrides = {
     'ai_model':         ['RTCLAW_AI_MODEL',         'CONFIG_RTCLAW_AI_MODEL'],
     'feishu_app_id':    ['RTCLAW_FEISHU_APP_ID',    'CONFIG_RTCLAW_FEISHU_APP_ID'],
     'feishu_app_secret':['RTCLAW_FEISHU_APP_SECRET','CONFIG_RTCLAW_FEISHU_APP_SECRET'],
+    'telegram_bot_token':['RTCLAW_TELEGRAM_BOT_TOKEN','CONFIG_RTCLAW_TELEGRAM_BOT_TOKEN'],
+    'telegram_api_url':  ['RTCLAW_TELEGRAM_API_URL',  'CONFIG_RTCLAW_TELEGRAM_API_URL'],
 }
 
 # Integer config: [meson_option, env_var_name, config_macro_name]

@@ -30,6 +30,7 @@ meson configure build/<platform>/meson -Dswarm=false -Dheartbeat=false
 | CONFIG_RTCLAW_SKILL_ENABLE | on | ~4KB | Skill system |
 | CONFIG_RTCLAW_HEARTBEAT_ENABLE | off | ~9KB | Periodic AI patrol |
 | CONFIG_RTCLAW_FEISHU_ENABLE | off | ~20KB | Feishu IM + WebSocket + TLS |
+| CONFIG_RTCLAW_TELEGRAM_ENABLE | off | ~16KB | Telegram Bot + HTTP polling |
 | CONFIG_RTCLAW_TOOL_GPIO | on | ~2KB | GPIO tools |
 | CONFIG_RTCLAW_TOOL_SYSTEM | on | ~3KB | System info tools |
 | CONFIG_RTCLAW_TOOL_LCD | off | ~3KB | LCD drawing tools |
@@ -41,7 +42,7 @@ meson configure build/<platform>/meson -Dswarm=false -Dheartbeat=false
 For a bare AI chat terminal on ESP32-C3 with ~50KB headroom:
 
 ```
-Shell=on, Swarm=off, Sched=off, Skill=off, Heartbeat=off, Feishu=off
+Shell=on, Swarm=off, Sched=off, Skill=off, Heartbeat=off, Feishu=off, Telegram=off
 Tools: GPIO=on, System=on, others=off
 ```
 
@@ -50,7 +51,16 @@ Tools: GPIO=on, System=on, others=off
 Headless IM bot, no shell:
 
 ```
-Shell=off, Feishu=on, Swarm=off, Sched=on, Skill=on
+Shell=off, Feishu=on, Telegram=off, Swarm=off, Sched=on, Skill=on
+Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
+```
+
+### Telegram Bot Profile
+
+Headless Telegram bot, no shell:
+
+```
+Shell=off, Telegram=on, Feishu=off, Swarm=off, Sched=on, Skill=on
 Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 ```
 
@@ -110,6 +120,13 @@ Key sdkconfig knobs:
 | Max Tokens | 1024 | RTCLAW_AI_MAX_TOKENS | ai_max_tokens |
 | Context Size | 8192 | RTCLAW_AI_CONTEXT_SIZE | ai_context_size |
 | Memory Messages | 20 | RTCLAW_AI_MEMORY_MAX_MSGS | ai_memory_max_msgs |
+
+### Build-time Telegram Defaults
+
+| Parameter | Default | Env Var | Meson Option |
+|-----------|---------|---------|--------------|
+| Bot Token | "" | RTCLAW_TELEGRAM_BOT_TOKEN | telegram_bot_token |
+| API URL | https://api.telegram.org | RTCLAW_TELEGRAM_API_URL | telegram_api_url |
 
 ## Network Notes
 

@@ -17,17 +17,17 @@ links into the final firmware binary.
 ```
 +----------------------------------------------------------------------+
 |  Application                                                         |
-|  gateway | swarm | net | ai_engine | tools | shell | sched | feishu  |
+|  gateway | swarm | net | ai_engine | tools | shell | sched | im      |
 |  heartbeat                                                           |
 +----------------------------------------------------------------------+
 |  OSAL                                                                |
-|  claw_os.h  |  claw_net.h                                           |
+|  claw_os.h  |  claw_net.h                                            |
 +----------------------------------------------------------------------+
 |  RTOS                                                                |
 |  FreeRTOS (ESP-IDF)              |  RT-Thread                        |
 +----------------------------------------------------------------------+
 |  Hardware                                                            |
-|  ESP32-C3/S3 (WiFi/BLE/OLED/Audio)  |  vexpress-a9 (Ethernet/UART)  |
+|  ESP32-C3/S3 (WiFi/BLE/OLED/Audio)  |  vexpress-a9 (Ethernet/UART)   |
 +----------------------------------------------------------------------+
 ```
 
@@ -96,11 +96,19 @@ Platform-aware HTTP client. ESP-IDF: `esp_http_client` with mbedTLS for
 HTTPS. RT-Thread: BSD sockets routed through `scripts/api-proxy.py`
 (HTTP-to-HTTPS proxy for environments without native TLS).
 
-### Feishu IM (`claw/services/im/`)
+### Feishu IM (`claw/services/im/feishu.c`)
 
 WebSocket long connection to Feishu/Lark messaging platform. No public IP
 or webhook endpoint required. Event subscription: `im.message.receive_v1`.
 Bidirectional message relay between Feishu users and the AI engine.
+
+### Telegram IM (`claw/services/im/telegram.c`)
+
+HTTP long polling integration with Telegram Bot API. Three-thread architecture:
+poll thread (getUpdates with 30s timeout), AI worker thread (ai_chat + channel
+hint), and outbound thread (sendMessage with auto-chunking for messages >4096
+chars). Bot Token authentication, no webhook or public IP needed. Supports
+typing indicators via sendChatAction.
 
 ### Shell (`claw/shell/`)
 

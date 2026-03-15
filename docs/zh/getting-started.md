@@ -79,7 +79,55 @@ export RTCLAW_FEISHU_APP_ID='cli_...'
 export RTCLAW_FEISHU_APP_SECRET='...'
 ```
 
-或使用 Meson 选项：`-Dfeishu_app_id=... -Dfeishu_app_secret=...`
+或使用 Meson 选项：`-Dfeishu=true -Dfeishu_app_id=... -Dfeishu_app_secret=...`
+
+### Telegram Bot
+
+使用 Telegram 机器人集成的步骤：
+
+1. 在 Telegram 中通过 [@BotFather](https://t.me/BotFather) 创建机器人
+2. 复制 Bot Token（格式如 `123456:ABC-DEF...`）
+3. 导出凭证：
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+```
+
+或使用 Meson 选项：`-Dtelegram=true -Dtelegram_bot_token='...'`
+
+QEMU 测试时（无 TLS），需在单独端口启动 Telegram API 代理：
+
+```bash
+python3 scripts/api-proxy.py https://api.telegram.org 8889
+```
+
+并将 API URL 指向代理：
+
+```bash
+meson configure build/<platform>/meson \
+    -Dtelegram=true \
+    -Dtelegram_bot_token='...' \
+    -Dtelegram_api_url='http://10.0.2.2:8889'
+```
+
+**真实硬件**（ESP32-C3/S3，带 WiFi）支持原生 TLS，无需代理：
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+
+# ESP32-C3 xiaozhi-xmini 示例
+make build-esp32c3-xiaozhi-xmini
+make flash-esp32c3-xiaozhi-xmini
+make run-esp32c3-xiaozhi-xmini    # 串口监视器 — 观察 [telegram] 日志
+
+# ESP32-S3 示例
+make esp32s3
+make flash-esp32s3
+make monitor-esp32s3
+```
+
+烧录后，通过 `/wifi_set <SSID> <PASS>` 配置 WiFi，然后重启。
+设备连接 WiFi 后会自动开始轮询 Telegram，即可接收来自机器人的消息。
 
 ### WiFi（仅限硬件开发板）
 

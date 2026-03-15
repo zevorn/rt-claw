@@ -153,3 +153,33 @@ export RTCLAW_FEISHU_APP_SECRET='...'
 ```
 
 Check status with `/feishu_status`.
+
+## Telegram Integration
+
+HTTP long polling -- no public IP, webhook, or port forwarding needed.
+The device polls the Telegram Bot API for new messages on boot. Incoming
+messages are forwarded to the AI engine; replies are sent back via
+sendMessage. Messages longer than 4096 characters are automatically split.
+
+Configure the bot token at build time:
+
+```bash
+export RTCLAW_TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'
+meson configure build/<platform>/meson -Dtelegram=true
+```
+
+Or via Meson options:
+
+```bash
+meson configure build/<platform>/meson \
+    -Dtelegram=true \
+    -Dtelegram_bot_token='123456:ABC-DEF...'
+```
+
+For QEMU (no TLS), run the API proxy in a separate terminal:
+
+```bash
+python3 scripts/api-proxy.py https://api.telegram.org 8889
+```
+
+And set `-Dtelegram_api_url='http://10.0.2.2:8889'`.

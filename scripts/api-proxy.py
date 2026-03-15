@@ -14,8 +14,9 @@ import http.server
 import urllib.request
 import ssl
 import sys
+import os
 
-PORT = 8888
+PORT = int(os.environ.get("PORT", sys.argv[2] if len(sys.argv) > 2 else "8888"))
 TARGET = sys.argv[1] if len(sys.argv) > 1 else "https://api.hiyo.top"
 
 
