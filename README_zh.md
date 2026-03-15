@@ -106,7 +106,7 @@ make run-esp32c3-qemu
 - **QQ 群**：[加入](https://qm.qq.com/q/heSPPC9De8)
 - **Telegram**：[GTOC 频道](https://t.me/gevico_channel)
 - **Bilibili**：[绝对是泽文啦](https://space.bilibili.com/483048140)
-- **微信**：GTOC 微信公众号
+- **微信**：[GTOC 微信公众号](https://mp.weixin.qq.com/s/PhTZKjk4FO0iVveBB9OvSQ)
 
 ## 致谢
 

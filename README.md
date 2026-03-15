@@ -106,7 +106,7 @@ Join the GTOC (Gevico Open-Source Community) channels:
 - **QQ Group**: [Join](https://qm.qq.com/q/heSPPC9De8)
 - **Telegram**: [GTOC Channel](https://t.me/gevico_channel)
 - **Bilibili**: [Zevorn](https://space.bilibili.com/483048140)
-- **WeChat**: GTOC
+- **WeChat**: [GTOC](https://mp.weixin.qq.com/s/PhTZKjk4FO0iVveBB9OvSQ)
 
 ## Acknowledgments
 
