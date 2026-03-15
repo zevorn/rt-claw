@@ -70,22 +70,55 @@
         .nav-links a:hover { color: var(--text); }
         .nav-btn {
             display: inline-flex; align-items: center; gap: 0.4rem;
-            padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            padding: 0.55rem 1.15rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem;
             background: var(--accent); color: #fff; border: none; cursor: pointer;
             transition: transform 0.15s, box-shadow 0.15s;
             text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+            animation: flash-pulse 2s ease-in-out infinite;
         }
         .nav-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
             color: #fff;
         }
+        @keyframes flash-pulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.6); }
+        }
         .nav-btn svg { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
         .nav-github {
-            color: var(--text-muted); display: flex; align-items: center;
+            color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;
             transition: color 0.2s;
         }
         .nav-github:hover { color: var(--text); }
+
+        .star-badge {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 20px; padding: 0.25rem 0.6rem;
+            font-size: 0.78rem; font-weight: 600; color: var(--accent);
+        }
+
+        .lang-toggle {
+            display: inline-flex; align-items: center;
+            background: rgba(148, 163, 184, 0.12); border: 1px solid var(--border);
+            border-radius: 20px; padding: 0; overflow: hidden; font-size: 0.78rem;
+            font-weight: 600; cursor: pointer; user-select: none;
+        }
+        .lang-toggle span {
+            padding: 0.25rem 0.55rem; transition: background 0.2s, color 0.2s;
+            color: var(--text-muted);
+        }
+        .lang-toggle span.active {
+            background: var(--accent); color: #fff;
+        }
+
+        .btn-star {
+            background: rgba(245, 158, 11, 0.12); border: 1.5px solid rgba(245, 158, 11, 0.35);
+            color: var(--accent);
+        }
+        .btn-star:hover { background: rgba(245, 158, 11, 0.22); border-color: var(--accent); color: var(--accent); }
 
         .nav-toggle {
             display: none; background: none; border: none;
@@ -524,17 +557,24 @@
         </a>
         <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">&#9776;</button>
         <ul class="nav-links">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#architecture">Architecture</a></li>
-            <li><a href="#platforms">Platforms</a></li>
-            <li><a href="#flash">Flash</a></li>
-            <li><a href="#community">Community</a></li>
+            <li><a href="#features" data-en="Features" data-zh="特性">Features</a></li>
+            <li><a href="#architecture" data-en="Architecture" data-zh="架构">Architecture</a></li>
+            <li><a href="#platforms" data-en="Platforms" data-zh="平台">Platforms</a></li>
+            <li><a href="#flash" data-en="Flash" data-zh="烧录">Flash</a></li>
+            <li><a href="#community" data-en="Community" data-zh="社区">Community</a></li>
+            <li>
+                <div class="lang-toggle" onclick="toggleLang()">
+                    <span id="lang-en" class="active">EN</span>
+                    <span id="lang-zh">中文</span>
+                </div>
+            </li>
             <li><a href="https://github.com/zevorn/rt-claw" class="nav-github" target="_blank">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+                <span class="star-badge" id="nav-star-count">&#9733; --</span>
             </a></li>
             <li><a href="#flash" class="nav-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Flash
+                <span data-en="Flash" data-zh="烧录">Flash</span>
             </a></li>
         </ul>
     </div>
@@ -545,17 +585,22 @@
     <div class="hero-circuit"></div>
     <div class="hero-content">
         <img src="img/logo.png" alt="RT-Claw" class="hero-logo">
-        <h1><span class="highlight">Making AI Assistants</span><br>Cheap Again</h1>
-        <p>Deploy your own AI assistant on hardware that costs just one dollar.
+        <h1><span class="highlight" data-en="Making AI Assistants" data-zh="让 AI 助手">Making AI Assistants</span><br><span data-en="Cheap Again" data-zh="再次廉价">Cheap Again</span></h1>
+        <p data-en="Deploy your own AI assistant on hardware that costs just one dollar. Seamlessly bridging the digital and physical worlds." data-zh="在仅需一美元的硬件上部署您自己的 AI 助手。无缝连接数字世界与物理世界。">Deploy your own AI assistant on hardware that costs just one dollar.
            Seamlessly bridging the digital and physical worlds.</p>
         <div class="hero-buttons">
             <a href="https://github.com/zevorn/rt-claw" class="btn btn-primary" target="_blank">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
-                Get Started
+                <span data-en="Get Started" data-zh="快速开始">Get Started</span>
             </a>
             <a href="#flash" class="btn btn-outline">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Flash Firmware
+                <span data-en="Flash Firmware" data-zh="烧录固件">Flash Firmware</span>
+            </a>
+            <a href="https://github.com/zevorn/rt-claw" class="btn btn-star" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L0 9.306l8.332-1.151z"/></svg>
+                <span data-en="Star on GitHub" data-zh="GitHub 加星">Star on GitHub</span>
+                <span class="star-badge" id="hero-star-count">&#9733; --</span>
             </a>
         </div>
     </div>
@@ -569,19 +614,19 @@
     <div class="stats-grid">
         <div class="stat reveal">
             <div class="stat-value">5</div>
-            <div class="stat-label">Platforms</div>
+            <div class="stat-label" data-en="Platforms" data-zh="平台">Platforms</div>
         </div>
         <div class="stat reveal">
             <div class="stat-value">9</div>
-            <div class="stat-label">Features Done</div>
+            <div class="stat-label" data-en="Features Done" data-zh="已完成特性">Features Done</div>
         </div>
         <div class="stat reveal">
             <div class="stat-value">$1</div>
-            <div class="stat-label">Hardware Cost</div>
+            <div class="stat-label" data-en="Hardware Cost" data-zh="硬件成本">Hardware Cost</div>
         </div>
         <div class="stat reveal">
             <div class="stat-value">2</div>
-            <div class="stat-label">RTOS Supported</div>
+            <div class="stat-label" data-en="RTOS Supported" data-zh="支持的 RTOS">RTOS Supported</div>
         </div>
     </div>
 </div>
@@ -589,27 +634,27 @@
 <!-- Key Differentiators -->
 <section id="highlights">
     <div class="container">
-        <div class="section-label reveal">Why RT-Claw</div>
-        <h2 class="section-title reveal">Intelligence at the Edge</h2>
-        <p class="section-subtitle reveal">No cloud dependency. No Linux. Just pure C on bare-metal RTOS, with LLM superpowers.</p>
+        <div class="section-label reveal" data-en="Why RT-Claw" data-zh="为什么选择 RT-Claw">Why RT-Claw</div>
+        <h2 class="section-title reveal" data-en="Intelligence at the Edge" data-zh="边缘智能">Intelligence at the Edge</h2>
+        <p class="section-subtitle reveal" data-en="No cloud dependency. No Linux. Just pure C on bare-metal RTOS, with LLM superpowers." data-zh="无需云端依赖。无需 Linux。纯 C 语言运行在裸机 RTOS 上，拥有 LLM 超能力。">No cloud dependency. No Linux. Just pure C on bare-metal RTOS, with LLM superpowers.</p>
         <div class="highlights-grid">
             <div class="highlight-card reveal">
                 <div class="highlight-num">01</div>
                 <div class="highlight-icon">&#9889;</div>
-                <h3>Pure C, Zero Bloat</h3>
-                <p>No Linux. No Node.js. C99 on FreeRTOS and RT-Thread. Runs on MCUs with 400 KB RAM. Hardware costs one dollar.</p>
+                <h3 data-en="Pure C, Zero Bloat" data-zh="纯 C 语言，零臃肿">Pure C, Zero Bloat</h3>
+                <p data-en="No Linux. No Node.js. C99 on FreeRTOS and RT-Thread. Runs on MCUs with 400 KB RAM. Hardware costs one dollar." data-zh="无需 Linux。无需 Node.js。C99 运行在 FreeRTOS 和 RT-Thread 上。仅需 400 KB RAM 的 MCU。硬件成本仅一美元。">No Linux. No Node.js. C99 on FreeRTOS and RT-Thread. Runs on MCUs with 400 KB RAM. Hardware costs one dollar.</p>
             </div>
             <div class="highlight-card reveal">
                 <div class="highlight-num">02</div>
                 <div class="highlight-icon">&#129703;</div>
-                <h3>Swarm Intelligence</h3>
-                <p>Networked nodes discover each other, share tasks, and collaborate in real time. Each Claw is a neuron in a distributed brain.</p>
+                <h3 data-en="Swarm Intelligence" data-zh="群体智能">Swarm Intelligence</h3>
+                <p data-en="Networked nodes discover each other, share tasks, and collaborate in real time. Each Claw is a neuron in a distributed brain." data-zh="联网节点自动发现、共享任务并实时协作。每个 Claw 都是分布式大脑中的一个神经元。">Networked nodes discover each other, share tasks, and collaborate in real time. Each Claw is a neuron in a distributed brain.</p>
             </div>
             <div class="highlight-card reveal">
                 <div class="highlight-num">03</div>
                 <div class="highlight-icon">&#128295;</div>
-                <h3>LLM Tool Use</h3>
-                <p>The AI dynamically orchestrates GPIO, LCD, sensors, and more via function calling. No re-flashing needed.</p>
+                <h3 data-en="LLM Tool Use" data-zh="LLM 工具调用">LLM Tool Use</h3>
+                <p data-en="The AI dynamically orchestrates GPIO, LCD, sensors, and more via function calling. No re-flashing needed." data-zh="AI 通过函数调用动态编排 GPIO、LCD、传感器等。无需重新烧录固件。">The AI dynamically orchestrates GPIO, LCD, sensors, and more via function calling. No re-flashing needed.</p>
             </div>
         </div>
     </div>
@@ -618,54 +663,54 @@
 <!-- Features -->
 <section id="features">
     <div class="container">
-        <div class="section-label reveal">Capabilities</div>
-        <h2 class="section-title reveal">Core Features</h2>
-        <p class="section-subtitle reveal">Everything you need to build intelligent embedded agents.</p>
+        <div class="section-label reveal" data-en="Capabilities" data-zh="能力">Capabilities</div>
+        <h2 class="section-title reveal" data-en="Core Features" data-zh="核心特性">Core Features</h2>
+        <p class="section-subtitle reveal" data-en="Everything you need to build intelligent embedded agents." data-zh="构建智能嵌入式代理所需的一切。">Everything you need to build intelligent embedded agents.</p>
         <div class="features-grid">
             <div class="feature-card reveal">
                 <div class="feature-icon">&#129302;</div>
-                <h3>LLM Chat Engine</h3>
-                <p>Interactive conversation with Claude API over HTTP. Chat-first shell where direct input goes to AI.</p>
+                <h3 data-en="LLM Chat Engine" data-zh="LLM 对话引擎">LLM Chat Engine</h3>
+                <p data-en="Interactive conversation with Claude API over HTTP. Chat-first shell where direct input goes to AI." data-zh="通过 HTTP 与 Claude API 进行交互式对话。对话优先的 Shell，输入直接发送给 AI。">Interactive conversation with Claude API over HTTP. Chat-first shell where direct input goes to AI.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128295;</div>
-                <h3>Tool Use</h3>
-                <p>LLM-driven hardware control via function calling. GPIO, system info, LCD drawing dynamically orchestrated.</p>
+                <h3 data-en="Tool Use" data-zh="工具调用">Tool Use</h3>
+                <p data-en="LLM-driven hardware control via function calling. GPIO, system info, LCD drawing dynamically orchestrated." data-zh="通过函数调用实现 LLM 驱动的硬件控制。GPIO、系统信息、LCD 绘图动态编排。">LLM-driven hardware control via function calling. GPIO, system info, LCD drawing dynamically orchestrated.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#127912;</div>
-                <h3>LCD Graphics</h3>
-                <p>320x240 RGB565 framebuffer with text, shapes, drawing primitives. AI draws on screen via tool calls.</p>
+                <h3 data-en="LCD Graphics" data-zh="LCD 图形">LCD Graphics</h3>
+                <p data-en="320x240 RGB565 framebuffer with text, shapes, drawing primitives. AI draws on screen via tool calls." data-zh="320x240 RGB565 帧缓冲，支持文字、形状、绘图基元。AI 通过工具调用在屏幕上绘图。">320x240 RGB565 framebuffer with text, shapes, drawing primitives. AI draws on screen via tool calls.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128736;</div>
-                <h3>OSAL Abstraction</h3>
-                <p>Write once, run on FreeRTOS and RT-Thread. Clean claw_os.h hides all RTOS specifics.</p>
+                <h3 data-en="OSAL Abstraction" data-zh="OSAL 抽象层">OSAL Abstraction</h3>
+                <p data-en="Write once, run on FreeRTOS and RT-Thread. Clean claw_os.h hides all RTOS specifics." data-zh="一次编写，在 FreeRTOS 和 RT-Thread 上运行。简洁的 claw_os.h 屏蔽所有 RTOS 差异。">Write once, run on FreeRTOS and RT-Thread. Clean claw_os.h hides all RTOS specifics.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#129703;</div>
-                <h3>Swarm Intelligence</h3>
-                <p>Node discovery, heartbeat, and distributed task scheduling. Collaborative real-time execution.</p>
+                <h3 data-en="Swarm Intelligence" data-zh="群体智能">Swarm Intelligence</h3>
+                <p data-en="Node discovery, heartbeat, and distributed task scheduling. Collaborative real-time execution." data-zh="节点发现、心跳和分布式任务调度。协作式实时执行。">Node discovery, heartbeat, and distributed task scheduling. Collaborative real-time execution.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128268;</div>
-                <h3>Gateway Router</h3>
-                <p>Thread-safe message routing between services. Decoupled, modular architecture.</p>
+                <h3 data-en="Gateway Router" data-zh="网关路由">Gateway Router</h3>
+                <p data-en="Thread-safe message routing between services. Decoupled, modular architecture." data-zh="服务间线程安全的消息路由。解耦的模块化架构。">Thread-safe message routing between services. Decoupled, modular architecture.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#129504;</div>
-                <h3>Memory System</h3>
-                <p>Short-term RAM ring buffer + long-term NVS Flash. Nodes learn and recall operation patterns.</p>
+                <h3 data-en="Memory System" data-zh="记忆系统">Memory System</h3>
+                <p data-en="Short-term RAM ring buffer + long-term NVS Flash. Nodes learn and recall operation patterns." data-zh="短期 RAM 环形缓冲 + 长期 NVS Flash 存储。节点学习并回忆操作模式。">Short-term RAM ring buffer + long-term NVS Flash. Nodes learn and recall operation patterns.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#9200;</div>
-                <h3>Scheduled Tasks</h3>
-                <p>Timer-driven execution and periodic automation. Recurring operations run autonomously.</p>
+                <h3 data-en="Scheduled Tasks" data-zh="定时任务">Scheduled Tasks</h3>
+                <p data-en="Timer-driven execution and periodic automation. Recurring operations run autonomously." data-zh="定时器驱动执行和周期性自动化。周期性操作自主运行。">Timer-driven execution and periodic automation. Recurring operations run autonomously.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128172;</div>
-                <h3>IM Integrations</h3>
-                <p>Connect Feishu, DingTalk, QQ, Telegram as message channels. Control hardware from any chat.</p>
+                <h3 data-en="IM Integrations" data-zh="即时通讯集成">IM Integrations</h3>
+                <p data-en="Connect Feishu, DingTalk, QQ, Telegram as message channels. Control hardware from any chat." data-zh="接入飞书、钉钉、QQ、Telegram 作为消息通道。从任何聊天控制硬件。">Connect Feishu, DingTalk, QQ, Telegram as message channels. Control hardware from any chat.</p>
             </div>
         </div>
     </div>
@@ -674,9 +719,9 @@
 <!-- Architecture -->
 <section id="architecture" class="arch-section">
     <div class="container">
-        <div class="section-label reveal">Design</div>
-        <h2 class="section-title reveal">Architecture</h2>
-        <p class="section-subtitle reveal">Clean layered design with OSAL bridging multiple RTOS platforms.</p>
+        <div class="section-label reveal" data-en="Design" data-zh="设计">Design</div>
+        <h2 class="section-title reveal" data-en="Architecture" data-zh="架构">Architecture</h2>
+        <p class="section-subtitle reveal" data-en="Clean layered design with OSAL bridging multiple RTOS platforms." data-zh="简洁的分层设计，通过 OSAL 桥接多个 RTOS 平台。">Clean layered design with OSAL bridging multiple RTOS platforms.</p>
         <div class="arch-diagram reveal">+---------------------------------------------------+
 |                rt-claw Application                |
 |  gateway | swarm | net | ai_engine | tools | lcd  |
@@ -694,9 +739,9 @@
 <!-- Demo -->
 <section id="demo">
     <div class="container">
-        <div class="section-label reveal">In Action</div>
-        <h2 class="section-title reveal">See It Work</h2>
-        <p class="section-subtitle reveal">AI drawing on LCD via Tool Use — the LLM controls hardware in real time.</p>
+        <div class="section-label reveal" data-en="In Action" data-zh="实际演示">In Action</div>
+        <h2 class="section-title reveal" data-en="See It Work" data-zh="看看效果">See It Work</h2>
+        <p class="section-subtitle reveal" data-en="AI drawing on LCD via Tool Use — the LLM controls hardware in real time." data-zh="AI 通过工具调用在 LCD 上绘图 —— LLM 实时控制硬件。">AI drawing on LCD via Tool Use — the LLM controls hardware in real time.</p>
         <img src="img/demo.png" alt="RT-Claw Demo — AI drawing on LCD via Tool Use" class="demo-img reveal">
     </div>
 </section>
@@ -704,9 +749,9 @@
 <!-- Platforms -->
 <section id="platforms">
     <div class="container">
-        <div class="section-label reveal">Hardware</div>
-        <h2 class="section-title reveal">Supported Platforms</h2>
-        <p class="section-subtitle reveal">Run on real hardware or emulate with QEMU. Current QEMU support covers Espressif fork targets and vexpress-a9; upstream STM32 boards are excluded for now because QEMU still lacks working Ethernet there.</p>
+        <div class="section-label reveal" data-en="Hardware" data-zh="硬件">Hardware</div>
+        <h2 class="section-title reveal" data-en="Supported Platforms" data-zh="支持的平台">Supported Platforms</h2>
+        <p class="section-subtitle reveal" data-en="Run on real hardware or emulate with QEMU. Current QEMU support covers Espressif fork targets and vexpress-a9; upstream STM32 boards are excluded for now because QEMU still lacks working Ethernet there." data-zh="在真实硬件上运行或使用 QEMU 仿真。当前 QEMU 支持 Espressif 分支目标和 vexpress-a9；上游 STM32 板卡由于 QEMU 尚缺少可用的以太网支持而暂时排除。">Run on real hardware or emulate with QEMU. Current QEMU support covers Espressif fork targets and vexpress-a9; upstream STM32 boards are excluded for now because QEMU still lacks working Ethernet there.</p>
         <div class="platforms-grid">
             <div class="platform-card reveal">
                 <h3>ESP32-S3</h3>
@@ -718,10 +763,10 @@
                     <span class="platform-tag">BLE</span>
                 </div>
                 <ul>
-                    <li>Dual-core 240 MHz, 16 MB Flash + 8 MB PSRAM</li>
-                    <li>WiFi + PSRAM for real-world deployment</li>
-                    <li>Web Flash supported from this page</li>
-                    <li>QEMU + open_eth networking available</li>
+                    <li data-en="Dual-core 240 MHz, 16 MB Flash + 8 MB PSRAM" data-zh="双核 240 MHz，16 MB Flash + 8 MB PSRAM">Dual-core 240 MHz, 16 MB Flash + 8 MB PSRAM</li>
+                    <li data-en="WiFi + PSRAM for real-world deployment" data-zh="WiFi + PSRAM 用于实际部署">WiFi + PSRAM for real-world deployment</li>
+                    <li data-en="Web Flash supported from this page" data-zh="支持从本页面 Web 烧录">Web Flash supported from this page</li>
+                    <li data-en="QEMU + open_eth networking available" data-zh="支持 QEMU + open_eth 网络">QEMU + open_eth networking available</li>
                 </ul>
             </div>
             <div class="platform-card reveal">
@@ -734,10 +779,10 @@
                     <span class="platform-tag">BLE</span>
                 </div>
                 <ul>
-                    <li>160 MHz single-core, 400 KB SRAM</li>
-                    <li>Lowest cost option (~$1 modules)</li>
-                    <li>AI + Ethernet verified on QEMU</li>
-                    <li>Flash to real hardware or emulate with open_eth</li>
+                    <li data-en="160 MHz single-core, 400 KB SRAM" data-zh="160 MHz 单核，400 KB SRAM">160 MHz single-core, 400 KB SRAM</li>
+                    <li data-en="Lowest cost option (~$1 modules)" data-zh="最低成本方案（约 $1 模块）">Lowest cost option (~$1 modules)</li>
+                    <li data-en="AI + Ethernet verified on QEMU" data-zh="AI + 以太网在 QEMU 上已验证">AI + Ethernet verified on QEMU</li>
+                    <li data-en="Flash to real hardware or emulate with open_eth" data-zh="烧录到真实硬件或使用 open_eth 仿真">Flash to real hardware or emulate with open_eth</li>
                 </ul>
             </div>
             <div class="platform-card reveal">
@@ -750,19 +795,19 @@
                 </div>
                 <ul>
                     <li>RT-Thread v5.3.0 BSP</li>
-                    <li>No hardware needed</li>
-                    <li>Boot + Ethernet verified on QEMU</li>
-                    <li>lan9118 user-mode networking</li>
+                    <li data-en="No hardware needed" data-zh="无需硬件">No hardware needed</li>
+                    <li data-en="Boot + Ethernet verified on QEMU" data-zh="启动 + 以太网在 QEMU 上已验证">Boot + Ethernet verified on QEMU</li>
+                    <li data-en="lan9118 user-mode networking" data-zh="lan9118 用户模式网络">lan9118 user-mode networking</li>
                 </ul>
             </div>
         </div>
 
         <!-- Status Table -->
-        <h2 class="section-title reveal" style="margin-top: 4rem;">Feature Status</h2>
+        <h2 class="section-title reveal" style="margin-top: 4rem;" data-en="Feature Status" data-zh="特性状态">Feature Status</h2>
         <div class="status-wrap reveal">
             <table class="status-table">
                 <thead>
-                    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+                    <tr><th data-en="Feature" data-zh="特性">Feature</th><th data-en="Description" data-zh="描述">Description</th><th data-en="Status" data-zh="状态">Status</th></tr>
                 </thead>
                 <tbody>
                     <tr><td>LLM Chat Engine</td><td>Interactive conversation with Claude API over HTTP</td><td><span class="badge badge-done">Done</span></td></tr>
@@ -789,11 +834,11 @@
 <!-- Flash & Monitor -->
 <section id="flash" class="flash-section">
     <div class="container">
-        <div class="section-label reveal">Web Flash</div>
-        <h2 class="section-title reveal">Flash &amp; Monitor</h2>
-        <p class="section-subtitle reveal">Flash firmware and open a serial terminal — directly from your browser. Requires Chrome or Edge.</p>
+        <div class="section-label reveal" data-en="Web Flash" data-zh="Web 烧录">Web Flash</div>
+        <h2 class="section-title reveal" data-en="Flash &amp; Monitor" data-zh="烧录 &amp; 监控">Flash &amp; Monitor</h2>
+        <p class="section-subtitle reveal" data-en="Flash firmware and open a serial terminal — directly from your browser. Requires Chrome or Edge." data-zh="直接在浏览器中烧录固件并打开串口终端。需要 Chrome 或 Edge 浏览器。">Flash firmware and open a serial terminal — directly from your browser. Requires Chrome or Edge.</p>
 
-        <div id="flash-unsupported" class="flash-unsupported reveal">
+        <div id="flash-unsupported" class="flash-unsupported reveal" data-en-html="<strong>Web Serial API is not available.</strong><br>Please use <strong>Chrome</strong> or <strong>Edge</strong> on desktop, and make sure you're on <strong>HTTPS</strong> or <strong>localhost</strong>." data-zh-html="<strong>Web Serial API 不可用。</strong><br>请使用桌面端的 <strong>Chrome</strong> 或 <strong>Edge</strong>，并确保使用 <strong>HTTPS</strong> 或 <strong>localhost</strong>。">
             <strong>Web Serial API is not available.</strong><br>
             Please use <strong>Chrome</strong> or <strong>Edge</strong> on desktop, and make sure you're on <strong>HTTPS</strong> or <strong>localhost</strong>.
         </div>
@@ -804,20 +849,20 @@
                 <div class="flash-panel-header">
                     <h3>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                        Firmware Flash
+                        <span data-en="Firmware Flash" data-zh="固件烧录">Firmware Flash</span>
                     </h3>
                 </div>
                 <div class="flash-panel-body">
                     <div class="flash-config">
                         <div class="flash-field">
-                            <label>Platform</label>
+                            <label data-en="Platform" data-zh="平台">Platform</label>
                             <select id="flash-platform">
                                 <option value="esp32s3" selected>ESP32-S3 (WiFi + PSRAM)</option>
                                 <option value="esp32c3">ESP32-C3 (RISC-V)</option>
                             </select>
                         </div>
                         <div class="flash-field">
-                            <label>Baud Rate</label>
+                            <label data-en="Baud Rate" data-zh="波特率">Baud Rate</label>
                             <select id="flash-baudrate">
                                 <option value="921600" selected>921600</option>
                                 <option value="460800">460800</option>
@@ -828,10 +873,10 @@
                         <div class="flash-actions">
                             <button class="flash-btn flash-btn-primary" id="flash-btn" onclick="flashFirmware()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                                Install RT-Claw
+                                <span data-en="Install RT-Claw" data-zh="安装 RT-Claw">Install RT-Claw</span>
                             </button>
                             <button class="flash-btn flash-btn-outline" id="flash-erase-btn" onclick="eraseFlash()" style="display:none">
-                                Erase
+                                <span data-en="Erase" data-zh="擦除">Erase</span>
                             </button>
                         </div>
                     </div>
@@ -850,7 +895,7 @@
                 <div class="serial-titlebar">
                     <span>
                         <span class="serial-status" id="serial-status"></span>
-                        Serial Monitor
+                        <span data-en="Serial Monitor" data-zh="串口监视器">Serial Monitor</span>
                     </span>
                     <div class="serial-controls">
                         <select class="serial-baud" id="serial-baudrate">
@@ -863,15 +908,15 @@
                             <option value="460800">460800</option>
                             <option value="921600">921600</option>
                         </select>
-                        <button class="serial-ctrl-btn" id="serial-connect-btn" onclick="serialToggle()">Connect</button>
-                        <button class="serial-ctrl-btn" onclick="serialReset()">Reset</button>
-                        <button class="serial-ctrl-btn" onclick="serialClear()">Clear</button>
+                        <button class="serial-ctrl-btn" id="serial-connect-btn" onclick="serialToggle()" data-en="Connect" data-zh="连接">Connect</button>
+                        <button class="serial-ctrl-btn" onclick="serialReset()" data-en="Reset" data-zh="重置">Reset</button>
+                        <button class="serial-ctrl-btn" onclick="serialClear()" data-en="Clear" data-zh="清除">Clear</button>
                     </div>
                 </div>
-                <div class="serial-output" id="serial-output">Click "Connect" to open a serial port...</div>
+                <div class="serial-output" id="serial-output" data-en-default="Click &quot;Connect&quot; to open a serial port..." data-zh-default="点击"连接"打开串口...">Click "Connect" to open a serial port...</div>
                 <div class="serial-input-bar">
-                    <input type="text" id="serial-input" placeholder="Type a message and press Enter..." onkeydown="if(event.key==='Enter')serialSend()">
-                    <button onclick="serialSend()">Send</button>
+                    <input type="text" id="serial-input" data-en-placeholder="Type a message and press Enter..." data-zh-placeholder="输入消息并按回车..." placeholder="Type a message and press Enter..." onkeydown="if(event.key==='Enter')serialSend()">
+                    <button onclick="serialSend()" data-en="Send" data-zh="发送">Send</button>
                 </div>
             </div>
         </div>
@@ -881,9 +926,9 @@
 <!-- Community -->
 <section id="community">
     <div class="container">
-        <div class="section-label reveal">Open Source</div>
-        <h2 class="section-title reveal">Join the Community</h2>
-        <p class="section-subtitle reveal">GTOC (Gevico Open-Source Community) — build the future of embedded AI together.</p>
+        <div class="section-label reveal" data-en="Open Source" data-zh="开源">Open Source</div>
+        <h2 class="section-title reveal" data-en="Join the Community" data-zh="加入社区">Join the Community</h2>
+        <p class="section-subtitle reveal" data-en="GTOC (Gevico Open-Source Community) — build the future of embedded AI together." data-zh="GTOC（Gevico 开源社区）—— 一起构建嵌入式 AI 的未来。">GTOC (Gevico Open-Source Community) — build the future of embedded AI together.</p>
         <div class="community-links reveal">
             <a href="https://github.com/zevorn/rt-claw" class="community-link" target="_blank">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
@@ -894,7 +939,7 @@
                 Discord
             </a>
             <a href="https://qm.qq.com/q/heSPPC9De8" class="community-link" target="_blank">
-                QQ Group
+                <span data-en="QQ Group" data-zh="QQ 群">QQ Group</span>
             </a>
             <a href="https://t.me/gevico_channel" class="community-link" target="_blank">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
@@ -910,8 +955,8 @@
 <!-- Footer -->
 <footer>
     <div class="container">
-        <p><strong style="color: var(--text);">RT-Claw</strong> — OpenClaw-inspired AI Assistant on Embedded RTOS</p>
-        <p>Released under the <a href="https://github.com/zevorn/rt-claw/blob/main/LICENSE">MIT License</a></p>
+        <p><strong style="color: var(--text);">RT-Claw</strong> — <span data-en="OpenClaw-inspired AI Assistant on Embedded RTOS" data-zh="受 OpenClaw 启发的嵌入式 RTOS AI 助手">OpenClaw-inspired AI Assistant on Embedded RTOS</span></p>
+        <p><span data-en="Released under the" data-zh="基于">Released under the</span> <a href="https://github.com/zevorn/rt-claw/blob/main/LICENSE" data-en="MIT License" data-zh="MIT 许可证">MIT License</a></p>
     </div>
 </footer>
 
@@ -1080,7 +1125,9 @@ window.flashFirmware = async function() {
     } finally {
         await cleanupFlash();
         flashBtn.disabled = false;
-        flashBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Install RT-Claw';
+        var flashLang = localStorage.getItem('lang') || 'en';
+        var flashLabel = flashLang === 'zh' ? '\u5B89\u88C5 RT-Claw' : 'Install RT-Claw';
+        flashBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> <span data-en="Install RT-Claw" data-zh="\u5B89\u88C5 RT-Claw">' + flashLabel + '</span>';
     }
 };
 
@@ -1122,6 +1169,86 @@ var observer = new IntersectionObserver(function(entries) {
     entries.forEach(function(e) { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
+
+/* ── Language Toggle ── */
+function switchLang(lang) {
+    document.documentElement.lang = lang;
+    localStorage.setItem('lang', lang);
+
+    /* Toggle pill active state */
+    document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+    document.getElementById('lang-zh').classList.toggle('active', lang === 'zh');
+
+    /* Update all [data-en] elements */
+    document.querySelectorAll('[data-en]').forEach(function(el) {
+        el.textContent = el.getAttribute('data-' + lang);
+    });
+
+    /* Update elements with HTML content (data-en-html / data-zh-html) */
+    document.querySelectorAll('[data-en-html]').forEach(function(el) {
+        el.innerHTML = el.getAttribute('data-' + lang + '-html');
+    });
+
+    /* Update placeholders */
+    document.querySelectorAll('[data-en-placeholder]').forEach(function(el) {
+        el.placeholder = el.getAttribute('data-' + lang + '-placeholder');
+    });
+
+    /* Update serial output default text (only if not connected) */
+    var serialOut = document.getElementById('serial-output');
+    var isConnected = (typeof serialPort !== 'undefined') && serialPort;
+    if (serialOut && !isConnected) {
+        serialOut.textContent = serialOut.getAttribute('data-' + lang + '-default');
+    }
+
+    /* Update serial connect button text based on connection state */
+    var connectBtn = document.getElementById('serial-connect-btn');
+    if (connectBtn && isConnected) {
+        connectBtn.textContent = lang === 'en' ? 'Disconnect' : '断开';
+    }
+}
+
+function toggleLang() {
+    var current = localStorage.getItem('lang') || 'en';
+    switchLang(current === 'en' ? 'zh' : 'en');
+}
+
+/* Apply saved language on load */
+(function() {
+    var savedLang = localStorage.getItem('lang') || 'en';
+    if (savedLang !== 'en') {
+        switchLang(savedLang);
+    }
+})();
+
+/* ── GitHub Star Count ── */
+(function() {
+    var cached = sessionStorage.getItem('rtclaw-stars');
+    if (cached !== null) {
+        updateStarBadges(cached);
+        return;
+    }
+    fetch('https://api.github.com/repos/zevorn/rt-claw')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data && typeof data.stargazers_count === 'number') {
+                var count = data.stargazers_count;
+                sessionStorage.setItem('rtclaw-stars', count);
+                updateStarBadges(count);
+            }
+        })
+        .catch(function() { /* silently ignore rate limit errors */ });
+})();
+
+function updateStarBadges(count) {
+    var badges = [
+        document.getElementById('nav-star-count'),
+        document.getElementById('hero-star-count')
+    ];
+    badges.forEach(function(el) {
+        if (el) el.textContent = '\u2605 ' + count;
+    });
+}
 
 /* ── Web Serial Detection ── */
 (function() {
@@ -1311,7 +1438,8 @@ async function serialConnect() {
         var baud = parseInt(document.getElementById('serial-baudrate').value);
         await serialPort.open({ baudRate: baud });
         serialWriter = serialPort.writable.getWriter();
-        serialConnectBtn.textContent = 'Disconnect';
+        var curLang = localStorage.getItem('lang') || 'en';
+        serialConnectBtn.textContent = curLang === 'zh' ? '断开' : 'Disconnect';
         serialConnectBtn.classList.add('active');
         serialStatus.classList.add('connected');
         serialOutput.innerHTML = '';
@@ -1354,7 +1482,8 @@ async function serialDisconnect() {
         if (serialWriter) { serialWriter.releaseLock(); serialWriter = null; }
         if (serialPort) { await serialPort.close(); serialPort = null; }
     } catch (e) { /* ignore */ }
-    serialConnectBtn.textContent = 'Connect';
+    var curLang2 = localStorage.getItem('lang') || 'en';
+    serialConnectBtn.textContent = curLang2 === 'zh' ? '连接' : 'Connect';
     serialConnectBtn.classList.remove('active');
     serialStatus.classList.remove('connected');
     serialLogMsg('\n[Disconnected]\n', 'serial-msg-warning');
@@ -1389,7 +1518,8 @@ function serialClear() {
     ansiResetState();
     serialAnsiPartial = '';
     if (!serialPort) {
-        serialOutput.textContent = 'Click "Connect" to open a serial port...';
+        var curLang3 = localStorage.getItem('lang') || 'en';
+        serialOutput.textContent = curLang3 === 'zh' ? '\u70B9\u51FB\u201C\u8FDE\u63A5\u201D\u6253\u5F00\u4E32\u53E3...' : 'Click "Connect" to open a serial port...';
     }
 }
 </script>
