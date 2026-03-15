@@ -351,7 +351,8 @@
             border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
         }
         .flash-layout {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem;
+            align-items: stretch; position: relative;
         }
         .flash-panel {
             background: var(--bg-card); border: 1px solid var(--border);
@@ -444,6 +445,7 @@
         .serial-panel {
             background: #0c0c0c; border: 1px solid var(--border);
             border-radius: var(--radius); overflow: hidden;
+            display: flex; flex-direction: column;
         }
         .serial-titlebar {
             display: flex; align-items: center; justify-content: space-between;
@@ -474,7 +476,7 @@
         .serial-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
         .serial-ctrl-btn.active { border-color: var(--accent3); color: var(--accent3); }
         .serial-output {
-            padding: 0.75rem 1rem; height: 360px; overflow-y: auto;
+            padding: 0.75rem 1rem; flex: 1; min-height: 200px; overflow-y: auto;
             font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
             color: #d4d4d4; word-break: break-all;
         }
@@ -496,10 +498,8 @@
         }
         .serial-input-bar button:hover { background: rgba(245, 158, 11, 0.1); }
         .serial-panel.expanded {
-            grid-column: 1 / -1;
-        }
-        .serial-panel.expanded .serial-output {
-            height: 500px;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10; border-radius: var(--radius);
         }
         .serial-msg-success { color: #4ade80; }
         .serial-msg-error { color: #f87171; }
