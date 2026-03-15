@@ -120,12 +120,20 @@ sudo apt install git wget flex bison gperf python3 python3-venv \
 
 **2. Configure API key**
 
-```bash
-source $HOME/esp/esp-idf/export.sh
+Option A — environment variables (recommended):
 
-idf.py -C platform/esp32s3 menuconfig
-# Navigate: Component config → rt-claw Configuration → AI Engine
-#   → API Key / API URL / Model
+```bash
+export RTCLAW_AI_API_KEY='<your-api-key>'
+export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+```
+
+Option B — runtime via shell (saved to NVS, survives reboot):
+
+```
+/ai_set key <your-api-key>
+/ai_set url https://api.anthropic.com/v1/messages
+/ai_set model claude-sonnet-4-6
 ```
 
 **3. Configure WiFi**
@@ -243,7 +251,7 @@ LCD, skills, and boot-time AI connectivity test.
 
 **4. Configure API key**
 
-Option A — environment variables (all platforms):
+Option A — environment variables (recommended):
 
 ```bash
 export RTCLAW_AI_API_KEY='<your-api-key>'
@@ -251,17 +259,18 @@ export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
 export RTCLAW_AI_MODEL='claude-sonnet-4-6'
 ```
 
-Option B — ESP-IDF menuconfig:
-
-```bash
-idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
-# Navigate: Component config → rt-claw Configuration → AI Engine
-```
-
-Option C — Meson option:
+Option B — Meson option:
 
 ```bash
 meson configure build/esp32c3-qemu/meson -Dai_api_key='<your-api-key>'
+```
+
+Option C — runtime via shell (saved to NVS, survives reboot):
+
+```
+/ai_set key <your-api-key>
+/ai_set url https://api.anthropic.com/v1/messages
+/ai_set model claude-sonnet-4-6
 ```
 
 **5. (Optional) Configure Feishu bot**

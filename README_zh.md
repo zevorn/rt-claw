@@ -117,12 +117,20 @@ sudo apt install git wget flex bison gperf python3 python3-venv \
 
 **2. 配置 API 密钥**
 
-```bash
-source $HOME/esp/esp-idf/export.sh
+方式 A — 环境变量（推荐）：
 
-idf.py -C platform/esp32s3 menuconfig
-# 路径：Component config → rt-claw Configuration → AI Engine
-#   → API Key / API URL / Model
+```bash
+export RTCLAW_AI_API_KEY='<你的 API 密钥>'
+export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+```
+
+方式 B — 运行时通过 Shell 命令（写入 NVS，重启保持）：
+
+```
+/ai_set key <你的 API 密钥>
+/ai_set url https://api.anthropic.com/v1/messages
+/ai_set model claude-sonnet-4-6
 ```
 
 **3. 配置 WiFi**
@@ -239,7 +247,7 @@ idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu set-tar
 
 **4. 配置 API 密钥**
 
-方式 A — 环境变量（所有平台通用）：
+方式 A — 环境变量（推荐）：
 
 ```bash
 export RTCLAW_AI_API_KEY='<你的 API 密钥>'
@@ -247,17 +255,18 @@ export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
 export RTCLAW_AI_MODEL='claude-sonnet-4-6'
 ```
 
-方式 B — ESP-IDF menuconfig：
-
-```bash
-idf.py -C platform/esp32c3 -B build/esp32c3-qemu/idf -DRTCLAW_BOARD=qemu menuconfig
-# 路径：Component config → rt-claw Configuration → AI Engine
-```
-
-方式 C — Meson 选项：
+方式 B — Meson 选项：
 
 ```bash
 meson configure build/esp32c3-qemu/meson -Dai_api_key='<你的 API 密钥>'
+```
+
+方式 C — 运行时通过 Shell 命令（写入 NVS，重启保持）：
+
+```
+/ai_set key <你的 API 密钥>
+/ai_set url https://api.anthropic.com/v1/messages
+/ai_set model claude-sonnet-4-6
 ```
 
 **5.（可选）配置飞书机器人**
