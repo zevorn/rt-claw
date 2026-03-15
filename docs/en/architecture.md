@@ -21,13 +21,13 @@ links into the final firmware binary.
 |  heartbeat                                                           |
 +----------------------------------------------------------------------+
 |  OSAL                                                                |
-|  claw_os.h  |  claw_net.h                                           |
+|  claw_os.h  |  claw_net.h                                            |
 +----------------------------------------------------------------------+
 |  RTOS                                                                |
 |  FreeRTOS (ESP-IDF)              |  RT-Thread                        |
 +----------------------------------------------------------------------+
 |  Hardware                                                            |
-|  ESP32-C3/S3 (WiFi/BLE/OLED/Audio)  |  vexpress-a9 (Ethernet/UART)  |
+|  ESP32-C3/S3 (WiFi/BLE/OLED/Audio)  |  vexpress-a9 (Ethernet/UART)   |
 +----------------------------------------------------------------------+
 ```
 
