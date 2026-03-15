@@ -476,8 +476,9 @@
         .serial-output {
             padding: 0.75rem 1rem; height: 360px; overflow-y: auto;
             font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
-            color: #d4d4d4; white-space: pre-wrap; word-break: break-all;
+            color: #d4d4d4; word-break: break-all;
         }
+        .serial-output > div { white-space: pre-wrap; min-height: 1.2em; }
         .serial-input-bar {
             display: flex; border-top: 1px solid var(--border);
         }
@@ -1361,6 +1362,72 @@ function ansiBuildStyle() {
     return parts.join(';');
 }
 
+/* Get or create the current line div */
+var serialCurrentLine = null;
+
+function serialGetLine() {
+    if (!serialCurrentLine) {
+        serialCurrentLine = document.createElement('div');
+        serialOutput.appendChild(serialCurrentLine);
+    }
+    return serialCurrentLine;
+}
+
+/* Append a styled span to the current line */
+function serialAppendSpan(text) {
+    if (!text) return;
+    var span = document.createElement('span');
+    var style = ansiBuildStyle();
+    if (style) span.setAttribute('style', style);
+    span.textContent = text;
+    serialGetLine().appendChild(span);
+}
+
+/* Handle \r and \n within a cleaned text segment */
+function serialWriteSegment(seg) {
+    /* Strip non-SGR escapes and control chars (keep \r \n \t) */
+    seg = seg.replace(/\x1b\[[^m]*[A-Za-z]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
+    if (!seg) return;
+
+    var i = 0;
+    while (i < seg.length) {
+        var crIdx = seg.indexOf('\r', i);
+        var lfIdx = seg.indexOf('\n', i);
+
+        /* Find nearest control char */
+        var nextCtrl = -1;
+        if (crIdx >= i && (lfIdx < i || crIdx < lfIdx)) nextCtrl = crIdx;
+        else if (lfIdx >= i) nextCtrl = lfIdx;
+
+        if (nextCtrl < 0) {
+            /* No more \r or \n, append rest */
+            serialAppendSpan(seg.substring(i));
+            break;
+        }
+
+        /* Append text before control char */
+        if (nextCtrl > i) {
+            serialAppendSpan(seg.substring(i, nextCtrl));
+        }
+
+        if (seg[nextCtrl] === '\n') {
+            /* Newline: finish current line, start new one */
+            serialCurrentLine = null;
+        } else if (seg[nextCtrl] === '\r') {
+            /* Carriage return: clear current line content */
+            if (nextCtrl + 1 < seg.length && seg[nextCtrl + 1] === '\n') {
+                /* \r\n: treat as newline */
+                serialCurrentLine = null;
+                i = nextCtrl + 2;
+                continue;
+            }
+            var line = serialGetLine();
+            line.innerHTML = '';
+        }
+        i = nextCtrl + 1;
+    }
+}
+
 /* Append ANSI-parsed text as DOM nodes to serial output */
 function serialAppendAnsi(rawText) {
     var text = serialAnsiPartial + rawText;
@@ -1373,44 +1440,23 @@ function serialAppendAnsi(rawText) {
         text = text.substring(0, text.length - trailMatch[0].length);
     }
 
-    var frag = document.createDocumentFragment();
     /* Split by ANSI CSI SGR: \x1b[ ... m */
     var re = /\x1b\[([\d;]*)m/g;
     var last = 0;
     var match;
 
     while ((match = re.exec(text)) !== null) {
-        /* Text before this escape */
         if (match.index > last) {
-            var seg = text.substring(last, match.index);
-            seg = seg.replace(/\x1b\[[^m]*[A-Za-z]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
-            if (seg) {
-                var span = document.createElement('span');
-                var style = ansiBuildStyle();
-                if (style) span.setAttribute('style', style);
-                span.textContent = seg;
-                frag.appendChild(span);
-            }
+            serialWriteSegment(text.substring(last, match.index));
         }
-        /* Apply SGR params */
         var params = match[1] ? match[1].split(';').map(Number) : [0];
         ansiApplySgr(params);
         last = re.lastIndex;
     }
-    /* Remaining text after last escape */
     if (last < text.length) {
-        var tail = text.substring(last);
-        tail = tail.replace(/\x1b\[[^m]*[A-Za-z]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
-        if (tail) {
-            var span2 = document.createElement('span');
-            var style2 = ansiBuildStyle();
-            if (style2) span2.setAttribute('style', style2);
-            span2.textContent = tail;
-            frag.appendChild(span2);
-        }
+        serialWriteSegment(text.substring(last));
     }
 
-    serialOutput.appendChild(frag);
     serialTrimOutput();
     serialOutput.scrollTop = serialOutput.scrollHeight;
 }
@@ -1422,12 +1468,16 @@ function serialTrimOutput() {
     }
 }
 
-/* Append a styled system message */
+/* Append a styled system message (starts a new line) */
 function serialLogMsg(text, cls) {
+    serialCurrentLine = null;
+    var div = document.createElement('div');
     var span = document.createElement('span');
     span.className = cls;
     span.textContent = text;
-    serialOutput.appendChild(span);
+    div.appendChild(span);
+    serialOutput.appendChild(div);
+    serialCurrentLine = null;
     serialTrimOutput();
     serialOutput.scrollTop = serialOutput.scrollHeight;
 }
@@ -1455,6 +1505,7 @@ async function serialConnect() {
         serialConnectBtn.classList.add('active');
         serialStatus.classList.add('connected');
         serialOutput.innerHTML = '';
+        serialCurrentLine = null;
         ansiResetState();
         serialAnsiPartial = '';
         serialLogMsg('[Connected] ' + baud + ' baud\n', 'serial-msg-success');
@@ -1527,6 +1578,7 @@ async function serialReset() {
 
 function serialClear() {
     serialOutput.innerHTML = '';
+    serialCurrentLine = null;
     ansiResetState();
     serialAnsiPartial = '';
     if (!serialPort) {

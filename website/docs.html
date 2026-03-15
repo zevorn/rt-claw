@@ -270,6 +270,7 @@ function loadDoc(name) {
         })
         .then(function(md) {
             content.innerHTML = marked.parse(md);
+            rewriteDocLinks(content);
             window.scrollTo(0, 0);
         })
         .catch(function() {
@@ -284,6 +285,39 @@ function loadDoc(name) {
 
     /* Update URL without reload */
     history.replaceState(null, '', '?doc=' + name);
+}
+
+/* Rewrite .md links in rendered content to docs.html?doc= */
+function rewriteDocLinks(container) {
+    container.querySelectorAll('a[href]').forEach(function(a) {
+        var href = a.getAttribute('href');
+        if (!href) return;
+
+        /* Cross-language link: ../zh/xxx.md or ../en/xxx.md */
+        var crossMatch = href.match(/^\.\.\/([a-z]{2})\/([\w-]+)\.md$/);
+        if (crossMatch) {
+            var lang = crossMatch[1];
+            var doc = crossMatch[2];
+            a.href = '?doc=' + doc;
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (lang !== currentLang) switchLang(lang);
+                else loadDoc(doc);
+            });
+            return;
+        }
+
+        /* Same-directory link: xxx.md */
+        var localMatch = href.match(/^([\w-]+)\.md$/);
+        if (localMatch) {
+            var doc2 = localMatch[1];
+            a.href = '?doc=' + doc2;
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                loadDoc(doc2);
+            });
+        }
+    });
 }
 
 /* Sidebar link click */
