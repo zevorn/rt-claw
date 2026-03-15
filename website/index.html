@@ -552,7 +552,7 @@
 <nav>
     <div class="nav-inner">
         <a href="#" class="nav-logo">
-            <img src="img/logo.png" alt="RT-Claw">
+            <img src="../images/logo.png" alt="RT-Claw">
             RT-Claw
         </a>
         <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">&#9776;</button>
@@ -584,7 +584,7 @@
 <section class="hero">
     <div class="hero-circuit"></div>
     <div class="hero-content">
-        <img src="img/logo.png" alt="RT-Claw" class="hero-logo">
+        <img src="../images/logo.png" alt="RT-Claw" class="hero-logo">
         <h1><span class="highlight" data-en="Making AI Assistants" data-zh="让 AI 助理">Making AI Assistants</span><br><span data-en="Cheap Again" data-zh="触手可及">Cheap Again</span></h1>
         <p data-en="Deploy your own AI assistant on hardware that costs just one dollar. Seamlessly bridging the digital and physical worlds." data-zh="在仅需一美元左右的硬件成本，就能快速部署您自己的 AI 助理。无缝连接数字世界与物理世界。">Deploy your own AI assistant on hardware that costs just one dollar.
            Seamlessly bridging the digital and physical worlds.</p>
@@ -1234,13 +1234,10 @@ function toggleLang() {
     }
 })();
 
-/* ── GitHub Star Count ── */
+/* ── GitHub Star Count (always fetch, cache for instant display) ── */
 (function() {
     var cached = sessionStorage.getItem('rtclaw-stars');
-    if (cached !== null) {
-        updateStarBadges(cached);
-        return;
-    }
+    if (cached !== null) updateStarBadges(cached);
     fetch('https://api.github.com/repos/zevorn/rt-claw')
         .then(function(r) { return r.json(); })
         .then(function(data) {
