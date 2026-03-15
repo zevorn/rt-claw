@@ -113,13 +113,38 @@ static int shell_read_line(char *buf, int size)
             continue;
         }
 
-        /* Backspace */
+        /* Backspace — UTF-8 aware */
         if (ch == '\b' || ch == 127) {
             if (cursor > 0) {
-                memmove(buf + cursor - 1, buf + cursor, len - cursor);
-                cursor--;
-                len--;
-                claw_console_write("\b", 1);
+                /*
+                 * Walk back over a complete UTF-8 sequence.
+                 * Continuation bytes are 10xxxxxx (0x80..0xBF).
+                 */
+                int del = 1;
+                while (del < cursor &&
+                       (buf[cursor - del] & 0xC0) == 0x80) {
+                    del++;
+                }
+
+                /* Determine display width: CJK fullwidth = 2 cols */
+                int cols = 1;
+                uint8_t lead = (uint8_t)buf[cursor - del];
+                if (del == 3 && (lead & 0xF0) == 0xE0) {
+                    /* 3-byte UTF-8: U+0800..U+FFFF (CJK range) */
+                    cols = 2;
+                } else if (del == 4 && (lead & 0xF8) == 0xF0) {
+                    /* 4-byte UTF-8: supplementary (emoji etc.) */
+                    cols = 2;
+                }
+
+                memmove(buf + cursor - del, buf + cursor,
+                        len - cursor);
+                cursor -= del;
+                len -= del;
+
+                for (int i = 0; i < cols; i++) {
+                    claw_console_write("\b", 1);
+                }
                 redraw_from(buf, len, cursor);
             }
             continue;
@@ -143,11 +168,25 @@ static int shell_read_line(char *buf, int size)
                 uint8_t tilde;
                 claw_console_read(&tilde, 1, 50);
                 if (seq[1] == '3' && tilde == '~') {
-                    /* Delete key */
+                    /* Delete key — UTF-8 aware */
                     if (cursor < len) {
-                        memmove(buf + cursor, buf + cursor + 1,
-                                len - cursor - 1);
-                        len--;
+                        int del = 1;
+                        uint8_t lead = (uint8_t)buf[cursor];
+                        if ((lead & 0x80) != 0) {
+                            if ((lead & 0xE0) == 0xC0) {
+                                del = 2;
+                            } else if ((lead & 0xF0) == 0xE0) {
+                                del = 3;
+                            } else if ((lead & 0xF8) == 0xF0) {
+                                del = 4;
+                            }
+                            if (cursor + del > len) {
+                                del = len - cursor;
+                            }
+                        }
+                        memmove(buf + cursor, buf + cursor + del,
+                                len - cursor - del);
+                        len -= del;
                         redraw_from(buf, len, cursor);
                     }
                 }
@@ -156,16 +195,52 @@ static int shell_read_line(char *buf, int size)
             }
 
             switch (seq[1]) {
-            case 'D': /* Left arrow */
+            case 'D': /* Left arrow — UTF-8 aware */
                 if (cursor > 0) {
-                    cursor--;
-                    claw_console_write("\033[D", 3);
+                    int skip = 1;
+                    while (skip < cursor &&
+                           (buf[cursor - skip] & 0xC0) == 0x80) {
+                        skip++;
+                    }
+                    int cols = 1;
+                    uint8_t ld = (uint8_t)buf[cursor - skip];
+                    if (skip == 3 && (ld & 0xF0) == 0xE0) {
+                        cols = 2;
+                    } else if (skip == 4 && (ld & 0xF8) == 0xF0) {
+                        cols = 2;
+                    }
+                    cursor -= skip;
+                    char esc[8];
+                    int elen = snprintf(esc, sizeof(esc),
+                                        "\033[%dD", cols);
+                    claw_console_write(esc, elen);
                 }
                 break;
-            case 'C': /* Right arrow */
+            case 'C': /* Right arrow — UTF-8 aware */
                 if (cursor < len) {
-                    cursor++;
-                    claw_console_write("\033[C", 3);
+                    int skip = 1;
+                    uint8_t ld = (uint8_t)buf[cursor];
+                    if ((ld & 0xE0) == 0xC0) {
+                        skip = 2;
+                    } else if ((ld & 0xF0) == 0xE0) {
+                        skip = 3;
+                    } else if ((ld & 0xF8) == 0xF0) {
+                        skip = 4;
+                    }
+                    if (cursor + skip > len) {
+                        skip = len - cursor;
+                    }
+                    int cols = 1;
+                    if (skip == 3 && (ld & 0xF0) == 0xE0) {
+                        cols = 2;
+                    } else if (skip == 4 && (ld & 0xF8) == 0xF0) {
+                        cols = 2;
+                    }
+                    cursor += skip;
+                    char esc[8];
+                    int elen = snprintf(esc, sizeof(esc),
+                                        "\033[%dC", cols);
+                    claw_console_write(esc, elen);
                 }
                 break;
             case 'H': /* Home */
@@ -186,16 +261,44 @@ static int shell_read_line(char *buf, int size)
             continue;
         }
 
-        /* Normal character — insert at cursor */
-        if (cursor < len) {
-            memmove(buf + cursor + 1, buf + cursor, len - cursor);
-        }
-        buf[cursor] = (char)ch;
-        len++;
-        cursor++;
+        /*
+         * Normal character — insert at cursor.
+         * For UTF-8 multi-byte sequences, read all continuation
+         * bytes before inserting so the character appears atomically.
+         */
+        int seq_len = 1;
+        uint8_t mb[4];
+        mb[0] = ch;
 
-        /* Echo: print from new char onward, move cursor back */
-        claw_console_write(&ch, 1);
+        if ((ch & 0xE0) == 0xC0) {
+            seq_len = 2;
+        } else if ((ch & 0xF0) == 0xE0) {
+            seq_len = 3;
+        } else if ((ch & 0xF8) == 0xF0) {
+            seq_len = 4;
+        }
+
+        for (int i = 1; i < seq_len; i++) {
+            if (claw_console_read(&mb[i], 1, 100) <= 0) {
+                seq_len = i;
+                break;
+            }
+        }
+
+        if (len + seq_len >= size) {
+            continue;
+        }
+
+        if (cursor < len) {
+            memmove(buf + cursor + seq_len, buf + cursor,
+                    len - cursor);
+        }
+        memcpy(buf + cursor, mb, seq_len);
+        len += seq_len;
+        cursor += seq_len;
+
+        /* Echo the complete character */
+        claw_console_write(mb, seq_len);
         if (cursor < len) {
             redraw_from(buf, len, cursor);
         }
