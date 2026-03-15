@@ -15,6 +15,7 @@
  */
 
 #include "osal/claw_os.h"
+#include "claw_config.h"
 #include "claw/services/im/feishu.h"
 #include "claw/services/ai/ai_engine.h"
 #include "claw/tools/claw_tools.h"
