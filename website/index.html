@@ -589,8 +589,8 @@
         <p data-en="Deploy your own AI assistant on hardware that costs just one dollar. Seamlessly bridging the digital and physical worlds." data-zh="在仅需一美元左右的硬件成本，就能快速部署您自己的 AI 助理。无缝连接数字世界与物理世界。">Deploy your own AI assistant on hardware that costs just one dollar.
            Seamlessly bridging the digital and physical worlds.</p>
         <div class="hero-buttons">
-            <a href="https://github.com/zevorn/rt-claw" class="btn btn-primary" target="_blank">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+            <a href="https://github.com/zevorn/rt-claw/blob/main/docs/en/getting-started.md" class="btn btn-primary" target="_blank" data-en-href="https://github.com/zevorn/rt-claw/blob/main/docs/en/getting-started.md" data-zh-href="https://github.com/zevorn/rt-claw/blob/main/docs/zh/getting-started.md">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                 <span data-en="Get Started" data-zh="快速开始">Get Started</span>
             </a>
             <a href="#flash" class="btn btn-outline">
@@ -722,17 +722,25 @@
         <div class="section-label reveal" data-en="Design" data-zh="设计">Design</div>
         <h2 class="section-title reveal" data-en="Architecture" data-zh="架构">Architecture</h2>
         <p class="section-subtitle reveal" data-en="Clean layered design with OSAL bridging multiple RTOS platforms." data-zh="简洁的分层设计，通过 OSAL 桥接多个 RTOS 平台。">Clean layered design with OSAL bridging multiple RTOS platforms.</p>
-        <div class="arch-diagram reveal">+---------------------------------------------------+
-|                rt-claw Application                |
-|  gateway | swarm | net | ai_engine | tools | lcd  |
-+---------------------------------------------------+
-|               claw_os.h  (OSAL API)               |
-+-----------------+---------------------------------+
-| FreeRTOS (IDF)  |          RT-Thread              |
-+-----------------+---------------------------------+
-| ESP32-C3 / S3   |  QEMU vexpress-a9               |
-| WiFi / BLE      |  Ethernet / UART                |
-+-----------------+---------------------------------+</div>
+        <div class="arch-diagram reveal">+--------------------------------------------------------------+
+|                     rt-claw Application                      |
+|  gateway | net | swarm | ai_engine | shell | sched | feishu  |
++--------------------------------------------------------------+
+|                      skills (AI Skills)                      |
+|             (one skill composes multiple tools)              |
++--------------------------------------------------------------+
+|                       tools (Tool Use)                       |
+|   gpio | system | lcd | audio | http | scheduler | memory    |
++--------------------------------------------------------------+
+|                    drivers (Hardware BSP)                    |
+|      WiFi | ES8311 | SSD1306 | serial | LCD framebuffer      |
++--------------------------------------------------------------+
+|                  osal/claw_os.h  (OSAL API)                  |
++-------------------+------------------------------------------+
+| FreeRTOS (IDF)    |                RT-Thread                 |
++-------------------+------------------------------------------+
+| ESP32-C3 / S3     |             QEMU vexpress-a9             |
++-------------------+------------------------------------------+</div>
     </div>
 </section>
 
@@ -1187,6 +1195,11 @@ function switchLang(lang) {
     /* Update elements with HTML content (data-en-html / data-zh-html) */
     document.querySelectorAll('[data-en-html]').forEach(function(el) {
         el.innerHTML = el.getAttribute('data-' + lang + '-html');
+    });
+
+    /* Update href links */
+    document.querySelectorAll('[data-en-href]').forEach(function(el) {
+        el.href = el.getAttribute('data-' + lang + '-href');
     });
 
     /* Update placeholders */
