@@ -53,4 +53,5 @@ sd.bin
 platform/*/cross.ini
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/skills/

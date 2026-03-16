@@ -123,6 +123,18 @@ No unit test framework yet. Verify changes by:
 2. `scripts/check-patch.sh --staged` passes
 3. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-esp32s3-qemu`
 
+## Skills (Claude Code Slash Commands)
+
+Project-level skills in `.claude/skills/`, invoked via `/command-name`:
+
+| Command | Description |
+|---------|-------------|
+| `/build-test [platform]` | Build and run on QEMU or flash to real hardware |
+| `/new-module <type> <name>` | Scaffold a new service, driver, or tool module |
+| `/diagnose` | Analyze pasted error logs (build, runtime, CI, network) |
+| `/sync-docs [scope]` | Update EN/ZH docs after code changes |
+| `/platform-port <name>` | Guide porting to a new hardware platform |
+
 ## Key Paths
 
 | Path | Purpose |
