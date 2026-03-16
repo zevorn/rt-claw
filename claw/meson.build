@@ -5,6 +5,7 @@ src_files = files(
     'services/ai/ai_engine.c',
     'services/ai/ai_memory.c',
     'services/ai/ai_skill.c',
+    'services/im/im_util.c',
     'services/im/feishu.c',
     'services/im/telegram.c',
     'services/net/net_service.c',

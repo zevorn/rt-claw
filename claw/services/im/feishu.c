@@ -17,6 +17,7 @@
 #include "osal/claw_os.h"
 #include "claw_config.h"
 #include "claw/services/im/feishu.h"
+#include "claw/services/im/im_util.h"
 #include "claw/services/ai/ai_engine.h"
 #include "claw/tools/claw_tools.h"
 
@@ -568,19 +569,9 @@ static int send_reply(const char *chat_id, const char *text)
     int part = 1;
 
     while (remaining > 0) {
-        size_t chunk = remaining;
-        if (chunk > FEISHU_MAX_MSG_LEN) {
-            chunk = FEISHU_MAX_MSG_LEN;
-            /* Split at last newline to keep text clean */
-            for (size_t i = chunk; i > chunk / 2; i--) {
-                if (p[i] == '\n') {
-                    chunk = i + 1;
-                    break;
-                }
-            }
-        }
+        size_t chunk = im_find_chunk_end(p, remaining,
+                                         FEISHU_MAX_MSG_LEN);
 
-        /* Copy chunk to heap buffer for null-terminated send */
         char *chunk_buf = claw_malloc(chunk + 1);
         if (!chunk_buf) {
             return CLAW_NOMEM;

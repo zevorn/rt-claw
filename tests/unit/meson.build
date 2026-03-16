@@ -6,6 +6,7 @@ unit_test_src = files(
     'test_ai_memory.c',
     'test_gateway.c',
     'test_tools.c',
+    'test_im_util.c',
 )
 
 unittest_lib = static_library('unittest',
