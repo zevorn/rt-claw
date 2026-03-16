@@ -70,6 +70,9 @@ static const claw_service_t s_services[] = {
 
 #define SERVICE_COUNT (sizeof(s_services) / sizeof(s_services[0]))
 
+#ifdef CONFIG_RTCLAW_AI_BOOT_TEST
+#if !defined(CONFIG_RTCLAW_FEISHU_ENABLE) && \
+    !defined(CONFIG_RTCLAW_TELEGRAM_ENABLE)
 static void ai_boot_test_thread(void *arg)
 {
     (void)arg;
@@ -89,6 +92,8 @@ static void ai_boot_test_thread(void *arg)
     }
     claw_free(buf);
 }
+#endif
+#endif
 
 int claw_init(void)
 {

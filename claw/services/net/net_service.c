@@ -100,35 +100,6 @@ static int eth_init(void)
     return CLAW_OK;
 }
 
-static int http_get_test(const char *url)
-{
-    CLAW_LOGI(TAG, "HTTP GET %s", url);
-
-    esp_http_client_config_t config = {
-        .url = url,
-        .timeout_ms = 10000,
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        CLAW_LOGE(TAG, "http client init failed");
-        return CLAW_ERROR;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        int status = esp_http_client_get_status_code(client);
-        int len = esp_http_client_get_content_length(client);
-        CLAW_LOGI(TAG, "HTTP status=%d, content_length=%d",
-                  status, len);
-    } else {
-        CLAW_LOGE(TAG, "HTTP GET failed: %s",
-                  esp_err_to_name(err));
-    }
-
-    esp_http_client_cleanup(client);
-    return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
-}
-
 int net_service_init(void)
 {
     s_got_ip_sem = claw_sem_create("net_ip", 0);
