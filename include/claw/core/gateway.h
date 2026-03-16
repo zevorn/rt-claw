@@ -49,17 +49,27 @@ struct gw_service_entry {
     claw_mq_t inbox;            /* service's own message queue */
 };
 
+#define GW_MAX_HANDLERS     8
+
 /* Message statistics */
 struct gateway_stats {
     uint32_t total;                         /* total dispatched */
     uint32_t per_type[GW_MSG_TYPE_MAX];     /* per message type */
     uint32_t dropped;                       /* queue-full drops */
     uint32_t no_consumer;                   /* msgs with no match */
+    uint32_t filtered;                      /* consumed by pipeline */
 };
 
 int gateway_init(void);
 int gateway_send(struct gateway_msg *msg);
 void gateway_get_stats(struct gateway_stats *out);
+
+/**
+ * Register a pipeline handler. Handlers run in registration order
+ * before service dispatch. A handler returning 1 consumes the
+ * message (stops the chain); returning 0 passes it to the next.
+ */
+int gateway_register_handler(const char *name, gw_handler_fn process);
 
 /**
  * Register a service to receive messages matching type_mask.

@@ -12,6 +12,29 @@
 
 #define TAG "gateway"
 
+/* --- Pipeline handlers --- */
+
+static struct gw_handler s_handlers[GW_MAX_HANDLERS];
+static int s_handler_count;
+
+int gateway_register_handler(const char *name, gw_handler_fn process)
+{
+    if (s_handler_count >= GW_MAX_HANDLERS) {
+        CLAW_LOGE(TAG, "handler registry full");
+        return CLAW_ERROR;
+    }
+    if (!name || !process) {
+        return CLAW_ERROR;
+    }
+
+    s_handlers[s_handler_count].name = name;
+    s_handlers[s_handler_count].process = process;
+    s_handler_count++;
+
+    CLAW_LOGI(TAG, "handler registered: %s", name);
+    return CLAW_OK;
+}
+
 /* --- Service registry --- */
 
 static struct gw_service_entry s_services[GW_MAX_SERVICES];
@@ -46,13 +69,30 @@ static struct gateway_stats s_stats;
 
 static void dispatch_msg(struct gateway_msg *msg)
 {
-    uint8_t bit = (uint8_t)(1 << msg->type);
-    int delivered = 0;
-
     s_stats.total++;
     if (msg->type < GW_MSG_TYPE_MAX) {
         s_stats.per_type[msg->type]++;
     }
+
+    /* Pipeline: run handlers in registration order */
+    for (int i = 0; i < s_handler_count; i++) {
+        int rc = s_handlers[i].process(msg);
+        if (rc > 0) {
+            s_stats.filtered++;
+            CLAW_LOGD(TAG, "msg type=%d consumed by %s",
+                      msg->type, s_handlers[i].name);
+            return;
+        }
+        if (rc < 0) {
+            CLAW_LOGW(TAG, "handler %s error %d on type=%d",
+                      s_handlers[i].name, rc, msg->type);
+            return;
+        }
+    }
+
+    /* Service dispatch: deliver to all matching consumers */
+    uint8_t bit = (uint8_t)(1 << msg->type);
+    int delivered = 0;
 
     for (int i = 0; i < s_service_count; i++) {
         if (s_services[i].type_mask & bit) {
@@ -95,6 +135,8 @@ static void gateway_thread_entry(void *param)
 
 int gateway_init(void)
 {
+    memset(s_handlers, 0, sizeof(s_handlers));
+    s_handler_count = 0;
     memset(s_services, 0, sizeof(s_services));
     memset(&s_stats, 0, sizeof(s_stats));
     s_service_count = 0;
