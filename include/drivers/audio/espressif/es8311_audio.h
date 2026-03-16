@@ -6,8 +6,8 @@
  * Supports playback (speaker) and capture (microphone).
  */
 
-#ifndef DRIVERS_AUDIO_ES8311_AUDIO_H
-#define DRIVERS_AUDIO_ES8311_AUDIO_H
+#ifndef CLAW_DRIVERS_AUDIO_ESPRESSIF_ES8311_AUDIO_H
+#define CLAW_DRIVERS_AUDIO_ESPRESSIF_ES8311_AUDIO_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -50,4 +50,4 @@ void es8311_audio_write(const int16_t *data, size_t samples);
  */
 int es8311_audio_play_sound(const char *name);
 
-#endif /* DRIVERS_AUDIO_ES8311_AUDIO_H */
+#endif /* CLAW_DRIVERS_AUDIO_ESPRESSIF_ES8311_AUDIO_H */

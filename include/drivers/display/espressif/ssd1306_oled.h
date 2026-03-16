@@ -6,8 +6,8 @@
  * Uses ESP-IDF esp_lcd + I2C.  No LVGL dependency.
  */
 
-#ifndef DRIVERS_DISPLAY_SSD1306_OLED_H
-#define DRIVERS_DISPLAY_SSD1306_OLED_H
+#ifndef CLAW_DRIVERS_DISPLAY_ESPRESSIF_SSD1306_OLED_H
+#define CLAW_DRIVERS_DISPLAY_ESPRESSIF_SSD1306_OLED_H
 
 #include <stdint.h>
 
@@ -54,4 +54,4 @@ void ssd1306_progress_bar(int row, int percent);
 /** Set pixel at (x, y). Call ssd1306_flush() to update display. */
 void ssd1306_set_pixel(int x, int y, int on);
 
-#endif /* DRIVERS_DISPLAY_SSD1306_OLED_H */
+#endif /* CLAW_DRIVERS_DISPLAY_ESPRESSIF_SSD1306_OLED_H */

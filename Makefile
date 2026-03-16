@@ -215,8 +215,9 @@ _c3-build:
 #
 ESP_S3_DIR := platform/esp32s3
 
-# Espressif QEMU xtensa binary (not in PATH by default after export.sh)
-QEMU_XTENSA := $(HOME)/.espressif/tools/qemu-xtensa/esp_develop_9.0.0_20240606/qemu/bin/qemu-system-xtensa
+# Espressif QEMU xtensa binary (not in PATH by default after export.sh).
+# Dynamically find the installed version to avoid hardcoding version strings.
+QEMU_XTENSA := $(shell find $(HOME)/.espressif/tools/qemu-xtensa -name qemu-system-xtensa -type f 2>/dev/null | head -1)
 
 # Default aliases
 .PHONY: build-esp32s3 esp32s3-qemu
