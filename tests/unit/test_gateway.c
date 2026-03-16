@@ -1,0 +1,64 @@
+/*
+ * SPDX-License-Identifier: MIT
+ * Unit tests for claw/core/gateway.c
+ */
+
+#include "framework/test.h"
+#include "claw/core/gateway.h"
+
+static void test_gateway_init(void)
+{
+    TEST_ASSERT_EQ(gateway_init(), CLAW_OK);
+}
+
+static void test_gateway_register_service(void)
+{
+    gateway_init();
+
+    claw_mq_t mq = claw_mq_create("test", sizeof(struct gateway_msg), 4);
+    TEST_ASSERT_NOT_NULL(mq);
+
+    int ret = gateway_register_service(
+        "svc_a", (1 << GW_MSG_DATA) | (1 << GW_MSG_CMD), mq);
+    TEST_ASSERT_EQ(ret, CLAW_OK);
+}
+
+static void test_gateway_stats_init(void)
+{
+    gateway_init();
+
+    struct gateway_stats st;
+    gateway_get_stats(&st);
+    TEST_ASSERT_EQ(st.total, 0);
+    TEST_ASSERT_EQ(st.dropped, 0);
+    TEST_ASSERT_EQ(st.no_consumer, 0);
+}
+
+static void test_gateway_register_overflow(void)
+{
+    gateway_init();
+
+    for (int i = 0; i < GW_MAX_SERVICES; i++) {
+        claw_mq_t mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
+        int ret = gateway_register_service("svc", 0xFF, mq);
+        TEST_ASSERT_EQ(ret, CLAW_OK);
+    }
+
+    /* One more should fail */
+    claw_mq_t mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
+    int ret = gateway_register_service("over", 0xFF, mq);
+    TEST_ASSERT(ret != CLAW_OK);
+}
+
+int test_gateway_suite(void)
+{
+    printf("=== test_gateway ===\n");
+    TEST_BEGIN();
+
+    RUN_TEST(test_gateway_init);
+    RUN_TEST(test_gateway_register_service);
+    RUN_TEST(test_gateway_stats_init);
+    RUN_TEST(test_gateway_register_overflow);
+
+    TEST_END();
+}

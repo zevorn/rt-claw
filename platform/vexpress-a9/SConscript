@@ -5,6 +5,8 @@ cwd = GetCurrentDir()
 project_root = os.path.normpath(os.path.join(cwd, '..', '..'))
 objs = []
 
+unit_test = os.environ.get('RTCLAW_UNIT_TEST', '0') == '1'
+
 # --- Local subdirectories (drivers, applications) ---
 for d in os.listdir(cwd):
     path = os.path.join(cwd, d)
@@ -21,16 +23,32 @@ objs = objs + group
 claw_inc = [
     os.path.join(project_root, 'include'),
     os.path.join(project_root, 'vendor', 'lib', 'cjson'),
+    project_root,
 ]
 Env.AppendUnique(CPPPATH=[os.path.abspath(p) for p in claw_inc])
 
 # Link pre-built libraries from Meson (build/vexpress-a9-qemu/)
 build_dir = os.path.join(project_root, 'build', 'vexpress-a9-qemu')
-Env.AppendUnique(LIBS=['rtclaw', 'osal', 'cjson'])
-Env.AppendUnique(LIBPATH=[
+libs = ['rtclaw', 'osal', 'cjson']
+lib_paths = [
     os.path.join(build_dir, 'claw'),
     os.path.join(build_dir, 'osal'),
     os.path.join(build_dir, 'vendor', 'lib', 'cjson'),
-])
+]
+
+if unit_test:
+    Env.Append(CFLAGS=' -DRTCLAW_UNIT_TEST')
+    libs.append('unittest')
+    lib_paths.append(os.path.join(build_dir, 'tests', 'unit'))
+
+Env.AppendUnique(LIBS=libs)
+Env.AppendUnique(LIBPATH=lib_paths)
+
+if unit_test:
+    # Resolve circular deps between unittest <-> rtclaw <-> cjson
+    Env['LINKCOM'] = Env['LINKCOM'].replace(
+        '$_LIBFLAGS',
+        '-Wl,--start-group $_LIBFLAGS -Wl,--end-group'
+    )
 
 Return('objs')
