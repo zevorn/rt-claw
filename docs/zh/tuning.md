@@ -66,10 +66,12 @@ Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 
 ## 内存优化
 
-### ESP32-C3（400KB SRAM，约 240KB 可用）
+### ESP32-C3（400KB SRAM，WiFi/TLS 后约 200KB 可用）
 
-关键 sdkconfig 配置项：
+实测运行时：约 43% 使用率（182KB 空闲 / 321KB 总堆）。关键调优：
 
+- `NET_RESP_MAX` -- HTTP 工具响应缓冲区（默认 4KB，原为 16KB）
+- `sched_ai_ctx` -- prompt/reply 缓冲区改为堆分配，用后即释放
 - `CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN` -- TLS 输入缓冲区（默认 16KB，可降至 8KB）
 - `CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN` -- TLS 输出缓冲区（默认 16KB，可降至 4KB）
 - `CONFIG_ESP_WIFI_IRAM_OPT` -- WiFi IRAM 优化（禁用可节省 IRAM）
@@ -104,8 +106,10 @@ Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 | CLAW_GW_MSG_POOL_SIZE | 16 | 网关消息队列深度 |
 | CLAW_GW_MSG_MAX_LEN | 256 | 最大消息大小（字节） |
 | CLAW_SWARM_MAX_NODES | 32 | 最大可发现集群节点数 |
-| CLAW_SWARM_HEARTBEAT_MS | 5000 | 心跳广播间隔 |
+| CLAW_SWARM_HEARTBEAT_MS | 5000 | 心跳广播间隔（20 字节数据包） |
 | CLAW_SWARM_PORT | 5300 | UDP 发现端口 |
+| SWARM_RPC_MAX_RETRIES | 3 | RPC 重试次数（指数退避） |
+| SWARM_RPC_RETRY_BASE_MS | 500 | 重试基准延迟（每次翻倍） |
 | CLAW_SCHED_MAX_TASKS | 8 | 最大并发调度任务数 |
 | CLAW_SCHED_TICK_MS | 1000 | 调度器分辨率 |
 | CLAW_HEARTBEAT_INTERVAL_MS | 300000 | AI 巡检间隔（5 分钟） |

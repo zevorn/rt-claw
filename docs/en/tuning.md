@@ -66,10 +66,12 @@ Tools: System=on, Sched=on, Net=on, GPIO=off, LCD=off
 
 ## Memory Optimization
 
-### ESP32-C3 (400KB SRAM, ~240KB available)
+### ESP32-C3 (400KB SRAM, ~200KB available after WiFi/TLS)
 
-Key sdkconfig knobs:
+Measured runtime: ~43% usage (182KB free / 321KB total heap). Key tuning:
 
+- `NET_RESP_MAX` -- HTTP tool response buffer (default 4KB, was 16KB)
+- `sched_ai_ctx` -- prompt/reply buffers are heap-allocated and freed after use
 - `CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN` -- TLS input buffer (default 16KB, reduce to 8KB)
 - `CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN` -- TLS output buffer (default 16KB, reduce to 4KB)
 - `CONFIG_ESP_WIFI_IRAM_OPT` -- WiFi IRAM optimization (disable to save IRAM)
@@ -104,8 +106,10 @@ Key sdkconfig knobs:
 | CLAW_GW_MSG_POOL_SIZE | 16 | Gateway message queue depth |
 | CLAW_GW_MSG_MAX_LEN | 256 | Max message size in bytes |
 | CLAW_SWARM_MAX_NODES | 32 | Max discoverable swarm nodes |
-| CLAW_SWARM_HEARTBEAT_MS | 5000 | Heartbeat broadcast interval |
+| CLAW_SWARM_HEARTBEAT_MS | 5000 | Heartbeat broadcast interval (20-byte packets) |
 | CLAW_SWARM_PORT | 5300 | UDP discovery port |
+| SWARM_RPC_MAX_RETRIES | 3 | RPC retry count (exponential backoff) |
+| SWARM_RPC_RETRY_BASE_MS | 500 | Base retry delay (doubles each attempt) |
 | CLAW_SCHED_MAX_TASKS | 8 | Max concurrent scheduled tasks |
 | CLAW_SCHED_TICK_MS | 1000 | Scheduler resolution |
 | CLAW_HEARTBEAT_INTERVAL_MS | 300000 | AI patrol interval (5 min) |

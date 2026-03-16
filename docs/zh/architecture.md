@@ -61,15 +61,17 @@ claw/*.c  --->  #include "osal/claw_os.h"
 
 ### 网关（`claw/core/gateway.c`）
 
-线程安全的消息路由中心。所有服务间通信通过网关消息队列传递。
-消息类型：DATA、CMD、EVENT、SWARM。
+消息路由中心，支持服务注册表和基于类型的消息分发。服务通过 type_mask 位图
+和自有消息队列注册；网关将传入消息投递到所有匹配的消费者。
+消息类型：DATA、CMD、EVENT、SWARM、AI_REQ。
 队列容量：16 条消息 x 256 字节。专用线程优先级为 15。
 
 ### 调度器（`claw/core/scheduler.c`）
 
 定时器驱动的任务执行框架，时钟分辨率为 1 秒。支持最多 8 个并发任务
 （一次性和重复性任务）。AI 可通过工具调用创建、列出和删除任务。
-通过 NVS 存储实现跨重启持久化。
+通过 NVS 存储实现跨重启持久化。专用 AI 工作线程通过轮转待处理队列处理
+定时 AI 任务——工作线程忙时到达的任务会被排队并依次执行，防止任务饿死。
 
 ### 心跳（`claw/core/heartbeat.c`）
 
@@ -78,15 +80,20 @@ claw/*.c  --->  #include "osal/claw_os.h"
 
 ### AI 引擎（`claw/services/ai/`）
 
-Claude API HTTP 客户端，支持 Tool Use。24 个内置工具，涵盖 GPIO、
-系统信息、LCD、音频、调度器、HTTP 请求和长期记忆。对话记忆：
-RAM 环形缓冲区（短期）+ NVS 存储（长期）。技能系统支持可复用的提示模板。
+Claude/OpenAI 兼容 API HTTP 客户端，支持 Tool Use。24 个内置工具，涵盖 GPIO、
+系统信息、LCD、音频、调度器、HTTP 请求和长期记忆。每个工具声明所需能力
+（`SWARM_CAP_*` 位图）和标志（`CLAW_TOOL_LOCAL_ONLY`），用于蜂群路由决策。
+对话记忆：RAM 环形缓冲区（短期）+ NVS 存储（长期）。技能系统支持可复用的提示模板。
 
 ### 集群（`claw/services/swarm/`）
 
 分布式节点协调。基于 UDP 广播的节点发现，端口 5300。
-基于心跳的存活检测。能力位图广播。
-支持局域网内跨节点远程工具调用。
+20 字节心跳包携带能力位图、负载百分比、节点角色
+（WORKER / THINKER / COORDINATOR / OBSERVER）和活跃任务数。
+负载感知节点选择：挑选能力匹配且负载最低的节点进行 RPC。
+指数退避 RPC 重试（3 次尝试，500ms / 1s / 2s）。标记为
+`CLAW_TOOL_LOCAL_ONLY` 的工具永远不会被远程委托。工具能力匹配使用
+`claw_tool_t.required_caps`，以前缀匹配作为降级方案。
 
 ### 网络（`claw/services/net/`）
 
@@ -172,10 +179,11 @@ Makefile (entry point)
 
 | 模块 | SRAM | 备注 |
 |------|------|------|
-| ESP-IDF + WiFi + TLS | ~160 KB | 系统开销 |
-| 网关 + 调度器 | ~12 KB | 消息队列 16x256B + 线程 + 定时器 |
+| ESP-IDF + WiFi + TLS | ~110 KB | 系统开销 |
+| 线程栈（5 线程） | ~48 KB | main 16K + gateway 4K + swarm 4K + sched 8K + sched_ai 16K |
+| 网关 + 调度器 | ~10 KB | 消息队列 16x260B + 服务注册表 + 定时器 |
 | AI 引擎 + 记忆 | ~15 KB | HTTP 客户端 + 对话环形缓冲区 |
-| 工具 | ~4 KB | 24 个工具描述符 + 处理函数 |
-| 集群 + 心跳 | ~14 KB | UDP 套接字 + 节点表 + 定时器 |
+| 工具 | ~5 KB | 24 个工具描述符（含能力/标志） + 处理函数 |
+| 集群 + 心跳 | ~14 KB | UDP 套接字 + 节点表（32 节点） + 定时器 |
 | Shell + 应用 | ~10 KB | 行缓冲区 + 命令表 |
-| **总计** | **~215 KB** | 可用 240 KB 中约剩余 ~25 KB |
+| **总计** | **~212 KB** | 运行时约 ~100 KB 空闲堆（实测使用率 43%） |

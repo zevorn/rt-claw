@@ -146,9 +146,9 @@ No unit test framework yet. Verify changes by:
 | `claw/claw_init.c` | Boot entry point |
 | `claw_config.h` | Unified compile-time configuration (project root) |
 | `claw_gen_config.h.in` | Meson template for generated config header |
-| `claw/core/gateway.c` | Message router |
+| `claw/core/gateway.c` | Message router with service registry and type-based dispatch |
 | `claw/services/{ai,net,swarm,im}/` | Service modules |
-| `claw/tools/` | Tool Use framework |
+| `claw/tools/` | Tool Use framework (tools declare SWARM_CAP_* and CLAW_TOOL_LOCAL_ONLY) |
 | `platform/common/espressif/` | Shared Espressif board helpers (WiFi init + shell) |
 | `platform/esp32c3/` | ESP32-C3 unified ESP-IDF project (all boards) |
 | `platform/esp32c3/boards/` | Board-specific configs (qemu, devkit, xiaozhi-xmini) |

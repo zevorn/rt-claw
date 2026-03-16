@@ -61,15 +61,20 @@ claw/*.c  --->  #include "osal/claw_os.h"
 
 ### Gateway (`claw/core/gateway.c`)
 
-Thread-safe message routing hub. All inter-service communication passes
-through the gateway message queue. Message types: DATA, CMD, EVENT, SWARM.
-Queue: 16 messages x 256 bytes. Dedicated thread at priority 15.
+Message routing hub with service registry and type-based dispatch. Services
+register with a type_mask bitmap and their own message queue; the gateway
+delivers incoming messages to all matching consumers. Message types: DATA,
+CMD, EVENT, SWARM, AI_REQ. Queue: 16 messages x 256 bytes. Dedicated thread
+at priority 15.
 
 ### Scheduler (`claw/core/scheduler.c`)
 
 Timer-driven task execution with 1-second tick resolution. Supports up to
 8 concurrent tasks (one-shot and repeating). AI can create, list, and
 remove tasks via tool calls. Persistent across reboots via NVS storage.
+A dedicated AI worker thread processes scheduled AI tasks with round-robin
+pending queue -- tasks that arrive while the worker is busy are queued and
+executed in turn, preventing task starvation.
 
 ### Heartbeat (`claw/core/heartbeat.c`)
 
@@ -79,16 +84,22 @@ Depends on the scheduler service for timing.
 
 ### AI Engine (`claw/services/ai/`)
 
-Claude API HTTP client with Tool Use support. 24 built-in tools covering
-GPIO, system info, LCD, audio, scheduler, HTTP requests, and long-term
-memory. Conversation memory: RAM ring buffer (short-term) + NVS storage
-(long-term). Skill system for reusable prompt templates.
+Claude/OpenAI-compatible API HTTP client with Tool Use support. 24 built-in
+tools covering GPIO, system info, LCD, audio, scheduler, HTTP requests, and
+long-term memory. Each tool declares required capabilities (`SWARM_CAP_*`
+bitmap) and flags (`CLAW_TOOL_LOCAL_ONLY`) for swarm routing decisions.
+Conversation memory: RAM ring buffer (short-term) + NVS storage (long-term).
+Skill system for reusable prompt templates.
 
 ### Swarm (`claw/services/swarm/`)
 
 Distributed node coordination. UDP broadcast discovery on port 5300.
-Heartbeat-based liveness detection. Capability bitmap advertisement.
-Remote tool invocation across nodes in the local network.
+20-byte heartbeat packets carry capability bitmap, load percentage, node
+role (WORKER / THINKER / COORDINATOR / OBSERVER), and active task count.
+Load-aware node selection picks the least-loaded capable node for RPC.
+Exponential-backoff RPC retry (3 attempts, 500ms / 1s / 2s). Tools marked
+`CLAW_TOOL_LOCAL_ONLY` are never delegated remotely. Tool capability
+matching uses `claw_tool_t.required_caps` with prefix-based fallback.
 
 ### Network (`claw/services/net/`)
 
@@ -176,10 +187,11 @@ Makefile (entry point)
 
 | Module | SRAM | Notes |
 |--------|------|-------|
-| ESP-IDF + WiFi + TLS | ~160 KB | System overhead |
-| Gateway + Scheduler | ~12 KB | MQ 16x256B + threads + timer |
+| ESP-IDF + WiFi + TLS | ~110 KB | System overhead |
+| Thread stacks (5 threads) | ~48 KB | main 16K + gateway 4K + swarm 4K + sched 8K + sched_ai 16K |
+| Gateway + Scheduler | ~10 KB | MQ 16x260B + service registry + timer |
 | AI Engine + Memory | ~15 KB | HTTP client + conversation ring buffer |
-| Tools | ~4 KB | 24 tool descriptors + handlers |
-| Swarm + Heartbeat | ~14 KB | UDP socket + node table + timer |
+| Tools | ~5 KB | 24 tool descriptors (with caps/flags) + handlers |
+| Swarm + Heartbeat | ~14 KB | UDP socket + node table (32 nodes) + timer |
 | Shell + App | ~10 KB | Line buffer + command table |
-| **Total** | **~215 KB** | ~25 KB headroom on 240 KB available |
+| **Total** | **~212 KB** | ~100 KB free heap at runtime (43% usage measured) |
