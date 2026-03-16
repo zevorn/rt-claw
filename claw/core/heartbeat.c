@@ -20,6 +20,12 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef CLAW_PLATFORM_ESP_IDF
+#include "esp_heap_caps.h"
+#elif defined(CLAW_PLATFORM_RTTHREAD)
+#include <rtthread.h>
+#endif
+
 #define TAG "heartbeat"
 
 /* LLM connectivity state: -1 = unknown, 0 = offline, 1 = online */
@@ -129,10 +135,53 @@ out:
     claw_mutex_unlock(s_lock);
 }
 
+/*
+ * Device health check — collect anomalies and post events.
+ * Runs before the LLM ping so anomalies are included in the
+ * next heartbeat AI summary.
+ */
+static void check_device_health(void)
+{
+    uint32_t free_kb = 0;
+    uint32_t total_kb = 0;
+
+#ifdef CLAW_PLATFORM_ESP_IDF
+    size_t free_sz = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    size_t total_sz = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    free_kb = (uint32_t)(free_sz / 1024);
+    total_kb = (uint32_t)(total_sz / 1024);
+#elif defined(CLAW_PLATFORM_RTTHREAD)
+    rt_size_t total_rt = 0, used_rt = 0, max_rt = 0;
+    rt_memory_info(&total_rt, &used_rt, &max_rt);
+    free_kb = (uint32_t)((total_rt - used_rt) / 1024);
+    total_kb = (uint32_t)(total_rt / 1024);
+#endif
+
+    if (total_kb == 0) {
+        return;
+    }
+
+    uint32_t used_pct = 100 - (free_kb * 100 / total_kb);
+
+    /* Alert when heap usage exceeds 80% */
+    if (used_pct > 80) {
+        char msg[80];
+        snprintf(msg, sizeof(msg),
+                 "heap %lu%% used (%luKB free / %luKB total)",
+                 (unsigned long)used_pct,
+                 (unsigned long)free_kb,
+                 (unsigned long)total_kb);
+        heartbeat_post("memory", msg);
+    }
+}
+
 /* LLM connectivity probe — runs in its own thread */
 static void ping_thread(void *arg)
 {
     (void)arg;
+
+    check_device_health();
+
     int ok = (ai_ping() == CLAW_OK) ? 1 : 0;
     int prev = s_llm_state;
     s_llm_state = ok;
