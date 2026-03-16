@@ -203,6 +203,7 @@ void claw_free(void *ptr)
 /* ---------- Log ---------- */
 
 static int s_log_enabled = 1;
+static int s_log_level = CLAW_LOG_DEBUG;  /* show all by default */
 static const char *level_str[] = { "E", "W", "I", "D" };
 
 void claw_log_set_enabled(int enabled)
@@ -215,11 +216,27 @@ int claw_log_get_enabled(void)
     return s_log_enabled;
 }
 
+void claw_log_set_level(int level)
+{
+    if (level < CLAW_LOG_ERROR) {
+        level = CLAW_LOG_ERROR;
+    }
+    if (level > CLAW_LOG_DEBUG) {
+        level = CLAW_LOG_DEBUG;
+    }
+    s_log_level = level;
+}
+
+int claw_log_get_level(void)
+{
+    return s_log_level;
+}
+
 void claw_log(int level, const char *tag, const char *fmt, ...)
 {
     va_list ap;
 
-    if (!s_log_enabled) {
+    if (!s_log_enabled || level > s_log_level) {
         return;
     }
     if (level < 0) {

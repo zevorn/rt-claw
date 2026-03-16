@@ -267,6 +267,7 @@ void claw_free(void *ptr)
 /* ---------- Log ---------- */
 
 static int s_log_enabled = 1;
+static int s_log_level = CLAW_LOG_DEBUG;  /* show all by default */
 
 void claw_log_set_enabled(int enabled)
 {
@@ -285,11 +286,33 @@ int claw_log_get_enabled(void)
     return s_log_enabled;
 }
 
+void claw_log_set_level(int level)
+{
+    if (level < CLAW_LOG_ERROR) {
+        level = CLAW_LOG_ERROR;
+    }
+    if (level > CLAW_LOG_DEBUG) {
+        level = CLAW_LOG_DEBUG;
+    }
+    s_log_level = level;
+#ifdef CLAW_PLATFORM_ESP_IDF
+    static const esp_log_level_t map[] = {
+        ESP_LOG_ERROR, ESP_LOG_WARN, ESP_LOG_INFO, ESP_LOG_DEBUG
+    };
+    esp_log_level_set("*", map[level]);
+#endif
+}
+
+int claw_log_get_level(void)
+{
+    return s_log_level;
+}
+
 #ifdef CLAW_PLATFORM_ESP_IDF
 
 void claw_log(int level, const char *tag, const char *fmt, ...)
 {
-    if (!s_log_enabled) {
+    if (!s_log_enabled || level > s_log_level) {
         return;
     }
 
@@ -346,7 +369,7 @@ void claw_log(int level, const char *tag, const char *fmt, ...)
 {
     va_list ap;
 
-    if (!s_log_enabled) {
+    if (!s_log_enabled || level > s_log_level) {
         return;
     }
     if (level < 0) {

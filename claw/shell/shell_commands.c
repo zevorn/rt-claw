@@ -92,6 +92,17 @@ void shell_nvs_config_load(void)
 
 /* ---- Common command handlers ---- */
 
+static const char *log_level_name(int level)
+{
+    switch (level) {
+    case CLAW_LOG_ERROR: return "error";
+    case CLAW_LOG_WARN:  return "warn";
+    case CLAW_LOG_INFO:  return "info";
+    case CLAW_LOG_DEBUG: return "debug";
+    default:             return "unknown";
+    }
+}
+
 static void cmd_log(int argc, char **argv)
 {
     if (argc < 2) {
@@ -100,8 +111,31 @@ static void cmd_log(int argc, char **argv)
         claw_log_set_enabled(1);
     } else if (strcmp(argv[1], "off") == 0) {
         claw_log_set_enabled(0);
+    } else if (strcmp(argv[1], "level") == 0) {
+        if (argc < 3) {
+            printf("Log level: %s\n",
+                   log_level_name(claw_log_get_level()));
+            return;
+        }
+        int lv = -1;
+        if (strcmp(argv[2], "error") == 0) {
+            lv = CLAW_LOG_ERROR;
+        } else if (strcmp(argv[2], "warn") == 0) {
+            lv = CLAW_LOG_WARN;
+        } else if (strcmp(argv[2], "info") == 0) {
+            lv = CLAW_LOG_INFO;
+        } else if (strcmp(argv[2], "debug") == 0) {
+            lv = CLAW_LOG_DEBUG;
+        }
+        if (lv < 0) {
+            printf("Usage: /log level <error|warn|info|debug>\n");
+            return;
+        }
+        claw_log_set_level(lv);
+        printf("Log level: %s\n", log_level_name(lv));
+        return;
     } else {
-        printf("Usage: /log [on|off]\n");
+        printf("Usage: /log [on|off|level <error|warn|info|debug>]\n");
         return;
     }
     printf("Log output: %s\n",
@@ -305,7 +339,7 @@ static void cmd_nodes(int argc, char **argv)
 /* ---- Common command table ---- */
 
 const shell_cmd_t shell_common_commands[] = {
-    SHELL_CMD("/log",           cmd_log,           "Toggle log [on|off]"),
+    SHELL_CMD("/log",           cmd_log,           "Log [on|off|level <lvl>]"),
     SHELL_CMD("/history",       cmd_history,       "Show conversation count"),
     SHELL_CMD("/clear",         cmd_clear,         "Clear conversation memory"),
     SHELL_CMD("/ai_set",        cmd_ai_set,        "Set AI config (NVS)"),
