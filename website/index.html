@@ -447,6 +447,7 @@
             background: #0c0c0c; border: 1px solid var(--border);
             border-radius: var(--radius); overflow: hidden;
             display: flex; flex-direction: column;
+            min-height: 480px;
         }
         .serial-titlebar {
             display: flex; align-items: center; justify-content: space-between;
@@ -478,7 +479,7 @@
         .serial-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
         .serial-ctrl-btn.active { border-color: var(--accent3); color: var(--accent3); }
         .serial-output {
-            padding: 0.75rem 1rem; min-height: 360px; flex: 1;
+            padding: 0.75rem 1rem; height: 0; flex: 1;
             overflow-y: auto; font-family: var(--mono); font-size: 0.8rem;
             line-height: 1.5; color: #d4d4d4; word-break: break-all;
         }
