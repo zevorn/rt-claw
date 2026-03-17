@@ -38,6 +38,9 @@ help:
 	@echo "  GDB=1       Debug mode (GDB port 1234)"
 	@echo "  GRAPHICS=1  LCD display window (QEMU only)"
 	@echo ""
+	@echo "OTA:"
+	@echo "  make ota-server             Local OTA server (auto-detect firmware)"
+	@echo ""
 	@echo "Tests (unit — cross-compiled, QEMU semihosting):"
 	@echo "  make test-unit             Build + run unit tests (vexpress-a9)"
 	@echo ""
@@ -358,6 +361,12 @@ test-persist:
 .PHONY: test-online
 test-online:
 	$(FUNCTEST) -k TestAiOnline
+
+# --- OTA development server ---
+
+.PHONY: ota-server
+ota-server:
+	python3 scripts/ota-server.py $(OTA_ARGS)
 
 # --- Unit tests (RT-Thread / vexpress-a9 / semihosting) ---
 
