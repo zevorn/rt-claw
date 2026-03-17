@@ -1424,6 +1424,14 @@ function updateStarBadges(count) {
     }
 })();
 
+/* Lock serial panel height after layout settles to prevent content growth */
+window.addEventListener('load', function() {
+    var sp = document.querySelector('.serial-panel');
+    if (sp && !sp.classList.contains('expanded')) {
+        sp.style.height = sp.offsetHeight + 'px';
+    }
+});
+
 /* ── Serial Terminal ── */
 var serialPort = null;
 var serialReader = null;
@@ -1756,7 +1764,15 @@ function serialExpand() {
     var panel = document.querySelector('.serial-panel');
     panel.classList.toggle('expanded');
     var btn = document.getElementById('serial-expand-btn');
-    btn.classList.toggle('active', panel.classList.contains('expanded'));
+    var isExpanded = panel.classList.contains('expanded');
+    btn.classList.toggle('active', isExpanded);
+    if (isExpanded) {
+        panel.style.height = '';
+    } else {
+        /* Re-lock: clear height first to let grid compute, then freeze */
+        panel.style.height = '';
+        panel.style.height = panel.offsetHeight + 'px';
+    }
 }
 </script>
 
