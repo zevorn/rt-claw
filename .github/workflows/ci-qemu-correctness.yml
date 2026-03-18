@@ -11,6 +11,8 @@ on:
       - 'platform/esp32c3/**'
       - 'platform/common/**'
       - 'platform/vexpress-a9/**'
+      - 'platform/zynq-a9/**'
+      - 'vendor/bsp/**'
       - 'scripts/**'
       - 'tests/**'
       - 'Makefile'
@@ -26,6 +28,8 @@ on:
       - 'platform/esp32c3/**'
       - 'platform/common/**'
       - 'platform/vexpress-a9/**'
+      - 'platform/zynq-a9/**'
+      - 'vendor/bsp/**'
       - 'scripts/**'
       - 'tests/**'
       - 'Makefile'
@@ -59,6 +63,16 @@ jobs:
             qemu_tools: none
             make_target: test-smoke-vexpress
             timeout: 15
+          - target: zynq-a9-qemu
+            esp_targets: ""
+            qemu_tools: none
+            make_target: test-smoke-zynq
+            timeout: 15
+          - target: zynq-a9-unit
+            esp_targets: ""
+            qemu_tools: none
+            make_target: test-unit-zynq
+            timeout: 20
 
     steps:
       - uses: actions/checkout@v4
