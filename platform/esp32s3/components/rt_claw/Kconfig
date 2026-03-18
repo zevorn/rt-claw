@@ -65,6 +65,27 @@ menu "rt-claw Configuration"
             help
                 Predefined prompt templates (draw, monitor, greet).
 
+        config RTCLAW_FEISHU_ENABLE
+            bool "Enable Feishu (Lark) IM integration"
+            default n
+            help
+                WebSocket long connection to Feishu. Receives messages
+                and replies via AI engine. No public IP needed.
+
+        config RTCLAW_TELEGRAM_ENABLE
+            bool "Enable Telegram Bot integration"
+            default n
+            help
+                HTTP long-polling Telegram Bot. Receives messages and
+                replies via AI engine. No public IP needed.
+
+        config RTCLAW_HEARTBEAT_ENABLE
+            bool "Enable periodic AI heartbeat"
+            default n
+            depends on RTCLAW_SCHED_ENABLE
+            help
+                Periodic LLM health check with device status reporting.
+
         config RTCLAW_OTA_ENABLE
             bool "Enable OTA firmware update"
             default n
