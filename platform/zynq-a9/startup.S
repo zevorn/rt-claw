@@ -47,6 +47,14 @@ _reset:
     mov r0, #(1 << 30)          /* FPEXC.EN */
     vmsr fpexc, r0
 
+    /* Allow unaligned memory access (clear SCTLR.A bit).
+     * FreeRTOS+TCP uses 2-byte packet filler for IP header alignment,
+     * which causes unaligned 32-bit accesses. */
+    mrc p15, 0, r0, c1, c0, 0
+    bic r0, r0, #(1 << 1)       /* Clear A (alignment check) bit */
+    mcr p15, 0, r0, c1, c0, 0
+    isb
+
     /* Set VBAR to FreeRTOS vector table */
     ldr r0, =_freertos_vector_table
     mcr p15, 0, r0, c12, c0, 0

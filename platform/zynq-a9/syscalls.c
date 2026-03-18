@@ -164,5 +164,19 @@ const char *pcApplicationHostnameHook(void)
 
 /* ARM exception handler stubs */
 void FIQInterrupt(void) { while (1); }
-void DataAbortInterrupt(void) { while (1); }
+
+void DataAbortInterrupt(void)
+{
+    extern int printf(const char *, ...);
+    unsigned int dfar, dfsr, lr;
+    __asm__ volatile("mrc p15, 0, %0, c6, c0, 0" : "=r"(dfar));
+    __asm__ volatile("mrc p15, 0, %0, c5, c0, 0" : "=r"(dfsr));
+    __asm__ volatile("mov %0, lr" : "=r"(lr));
+    printf("DATA ABORT: DFAR=0x%08x DFSR=0x%08x LR=0x%08x\n",
+           dfar, dfsr, lr);
+    printf("  Fault at PC=0x%08x\n", lr - 8);
+    while (1) {
+    }
+}
+
 void PrefetchAbortInterrupt(void) { while (1); }

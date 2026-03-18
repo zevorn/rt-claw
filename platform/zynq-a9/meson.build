@@ -135,7 +135,7 @@ tcpip_lib = static_library('freertos_tcp',
         freertos_incs,
         bsp_incs,
     ],
-    c_args: ['-w'],
+    c_args: ['-w', '-mno-unaligned-access'],
 )
 
 # ---- Platform sources ----
