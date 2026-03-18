@@ -60,7 +60,8 @@
 /* Logging — map to printf */
 #define ipconfigHAS_PRINTF                      1
 #define FreeRTOS_printf(X)                      printf X
-#define ipconfigHAS_DEBUG_PRINTF                0
+#define ipconfigHAS_DEBUG_PRINTF                1
+#define FreeRTOS_debug_printf(X)                printf X
 
 /* Multi-interface support (required by latest FreeRTOS+TCP) */
 #define ipconfigUSE_DHCP_HOOK                   0
@@ -82,8 +83,15 @@
 /* configEMAC_TASK_STACK_SIZE for the GEM handler task */
 #define configEMAC_TASK_STACK_SIZE              (configMINIMAL_STACK_SIZE * 4)
 
+/* Reduce uncached memory from 1MB to 64KB for QEMU (no real cache) */
+#define uncMEMORY_SIZE                          0x10000U
+
 /* Socket semaphore count */
 #define ipconfigSOCK_DEFAULT_RECEIVE_BLOCK_TIME pdMS_TO_TICKS(5000)
 #define ipconfigSOCK_DEFAULT_SEND_BLOCK_TIME    pdMS_TO_TICKS(5000)
+
+/* DHCP timing: increase timeouts for slow QEMU initialization */
+#define ipconfigDHCP_FALL_BACK_AUTO_IP          0
+#define ipconfigMAXIMUM_DISCOVER_TX_PERIOD      pdMS_TO_TICKS(30000)
 
 #endif /* FREERTOS_IP_CONFIG_H */

@@ -114,7 +114,7 @@ tcpip_src = files(
     '../../vendor/lib/freertos-plus-tcp/source/FreeRTOS_UDP_IP.c',
     '../../vendor/lib/freertos-plus-tcp/source/FreeRTOS_UDP_IPv4.c',
     '../../vendor/lib/freertos-plus-tcp/source/portable/BufferManagement/BufferAllocation_2.c',
-    '../../vendor/lib/freertos-plus-tcp/source/portable/NetworkInterface/Zynq/NetworkInterface.c',
+    'drivers/NetworkInterface.c',
     '../../vendor/lib/freertos-plus-tcp/source/portable/NetworkInterface/Zynq/uncached_memory.c',
     '../../vendor/lib/freertos-plus-tcp/source/portable/NetworkInterface/Zynq/x_emacpsif_dma.c',
     '../../vendor/lib/freertos-plus-tcp/source/portable/NetworkInterface/Zynq/x_emacpsif_hw.c',
