@@ -45,6 +45,9 @@ jobs:
           - target: vexpress-a9-qemu
             make_target: vexpress-a9-qemu
             esp_targets: ""
+          - target: zynq-a9-qemu
+            make_target: build-zynq-a9-qemu
+            esp_targets: ""
           - target: esp32c3-devkit
             make_target: build-esp32c3-devkit
             esp_targets: esp32c3
@@ -90,7 +93,7 @@ jobs:
           source ~/esp/esp-idf/export.sh
           make ${{ matrix.make_target }}
 
-      - name: Build RT-Thread target
+      - name: Build non-ESP target
         if: ${{ matrix.esp_targets == '' }}
         run: make ${{ matrix.make_target }}
 
@@ -104,6 +107,9 @@ jobs:
               cp build/vexpress-a9-qemu/rtthread.bin "${OUT_DIR}/"
               cp build/vexpress-a9-qemu/rtthread.elf "${OUT_DIR}/"
               cp build/vexpress-a9-qemu/rtthread.map "${OUT_DIR}/"
+              ;;
+            zynq-a9-qemu)
+              cp build/zynq-a9-qemu/platform/zynq-a9/rtclaw.elf "${OUT_DIR}/"
               ;;
             esp32c3-devkit)
               cp build/esp32c3-devkit/idf/bootloader/bootloader.bin "${OUT_DIR}/"
