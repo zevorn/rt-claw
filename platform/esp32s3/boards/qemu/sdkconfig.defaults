@@ -37,5 +37,4 @@ CONFIG_RTCLAW_TOOL_NET=y
 # CONFIG_MBEDTLS_HARDWARE_SHA is not set
 
 # ---- Feishu (Lark) ----
-CONFIG_RTCLAW_FEISHU_ENABLE=y
-# Set App ID and Secret via: idf.py menuconfig -> rt-claw -> Feishu
+# CONFIG_RTCLAW_FEISHU_ENABLE=y
