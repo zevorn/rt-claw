@@ -38,3 +38,6 @@ CONFIG_RTCLAW_TOOL_NET=y
 
 # ---- Feishu (Lark) ----
 # CONFIG_RTCLAW_FEISHU_ENABLE=y
+
+# ---- Telegram Bot ----
+# CONFIG_RTCLAW_TELEGRAM_ENABLE is not set

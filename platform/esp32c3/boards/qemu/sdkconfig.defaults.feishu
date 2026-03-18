@@ -49,3 +49,6 @@ CONFIG_RTCLAW_TOOL_NET=y
 # ---- Feishu IM ----
 CONFIG_RTCLAW_FEISHU_ENABLE=y
 # Set App ID and Secret via: idf.py menuconfig -> rt-claw -> Feishu
+
+# ---- Telegram Bot ----
+# CONFIG_RTCLAW_TELEGRAM_ENABLE is not set

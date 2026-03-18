@@ -48,3 +48,6 @@ CONFIG_NEWLIB_STDIN_LINE_ENDING_LF=y
 
 # Feishu (Lark) Integration
 # CONFIG_RTCLAW_FEISHU_ENABLE=y
+
+# Telegram Bot Integration
+# CONFIG_RTCLAW_TELEGRAM_ENABLE is not set

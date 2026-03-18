@@ -56,4 +56,8 @@ CONFIG_RTCLAW_TOOL_SYSTEM=y
 CONFIG_RTCLAW_TOOL_SCHED=y
 CONFIG_RTCLAW_TOOL_NET=y
 
+# ---- IM integrations ----
+# CONFIG_RTCLAW_FEISHU_ENABLE is not set
+# CONFIG_RTCLAW_TELEGRAM_ENABLE is not set
+
 # AI Engine credentials and tuning: see claw_config.h + meson options
