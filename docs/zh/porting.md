@@ -110,7 +110,40 @@ meson compile -C build/<name>-<board>/meson
 | 模式 | 示例 | 关键文件 |
 |------|------|----------|
 | ESP-IDF (FreeRTOS) | `platform/esp32c3/` | CMakeLists.txt, components/rt_claw/, boards/ |
+| 独立 FreeRTOS | `platform/zynq-a9/` | meson.build（完整固件）、FreeRTOSConfig.h、startup.S |
 | RT-Thread (SCons) | `platform/vexpress-a9/` | SConstruct, rtconfig.py, cross.ini |
+
+### 独立 FreeRTOS 模式（Zynq-A9 示例）
+
+当移植到非 ESP-IDF 的 FreeRTOS 平台时，Zynq-A9 展示了"完整 Meson 构建"模式——
+Meson 编译所有内容（内核 + BSP + OSAL + claw）生成单个 ELF 文件：
+
+```
+platform/zynq-a9/
+├── startup.S               # 最小 ARM 启动代码（VFP、VBAR、栈设置）
+├── FreeRTOS_asm_vectors.S   # IRQ/SWI 向量表
+├── FreeRTOSConfig.h         # FreeRTOS 内核配置
+├── FreeRTOSIPConfig.h       # FreeRTOS+TCP 网络配置
+├── main.c                   # GIC + Timer 初始化、FreeRTOS+TCP 初始化、claw_init()
+├── syscalls.c               # Newlib 桩函数（UART printf、sbrk、BSP 桩）
+├── link.ld                  # 链接脚本
+├── cross.ini                # Meson 交叉编译文件（osal='freertos', platform='zynq-a9'）
+├── meson.build              # 编译 BSP + FreeRTOS + FreeRTOS+TCP + rtclaw → ELF
+├── drivers/
+│   └── NetworkInterface.c   # 修补的 Zynq GEM 网络驱动（QEMU 适配）
+└── boards/qemu/
+    └── board.c              # 板级抽象（QEMU 为空）
+```
+
+与 ESP-IDF 模式的关键差异：
+
+- **无外部构建系统** — Meson 处理所有编译和链接
+- **`platform` meson 选项** — 在 cross.ini 中设置 `platform = 'zynq-a9'`
+  以选择 `CLAW_PLATFORM_FREERTOS`（而非 `CLAW_PLATFORM_ESP_IDF`）
+- **BSP 在 vendor/ 中** — 硬件驱动（GIC、Timer、EMAC）位于 `vendor/bsp/xilinx/`
+- **FreeRTOS+TCP** — 独立 TCP/IP 栈位于 `vendor/lib/freertos-plus-tcp/`
+- **claw_net 使用 FreeRTOS+TCP socket** — `FreeRTOS_socket/connect/send/recv`
+  替代 ESP-IDF 的 `esp_http_client` 或 POSIX socket
 
 ## 添加新工具
 

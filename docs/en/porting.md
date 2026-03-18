@@ -112,7 +112,41 @@ meson compile -C build/<name>-<board>/meson
 | Pattern | Example | Key Files |
 |---------|---------|-----------|
 | ESP-IDF (FreeRTOS) | `platform/esp32c3/` | CMakeLists.txt, components/rt_claw/, boards/ |
+| Standalone FreeRTOS | `platform/zynq-a9/` | meson.build (full firmware), FreeRTOSConfig.h, startup.S |
 | RT-Thread (SCons) | `platform/vexpress-a9/` | SConstruct, rtconfig.py, cross.ini |
+
+### Standalone FreeRTOS Pattern (Zynq-A9 Example)
+
+When porting to a non-ESP-IDF FreeRTOS platform, the Zynq-A9 port demonstrates
+the "full Meson build" pattern where Meson compiles everything (kernel + BSP +
+OSAL + claw) into a single ELF:
+
+```
+platform/zynq-a9/
+├── startup.S               # Minimal ARM boot (VFP, VBAR, stacks)
+├── FreeRTOS_asm_vectors.S   # IRQ/SWI vector table
+├── FreeRTOSConfig.h         # FreeRTOS kernel configuration
+├── FreeRTOSIPConfig.h       # FreeRTOS+TCP network configuration
+├── main.c                   # GIC + Timer init, FreeRTOS+TCP init, claw_init()
+├── syscalls.c               # Newlib stubs (UART printf, sbrk, BSP stubs)
+├── link.ld                  # Linker script
+├── cross.ini                # Meson cross-file (osal='freertos', platform='zynq-a9')
+├── meson.build              # Compiles BSP + FreeRTOS + FreeRTOS+TCP + rtclaw → ELF
+├── drivers/
+│   └── NetworkInterface.c   # Patched Zynq GEM driver (QEMU workarounds)
+└── boards/qemu/
+    └── board.c              # Board abstraction (empty for QEMU)
+```
+
+Key differences from ESP-IDF pattern:
+
+- **No external build system** — Meson handles everything
+- **`platform` meson option** — set `platform = 'zynq-a9'` in cross.ini to
+  select `CLAW_PLATFORM_FREERTOS` (vs `CLAW_PLATFORM_ESP_IDF`)
+- **BSP in vendor/** — hardware drivers (GIC, Timer, EMAC) in `vendor/bsp/xilinx/`
+- **FreeRTOS+TCP** — standalone TCP/IP stack in `vendor/lib/freertos-plus-tcp/`
+- **claw_net uses FreeRTOS+TCP sockets** — `FreeRTOS_socket/connect/send/recv`
+  instead of ESP-IDF `esp_http_client` or POSIX sockets
 
 ## Adding a New Tool
 

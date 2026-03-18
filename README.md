@@ -65,11 +65,11 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 | WiFi | ES8311 | SSD1306 | serial | LCD framebuffer           |
 +--------------------------------------------------------------+
 |                  osal/claw_os.h (OSAL API)                   |
-+-------------------+------------------------------------------+
-| FreeRTOS (IDF)    |                RT-Thread                 |
-+-------------------+------------------------------------------+
-| ESP32-C3 / S3     |             QEMU vexpress-a9             |
-+-------------------+------------------------------------------+
++-------------------+-----------------------+------------------+
+| FreeRTOS (IDF)    | FreeRTOS (standalone) |    RT-Thread     |
++-------------------+-----------------------+------------------+
+| ESP32-C3 / S3     | QEMU Zynq-A9 (GEM)    | QEMU vexpress-a9 |
++-------------------+-----------------------+------------------+
 ```
 
 ## Supported Platforms
@@ -78,6 +78,7 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 |----------|--------|------|-------|--------|
 | ESP32-C3 | QEMU, xiaozhi-xmini, generic devkit | ESP-IDF + FreeRTOS | Meson + CMake | Verified |
 | ESP32-S3 | QEMU, real hardware | ESP-IDF + FreeRTOS | Meson + CMake | Verified |
+| Zynq-A9 | QEMU | FreeRTOS + FreeRTOS+TCP | Meson (full firmware) | Verified |
 | vexpress-a9 | QEMU | RT-Thread | Meson + SCons | Verified |
 
 ## Quick Start

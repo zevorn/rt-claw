@@ -14,6 +14,7 @@ make build-esp32c3-qemu                # ESP32-C3 QEMU (default)
 make build-esp32c3-xiaozhi-xmini             # ESP32-C3 xiaozhi-xmini 16MB board
 make build-esp32c3-devkit              # ESP32-C3 generic 4MB devkit
 make vexpress-a9-qemu                  # Meson + SCons → build/vexpress-a9-qemu/
+make build-zynq-a9-qemu               # Meson full firmware → build/zynq-a9-qemu/
 make build-esp32s3-qemu                # Meson + idf.py (requires ESP-IDF)
 make esp32s3                           # Meson + idf.py (real hardware)
 
@@ -60,6 +61,10 @@ Meson generates `claw_gen_config.h` in the build directory with the resolved val
 # QEMU vexpress-a9 (RT-Thread)
 make run-vexpress-a9-qemu              # build + launch QEMU
 make run-vexpress-a9-qemu GDB=1       # debug mode (GDB port 1234)
+
+# Zynq-A9 QEMU (FreeRTOS + FreeRTOS+TCP)
+make run-zynq-a9-qemu                 # build + launch QEMU (Cadence GEM network)
+make run-zynq-a9-qemu GDB=1          # debug mode (GDB port 1234)
 
 # ESP32-C3 (board = qemu | devkit | xiaozhi-xmini)
 make run-esp32c3-qemu                 # build + launch QEMU simulator
@@ -132,11 +137,23 @@ scripts/install-hooks.sh
 
 ## Testing
 
-No unit test framework yet. Verify changes by:
+```bash
+# Unit tests (cross-compiled, QEMU semihosting)
+make test-unit                         # vexpress-a9 (RT-Thread)
+make test-unit-zynq                    # zynq-a9 (FreeRTOS)
+
+# Functional tests (Python unittest, QEMU boot/shell)
+make test-smoke-esp32c3                # ESP32-C3 smoke tests
+make test-smoke-esp32s3                # ESP32-S3 smoke tests
+make test-smoke-vexpress               # vexpress-a9 boot test
+make test-smoke-zynq                   # zynq-a9 boot test
+```
+
+Verify changes by:
 
 1. Build passes on at least one platform
 2. `scripts/check-patch.sh --staged` passes
-3. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-esp32s3-qemu`
+3. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-zynq-a9-qemu`
 
 ## Skills (Claude Code Slash Commands)
 
@@ -181,7 +198,11 @@ Project-level skills in `.claude/skills/`, invoked via `/command-name`:
 | `platform/esp32c3/boards/` | Board-specific configs (qemu, devkit, xiaozhi-xmini) |
 | `platform/esp32s3/` | ESP32-S3 unified ESP-IDF project (all boards) |
 | `platform/esp32s3/boards/` | Board-specific configs (qemu, default) |
+| `platform/zynq-a9/` | Zynq-A9 QEMU (FreeRTOS + FreeRTOS+TCP, Cadence GEM) |
+| `platform/zynq-a9/drivers/` | Patched Zynq GEM NetworkInterface (ISR/PHY fixes) |
 | `platform/vexpress-a9/` | RT-Thread BSP + Meson cross-file |
+| `vendor/bsp/xilinx/` | Xilinx standalone BSP subset (GIC, Timer, EMAC PS) |
+| `vendor/lib/freertos-plus-tcp/` | FreeRTOS+TCP networking stack (submodule) |
 | `scripts/gen-esp32c3-cross.py` | Generate ESP32-C3 Meson cross-file |
 | `scripts/gen-esp32s3-cross.py` | Generate ESP32-S3 Meson cross-file |
 | `scripts/api-proxy.py` | HTTP→HTTPS proxy for QEMU without TLS |

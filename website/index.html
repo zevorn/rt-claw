@@ -313,6 +313,7 @@
         .platform-card:nth-child(1)::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
         .platform-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent2), var(--accent3)); }
         .platform-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+        .platform-card:nth-child(4)::before { background: linear-gradient(90deg, #8b5cf6, var(--accent2)); }
         .platform-card h3 { font-size: 1.15rem; margin-bottom: 0.75rem; font-weight: 600; }
         .platform-tag {
             display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
@@ -752,11 +753,11 @@
 |      WiFi | ES8311 | SSD1306 | serial | LCD framebuffer      |
 +--------------------------------------------------------------+
 |                  osal/claw_os.h  (OSAL API)                  |
-+-------------------+------------------------------------------+
-| FreeRTOS (IDF)    |                RT-Thread                 |
-+-------------------+------------------------------------------+
-| ESP32-C3 / S3     |             QEMU vexpress-a9             |
-+-------------------+------------------------------------------+</div>
++-------------------+-----------------------+------------------+
+| FreeRTOS (IDF)    | FreeRTOS (standalone) |    RT-Thread     |
++-------------------+-----------------------+------------------+
+| ESP32-C3 / S3     | QEMU Zynq-A9 (GEM)    | QEMU vexpress-a9 |
++-------------------+-----------------------+------------------+</div>
     </div>
 </section>
 
@@ -822,6 +823,21 @@
                     <li data-en="No hardware needed" data-zh="无需硬件">No hardware needed</li>
                     <li data-en="Boot + Ethernet verified on QEMU" data-zh="启动 + 以太网在 QEMU 上已验证">Boot + Ethernet verified on QEMU</li>
                     <li data-en="lan9118 user-mode networking" data-zh="lan9118 用户模式网络">lan9118 user-mode networking</li>
+                </ul>
+            </div>
+            <div class="platform-card reveal">
+                <h3>QEMU Zynq-A9</h3>
+                <div>
+                    <span class="platform-tag">ARM Cortex-A9</span>
+                    <span class="platform-tag">FreeRTOS</span>
+                    <span class="platform-tag">FreeRTOS+TCP</span>
+                    <span class="platform-tag">Cadence GEM</span>
+                </div>
+                <ul>
+                    <li data-en="Standalone FreeRTOS (non-ESP-IDF)" data-zh="独立 FreeRTOS（非 ESP-IDF）">Standalone FreeRTOS (non-ESP-IDF)</li>
+                    <li data-en="Full Meson firmware build" data-zh="完整 Meson 固件构建">Full Meson firmware build</li>
+                    <li data-en="DHCP + HTTP verified on QEMU" data-zh="DHCP + HTTP 在 QEMU 上已验证">DHCP + HTTP verified on QEMU</li>
+                    <li data-en="AI conversation via api-proxy" data-zh="通过 api-proxy 进行 AI 对话">AI conversation via api-proxy</li>
                 </ul>
             </div>
         </div>
