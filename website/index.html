@@ -1425,10 +1425,12 @@ function updateStarBadges(count) {
 })();
 
 /* Lock serial panel height after layout settles to prevent content growth */
+var serialPanelLockedHeight = 0;
 window.addEventListener('load', function() {
     var sp = document.querySelector('.serial-panel');
-    if (sp && !sp.classList.contains('expanded')) {
-        sp.style.height = sp.offsetHeight + 'px';
+    if (sp) {
+        serialPanelLockedHeight = sp.offsetHeight;
+        sp.style.height = serialPanelLockedHeight + 'px';
     }
 });
 
@@ -1764,14 +1766,14 @@ function serialExpand() {
     var panel = document.querySelector('.serial-panel');
     var btn = document.getElementById('serial-expand-btn');
     var wasExpanded = panel.classList.contains('expanded');
-    panel.style.height = '';
     panel.classList.toggle('expanded');
     btn.classList.toggle('active', !wasExpanded);
     if (wasExpanded) {
-        /* Collapsing: wait for layout reflow then lock height */
-        requestAnimationFrame(function() {
-            panel.style.height = panel.offsetHeight + 'px';
-        });
+        /* Collapsing: restore the height captured at page load */
+        panel.style.height = serialPanelLockedHeight + 'px';
+    } else {
+        /* Expanding: clear fixed height so absolute positioning works */
+        panel.style.height = '';
     }
 }
 </script>
