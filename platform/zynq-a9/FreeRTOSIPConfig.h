@@ -57,11 +57,9 @@
 /* Callbacks */
 #define ipconfigUSE_NETWORK_EVENT_HOOK          1
 
-/* Logging — map to printf */
-#define ipconfigHAS_PRINTF                      1
-#define FreeRTOS_printf(X)                      printf X
-#define ipconfigHAS_DEBUG_PRINTF                1
-#define FreeRTOS_debug_printf(X)                printf X
+/* Logging — disabled to keep shell output clean */
+#define ipconfigHAS_PRINTF                      0
+#define ipconfigHAS_DEBUG_PRINTF                0
 
 /* Multi-interface support (required by latest FreeRTOS+TCP) */
 #define ipconfigUSE_DHCP_HOOK                   0

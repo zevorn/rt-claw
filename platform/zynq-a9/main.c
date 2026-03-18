@@ -64,7 +64,7 @@ static void init_network(void)
     xEndPoint.bits.bWantDHCP = pdTRUE;
 
     FreeRTOS_IPInit_Multi();
-    printf("[net] FreeRTOS+TCP initialized, waiting for DHCP...\n");
+    /* FreeRTOS+TCP init done; [net] network up prints on DHCP success */
 }
 
 int main(void)
@@ -103,7 +103,7 @@ static void claw_main_task(void *pvParameters)
     claw_init();
 
     /* Wait for DHCP before starting shell */
-    printf("[init] waiting for network (10s)...\n");
+    /* Wait for DHCP before starting shell */
     vTaskDelay(pdMS_TO_TICKS(10000));
 
     /* Enter interactive shell (does not return) */

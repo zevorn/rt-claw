@@ -395,8 +395,6 @@ static BaseType_t xZynqNetworkInterfaceOutput( NetworkInterface_t * pxInterface,
                                                NetworkBufferDescriptor_t * const pxBuffer,
                                                BaseType_t bReleaseAfterSend )
 {
-    FreeRTOS_printf( ( "GEM TX: len=%lu buf=%p\n",
-                       pxBuffer->xDataLength, pxBuffer->pucEthernetBuffer ) );
     BaseType_t xEMACIndex = ( BaseType_t ) pxInterface->pvArgument;
 
     configASSERT( xEMACIndex >= 0 );
