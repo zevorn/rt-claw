@@ -32,6 +32,10 @@ list(APPEND CLAW_REQUIRES esp_eth esp_wifi esp_lcd esp_driver_i2c
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/rt_claw_stub.c" "/* auto-generated */\n")
 set(CLAW_SRCS "${CMAKE_CURRENT_BINARY_DIR}/rt_claw_stub.c")
 
+# es8311 audio driver — compiled by CMake (not Meson) because it
+# depends on esp_codec_dev managed component headers.
+list(APPEND CLAW_SRCS "${RT_CLAW_ROOT}/drivers/audio/espressif/es8311_audio.c")
+
 # Platform OTA implementation — must live in rt_claw (not main) so the
 # linker resolves symbols referenced by Meson-compiled ota_service.o.
 if(CONFIG_RTCLAW_OTA_ENABLE)
@@ -42,6 +46,8 @@ idf_component_register(
     SRCS ${CLAW_SRCS}
     INCLUDE_DIRS    ${CLAW_INC_DIRS}
     REQUIRES        ${CLAW_REQUIRES}
+    LDFRAGMENTS     "rtclaw.lf"
+    WHOLE_ARCHIVE
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC CLAW_PLATFORM_ESP_IDF)

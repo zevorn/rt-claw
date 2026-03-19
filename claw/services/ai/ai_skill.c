@@ -408,3 +408,11 @@ void claw_tools_register_skill(void)
 void claw_tools_register_skill(void) {}
 
 #endif
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+#ifdef CONFIG_RTCLAW_SKILL_ENABLE
+static const char *ai_skill_deps[] = { "ai_engine", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(ai_skill, "ai_skill",
+    ai_skill_init, NULL, NULL, ai_skill_deps);
+#endif

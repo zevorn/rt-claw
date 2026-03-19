@@ -65,3 +65,26 @@ int claw_console_write(const void *buf, size_t len)
 }
 
 #endif /* CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG */
+
+/* OOP driver registration */
+#include "claw/core/claw_driver.h"
+
+static claw_err_t console_drv_probe(struct claw_driver *drv)
+{
+    (void)drv;
+    claw_console_init();
+    return CLAW_OK;
+}
+
+static const struct claw_driver_ops console_drv_ops = {
+    .probe  = console_drv_probe,
+    .remove = NULL,
+};
+
+static struct claw_driver console_drv = {
+    .name  = "console",
+    .ops   = &console_drv_ops,
+    .state = CLAW_DRV_REGISTERED,
+};
+
+CLAW_DRIVER_REGISTER(console, &console_drv);

@@ -1,5 +1,9 @@
 src_files = files(
     'claw_init.c',
+    'core/claw_errno.c',
+    'core/service_core.c',
+    'core/driver_core.c',
+    'core/tool_core.c',
     'core/gateway.c',
     'core/scheduler.c',
     'services/ai/ai_engine.c',
@@ -20,9 +24,11 @@ src_files = files(
 )
 
 # Drivers (outside claw/ directory)
+# es8311_audio.c excluded: depends on esp_codec_dev managed component
+# which has transitive headers not available in Meson cross-compile.
+# It compiles via ESP-IDF CMake (platform/esp32c3/main/CMakeLists.txt).
 src_files += files(
     '../drivers/display/espressif/ssd1306_oled.c',
-    '../drivers/audio/espressif/es8311_audio.c',
 )
 
 # Feature flags
@@ -79,6 +85,6 @@ rtclaw_lib = static_library('rtclaw', src_files,
 )
 
 rtclaw_dep = declare_dependency(
-    link_with: rtclaw_lib,
+    link_whole: rtclaw_lib,
     include_directories: [claw_root_inc, claw_inc],
 )

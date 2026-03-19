@@ -2,12 +2,13 @@
  * Copyright (c) 2026, Chao Liu <chao.liu.zevorn@gmail.com>
  * SPDX-License-Identifier: MIT
  *
- * Task scheduler — dedicated thread polls task array every tick.
+ * Task scheduler — intrusive linked list, sorted by next_run_ms.
  */
 
 #include "osal/claw_os.h"
 #include "claw_config.h"
 #include "claw/core/scheduler.h"
+#include "utils/list.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -21,12 +22,41 @@ typedef struct {
     int32_t          remaining;     /* -1 = infinite, 0 = done */
     sched_callback_t callback;
     void            *arg;
-    int              active;
+    claw_list_node_t node;
 } sched_task_t;
 
-static sched_task_t s_tasks[CLAW_SCHED_MAX_TASKS];
-static claw_mutex_t s_lock;
-static claw_thread_t s_thread;
+static CLAW_LIST_HEAD(s_tasks);
+static int s_task_count;
+static struct claw_mutex *s_lock;
+static struct claw_thread *s_thread;
+
+static sched_task_t *find_task(const char *name)
+{
+    claw_list_node_t *pos;
+
+    claw_list_for_each(pos, &s_tasks) {
+        sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+        if (strcmp(t->name, name) == 0) {
+            return t;
+        }
+    }
+    return NULL;
+}
+
+static void insert_sorted(sched_task_t *task)
+{
+    claw_list_node_t *pos;
+
+    claw_list_for_each(pos, &s_tasks) {
+        sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+        if ((int32_t)(task->next_run_ms - t->next_run_ms) < 0) {
+            /* Insert before this node */
+            claw_list__insert(&task->node, pos->prev, pos);
+            return;
+        }
+    }
+    claw_list_add_tail(&task->node, &s_tasks);
+}
 
 static void sched_thread(void *arg)
 {
@@ -38,17 +68,19 @@ static void sched_thread(void *arg)
 
         claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
-        for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-            sched_task_t *t = &s_tasks[i];
+        claw_list_node_t *pos;
+        claw_list_node_t *tmp;
 
-            if (!t->active || t->remaining == 0) {
+        claw_list_for_each_safe(pos, tmp, &s_tasks) {
+            sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+
+            if (t->remaining == 0) {
                 continue;
             }
             if ((int32_t)(now - t->next_run_ms) < 0) {
-                continue;
+                break;  /* sorted: no more tasks due */
             }
 
-            /* Time to run */
             sched_callback_t cb = t->callback;
             void *cb_arg = t->arg;
 
@@ -56,9 +88,19 @@ static void sched_thread(void *arg)
             if (t->remaining > 0) {
                 t->remaining--;
                 if (t->remaining == 0) {
-                    t->active = 0;
+                    claw_list_del(&t->node);
+                    s_task_count--;
+                    claw_mutex_unlock(s_lock);
+                    cb(cb_arg);
+                    claw_free(t);
+                    claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
+                    continue;
                 }
             }
+
+            /* Re-insert at sorted position */
+            claw_list_del(&t->node);
+            insert_sorted(t);
 
             claw_mutex_unlock(s_lock);
             cb(cb_arg);
@@ -77,7 +119,7 @@ int sched_init(void)
         return CLAW_ERROR;
     }
 
-    memset(s_tasks, 0, sizeof(s_tasks));
+    s_task_count = 0;
 
     s_thread = claw_thread_create("sched", sched_thread, NULL,
                                     CLAW_SCHED_THREAD_STACK,
@@ -89,8 +131,8 @@ int sched_init(void)
         return CLAW_ERROR;
     }
 
-    CLAW_LOGI(TAG, "started, max_tasks=%d, tick=%dms",
-              CLAW_SCHED_MAX_TASKS, CLAW_SCHED_TICK_MS);
+    CLAW_LOGI(TAG, "started (intrusive list), tick=%dms",
+              CLAW_SCHED_TICK_MS);
     return CLAW_OK;
 }
 
@@ -99,7 +141,20 @@ void sched_stop(void)
     claw_thread_delete(s_thread);
     s_thread = NULL;
 
+    /* Free remaining tasks */
     if (s_lock) {
+        claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
+        claw_list_node_t *pos;
+        claw_list_node_t *tmp;
+
+        claw_list_for_each_safe(pos, tmp, &s_tasks) {
+            sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+            claw_list_del(&t->node);
+            claw_free(t);
+        }
+        s_task_count = 0;
+        claw_mutex_unlock(s_lock);
+
         claw_mutex_delete(s_lock);
         s_lock = NULL;
     }
@@ -116,38 +171,28 @@ int sched_add(const char *name, uint32_t interval_ms, int32_t count,
 
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
-    /* Reject duplicate names */
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active && strcmp(s_tasks[i].name, name) == 0) {
-            claw_mutex_unlock(s_lock);
-            CLAW_LOGW(TAG, "duplicate task '%s', rejected", name);
-            return CLAW_ERROR;
-        }
-    }
-
-    /* Find free slot */
-    int slot = -1;
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (!s_tasks[i].active) {
-            slot = i;
-            break;
-        }
-    }
-
-    if (slot < 0) {
+    if (find_task(name)) {
         claw_mutex_unlock(s_lock);
-        CLAW_LOGE(TAG, "no free slot for '%s'", name);
+        CLAW_LOGW(TAG, "duplicate task '%s', rejected", name);
         return CLAW_ERROR;
     }
 
-    sched_task_t *t = &s_tasks[slot];
+    sched_task_t *t = claw_malloc(sizeof(*t));
+    if (!t) {
+        claw_mutex_unlock(s_lock);
+        CLAW_LOGE(TAG, "no memory for '%s'", name);
+        return CLAW_ERROR;
+    }
+
     snprintf(t->name, sizeof(t->name), "%s", name);
     t->interval_ms = interval_ms;
     t->next_run_ms = claw_tick_ms() + interval_ms;
     t->remaining   = count;
     t->callback    = cb;
     t->arg         = arg;
-    t->active      = 1;
+    claw_list_init(&t->node);
+    insert_sorted(t);
+    s_task_count++;
 
     claw_mutex_unlock(s_lock);
     CLAW_LOGI(TAG, "added '%s' every %ums (count=%d)",
@@ -163,13 +208,14 @@ int sched_remove(const char *name)
 
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active && strcmp(s_tasks[i].name, name) == 0) {
-            s_tasks[i].active = 0;
-            claw_mutex_unlock(s_lock);
-            CLAW_LOGI(TAG, "removed '%s'", name);
-            return CLAW_OK;
-        }
+    sched_task_t *t = find_task(name);
+    if (t) {
+        claw_list_del(&t->node);
+        s_task_count--;
+        claw_mutex_unlock(s_lock);
+        CLAW_LOGI(TAG, "removed '%s'", name);
+        claw_free(t);
+        return CLAW_OK;
     }
 
     claw_mutex_unlock(s_lock);
@@ -180,21 +226,14 @@ void sched_list(void)
 {
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
-    int count = 0;
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active) {
-            count++;
-        }
-    }
+    printf("tasks: %d\n", s_task_count);
 
-    printf("tasks: %d/%d\n", count, CLAW_SCHED_MAX_TASKS);
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active) {
-            sched_task_t *t = &s_tasks[i];
-            printf("  [%d] %-20s  every %5ums  remaining=%d\n",
-                   i, t->name, (unsigned)t->interval_ms,
-                   (int)t->remaining);
-        }
+    claw_list_node_t *pos;
+
+    claw_list_for_each(pos, &s_tasks) {
+        sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+        printf("  %-20s  every %5ums  remaining=%d\n",
+               t->name, (unsigned)t->interval_ms, (int)t->remaining);
     }
 
     claw_mutex_unlock(s_lock);
@@ -210,18 +249,14 @@ int sched_list_to_buf(char *buf, size_t size)
 
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
 
-    int count = 0;
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active) {
-            count++;
-        }
-    }
-
     off += snprintf(buf + off, size - off,
-                    "%d active task(s):\n", count);
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active && (size_t)off < size - 1) {
-            sched_task_t *t = &s_tasks[i];
+                    "%d active task(s):\n", s_task_count);
+
+    claw_list_node_t *pos;
+
+    claw_list_for_each(pos, &s_tasks) {
+        sched_task_t *t = claw_list_entry(pos, sched_task_t, node);
+        if ((size_t)off < size - 1) {
             off += snprintf(buf + off, size - off,
                             "- %s: every %us, remaining=%d\n",
                             t->name,
@@ -236,15 +271,17 @@ int sched_list_to_buf(char *buf, size_t size)
 
 int sched_task_count(void)
 {
-    int count = 0;
+    int count;
 
     claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
-    for (int i = 0; i < CLAW_SCHED_MAX_TASKS; i++) {
-        if (s_tasks[i].active) {
-            count++;
-        }
-    }
+    count = s_task_count;
     claw_mutex_unlock(s_lock);
 
     return count;
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *sched_deps[] = { NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(sched, "sched",
+    sched_init, NULL, sched_stop, sched_deps);

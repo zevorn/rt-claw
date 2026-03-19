@@ -291,3 +291,9 @@ cJSON *claw_tools_to_json_exclude(const char *prefix)
     }
     return arr;
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *tools_deps[] = { "ai_engine", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(tools, "tools",
+    claw_tools_init, NULL, claw_tools_stop, tools_deps);

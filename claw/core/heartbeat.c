@@ -42,14 +42,14 @@ typedef struct {
 
 static hb_event_t  s_events[CLAW_HEARTBEAT_MAX_EVENTS];
 static int          s_event_count;
-static claw_mutex_t s_lock;
+static struct claw_mutex *s_lock;
 static int          s_busy;
-static claw_thread_t s_last_worker;
+static struct claw_thread *s_last_worker;
 
 /* IM reply destination (optional) */
 static heartbeat_reply_fn_t s_reply_fn;
 static char s_reply_target[64];
-static claw_mutex_t s_reply_lock;
+static struct claw_mutex *s_reply_lock;
 
 /*
  * Build a prompt from buffered events and clear the buffer.
@@ -362,3 +362,11 @@ int heartbeat_llm_online(void)
 {
     return s_llm_state;
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+#ifdef CONFIG_RTCLAW_HEARTBEAT_ENABLE
+static const char *heartbeat_deps[] = { "sched", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(heartbeat, "heartbeat",
+    heartbeat_init, NULL, heartbeat_stop, heartbeat_deps);
+#endif

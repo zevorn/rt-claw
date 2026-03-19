@@ -194,11 +194,19 @@ Project-level skills in `.claude/skills/`, invoked via `/command-name`:
 | `vendor/lib/cjson/` | cJSON library |
 | `vendor/os/freertos/` | FreeRTOS-Kernel (submodule) |
 | `vendor/os/rt-thread/` | RT-Thread (submodule) |
-| `claw/claw_init.c` | Boot entry point |
+| `include/claw/core/claw_class.h` | OOP infrastructure (container_of, registration macros, ops validation) |
+| `include/claw/core/claw_errno.h` | Unified error codes (`claw_err_t` enum + `claw_strerror()`) |
+| `include/claw/core/claw_service.h` | Service base class (ops vtable, lifecycle state machine, deps) |
+| `include/claw/core/claw_driver.h` | Driver base class (probe/remove lifecycle) |
+| `include/claw/core/claw_tool.h` | Tool base class (ops vtable) |
+| `claw/core/service_core.c` | Service registry, topological sort, lifecycle management |
+| `claw/core/driver_core.c` | Driver registry, probe/remove lifecycle |
+| `claw/core/tool_core.c` | Tool registry, linker section collection |
+| `claw/claw_init.c` | Boot entry: collect drivers/services/tools, probe, start |
 | `claw_config.h` | Unified compile-time configuration (project root) |
 | `claw_gen_config.h.in` | Meson template for generated config header |
-| `claw/core/gateway.c` | Message router with service registry and type-based dispatch |
-| `claw/services/{ai,net,swarm,im}/` | Service modules |
+| `claw/core/gateway.c` | Message router with OOP context, polymorphic dispatch |
+| `claw/services/{ai,net,swarm,im}/` | Service modules (OOP context structs, deps declaration) |
 | `claw/tools/` | Tool Use framework (tools declare SWARM_CAP_* and CLAW_TOOL_LOCAL_ONLY) |
 | `platform/common/espressif/` | Shared Espressif board helpers (WiFi init + shell) |
 | `platform/esp32c3/` | ESP32-C3 unified ESP-IDF project (all boards) |

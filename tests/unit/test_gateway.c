@@ -15,7 +15,7 @@ static void test_gateway_register_service(void)
 {
     gateway_init();
 
-    claw_mq_t mq = claw_mq_create("test", sizeof(struct gateway_msg), 4);
+    struct claw_mq *mq = claw_mq_create("test", sizeof(struct gateway_msg), 4);
     TEST_ASSERT_NOT_NULL(mq);
 
     int ret = gateway_register_service(
@@ -39,13 +39,13 @@ static void test_gateway_register_overflow(void)
     gateway_init();
 
     for (int i = 0; i < GW_MAX_SERVICES; i++) {
-        claw_mq_t mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
+        struct claw_mq *mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
         int ret = gateway_register_service("svc", 0xFF, mq);
         TEST_ASSERT_EQ(ret, CLAW_OK);
     }
 
     /* One more should fail */
-    claw_mq_t mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
+    struct claw_mq *mq = claw_mq_create("q", sizeof(struct gateway_msg), 2);
     int ret = gateway_register_service("over", 0xFF, mq);
     TEST_ASSERT(ret != CLAW_OK);
 }

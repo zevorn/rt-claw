@@ -55,6 +55,24 @@ SECTIONS
         __rodata_end = .;
     } > DDR
 
+    /* rt-claw OOP auto-registration sections */
+    .claw_registry : {
+        . = ALIGN(4);
+        __start_claw_services = .;
+        KEEP(*(SORT(claw_services*)))
+        __stop_claw_services = .;
+
+        . = ALIGN(4);
+        __start_claw_drivers = .;
+        KEEP(*(SORT(claw_drivers*)))
+        __stop_claw_drivers = .;
+
+        . = ALIGN(4);
+        __start_claw_tools = .;
+        KEEP(*(SORT(claw_tools*)))
+        __stop_claw_tools = .;
+    } > DDR
+
     /* ARM exception index (for unwinding) */
     .ARM.exidx : {
         __exidx_start = .;

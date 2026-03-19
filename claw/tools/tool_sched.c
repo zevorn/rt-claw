@@ -55,9 +55,9 @@ typedef struct {
 static sched_ai_ctx_t s_ctx[SCHED_AI_MAX];
 
 /* Worker thread state */
-static claw_thread_t s_ai_worker;
-static claw_sem_t   s_worker_sem;
-static claw_mutex_t s_worker_lock;
+static struct claw_thread *s_ai_worker;
+static struct claw_sem *s_worker_sem;
+static struct claw_mutex *s_worker_lock;
 static sched_ai_ctx_t *s_pending_ctx;
 static int s_worker_busy; /* protected by s_worker_lock */
 
@@ -68,7 +68,7 @@ static int s_worker_busy; /* protected by s_worker_lock */
  * while s_api_lock is held, so races are practically impossible
  * but we lock anyway for correctness.
  */
-static claw_mutex_t      s_rctx_lock;
+static struct claw_mutex *s_rctx_lock;
 static sched_reply_fn_t  s_rctx_fn;
 static char              s_rctx_target[REPLY_TARGET_MAX];
 

@@ -282,7 +282,7 @@ static struct {
     uint32_t intervals[BLINK_MAX_STEPS];
 } s_blink;
 
-static claw_timer_t s_blink_timer;
+static struct claw_timer *s_blink_timer;
 
 static void blink_timer_cb(void *arg)
 {

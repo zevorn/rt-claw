@@ -41,14 +41,22 @@ if unit_test:
     libs.append('unittest')
     lib_paths.append(os.path.join(build_dir, 'tests', 'unit'))
 
-Env.AppendUnique(LIBS=libs)
 Env.AppendUnique(LIBPATH=lib_paths)
 
-if unit_test:
-    # Resolve circular deps between unittest <-> rtclaw <-> cjson
-    Env['LINKCOM'] = Env['LINKCOM'].replace(
-        '$_LIBFLAGS',
-        '-Wl,--start-group $_LIBFLAGS -Wl,--end-group'
-    )
+# Use --whole-archive for rtclaw and osal so linker sections
+# (claw_services, claw_drivers, claw_tools) are retained.
+rtclaw_a = os.path.join(build_dir, 'claw', 'librtclaw.a')
+osal_a = os.path.join(build_dir, 'osal', 'libosal.a')
+Env.Append(_LIBFLAGS=' -Wl,--whole-archive'
+    + ' ' + rtclaw_a + ' ' + osal_a
+    + ' -Wl,--no-whole-archive')
+normal_libs = [l for l in libs if l not in ['rtclaw', 'osal']]
+Env.AppendUnique(LIBS=normal_libs)
+
+# Resolve circular deps between whole-archive libs and their dependencies
+Env['LINKCOM'] = Env['LINKCOM'].replace(
+    '$_LIBFLAGS',
+    '-Wl,--start-group $_LIBFLAGS -Wl,--end-group'
+)
 
 Return('objs')

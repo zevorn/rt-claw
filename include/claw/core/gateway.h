@@ -20,7 +20,21 @@ enum gateway_msg_type {
     GW_MSG_TYPE_MAX,
 };
 
+/*
+ * Message ops vtable — enables polymorphic dispatch.
+ * All fields are optional (NULL = use default behavior).
+ */
+struct gateway_msg;
+
+struct gateway_msg_ops {
+    int  (*dispatch)(struct gateway_msg *msg);
+    void (*destroy)(struct gateway_msg *msg);
+    int  (*serialize)(const struct gateway_msg *msg, char *buf, size_t len);
+    void (*dump)(const struct gateway_msg *msg);
+};
+
 struct gateway_msg {
+    const struct gateway_msg_ops *ops;  /* NULL = legacy dispatch */
     enum gateway_msg_type type;
     uint16_t len;
     uint8_t  payload[CLAW_GW_MSG_MAX_LEN];
@@ -46,7 +60,7 @@ struct gw_handler {
 struct gw_service_entry {
     const char *name;
     uint8_t type_mask;          /* (1 << GW_MSG_*) bitmap */
-    claw_mq_t inbox;            /* service's own message queue */
+    struct claw_mq *inbox;            /* service's own message queue */
 };
 
 #define GW_MAX_HANDLERS     8
@@ -79,6 +93,6 @@ int gateway_register_handler(const char *name, gw_handler_fn process);
  * @param inbox      Service's message queue (gateway delivers to it)
  */
 int gateway_register_service(const char *name, uint8_t type_mask,
-                             claw_mq_t inbox);
+                             struct claw_mq *inbox);
 
 #endif /* CLAW_CORE_GATEWAY_H */

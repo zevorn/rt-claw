@@ -286,3 +286,31 @@ void wifi_manager_scan_and_print(void)
 
     free(ap_list);
 }
+
+/* OOP driver registration */
+#include "claw/core/claw_driver.h"
+
+static claw_err_t wifi_drv_probe(struct claw_driver *drv)
+{
+    (void)drv;
+    return wifi_manager_init() == 0 ? CLAW_OK : CLAW_ERR_IO;
+}
+
+static void wifi_drv_remove(struct claw_driver *drv)
+{
+    (void)drv;
+    /* WiFi teardown handled by ESP-IDF on reboot */
+}
+
+static const struct claw_driver_ops wifi_drv_ops = {
+    .probe  = wifi_drv_probe,
+    .remove = wifi_drv_remove,
+};
+
+static struct claw_driver wifi_drv = {
+    .name  = "wifi_manager",
+    .ops   = &wifi_drv_ops,
+    .state = CLAW_DRV_REGISTERED,
+};
+
+CLAW_DRIVER_REGISTER(wifi, &wifi_drv);

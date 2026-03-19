@@ -20,24 +20,55 @@
 extern "C" {
 #endif
 
-/* ---------------- Types (opaque handles) ---------------- */
+/*
+ * OSAL object types — struct-based (Linux kernel style).
+ * Each RTOS backend defines a private sub-struct embedding these
+ * as the first member, recovered via container_of.
+ */
 
-typedef void *claw_thread_t;
-typedef void *claw_mutex_t;
-typedef void *claw_sem_t;
-typedef void *claw_mq_t;
-typedef void *claw_timer_t;
+struct claw_thread {
+    const char *name;
+    uint32_t    priority;
+    uint32_t    stack_size;
+};
+
+struct claw_mutex {
+    const char *name;
+};
+
+struct claw_sem {
+    const char *name;
+};
+
+struct claw_mq {
+    const char *name;
+    uint32_t    msg_size;
+    uint32_t    max_msgs;
+};
+
+struct claw_timer {
+    const char *name;
+    uint32_t    period_ms;
+    int         repeat;
+};
 
 /* ---------------- Constants ----------------------------- */
 
 #define CLAW_WAIT_FOREVER   UINT32_MAX
 #define CLAW_NO_WAIT        0
 
-/* Return codes */
+/*
+ * Return codes — canonical definitions in claw/core/claw_errno.h.
+ * Legacy macros kept for existing code; values match claw_err_t.
+ */
+#include "claw/core/claw_errno.h"
+
+#ifndef CLAW_OK
 #define CLAW_OK             0
-#define CLAW_ERROR          (-1)
-#define CLAW_TIMEOUT        (-2)
-#define CLAW_NOMEM          (-3)
+#endif
+#define CLAW_ERROR          CLAW_ERR_GENERIC
+#define CLAW_TIMEOUT        CLAW_ERR_TIMEOUT
+#define CLAW_NOMEM          CLAW_ERR_NOMEM
 
 /* Log levels */
 #define CLAW_LOG_ERROR      0
@@ -47,12 +78,12 @@ typedef void *claw_timer_t;
 
 /* ---------------- Thread -------------------------------- */
 
-claw_thread_t claw_thread_create(const char *name,
-                                  void (*entry)(void *arg),
-                                  void *arg,
-                                  uint32_t stack_size,
-                                  uint32_t priority);
-void claw_thread_delete(claw_thread_t thread);
+struct claw_thread *claw_thread_create(const char *name,
+                                       void (*entry)(void *arg),
+                                       void *arg,
+                                       uint32_t stack_size,
+                                       uint32_t priority);
+void claw_thread_delete(struct claw_thread *thread);
 void claw_thread_delay_ms(uint32_t ms);
 void claw_thread_yield(void);
 
@@ -67,39 +98,39 @@ int  claw_thread_should_exit(void);
 
 /* ---------------- Mutex --------------------------------- */
 
-claw_mutex_t claw_mutex_create(const char *name);
-int  claw_mutex_lock(claw_mutex_t mutex, uint32_t timeout_ms);
-void claw_mutex_unlock(claw_mutex_t mutex);
-void claw_mutex_delete(claw_mutex_t mutex);
+struct claw_mutex *claw_mutex_create(const char *name);
+int  claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms);
+void claw_mutex_unlock(struct claw_mutex *mutex);
+void claw_mutex_delete(struct claw_mutex *mutex);
 
 /* ---------------- Semaphore ----------------------------- */
 
-claw_sem_t claw_sem_create(const char *name, uint32_t init_value);
-int  claw_sem_take(claw_sem_t sem, uint32_t timeout_ms);
-void claw_sem_give(claw_sem_t sem);
-void claw_sem_delete(claw_sem_t sem);
+struct claw_sem *claw_sem_create(const char *name, uint32_t init_value);
+int  claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms);
+void claw_sem_give(struct claw_sem *sem);
+void claw_sem_delete(struct claw_sem *sem);
 
 /* ---------------- Message Queue ------------------------- */
 
-claw_mq_t claw_mq_create(const char *name,
-                           uint32_t msg_size,
-                           uint32_t max_msgs);
-int  claw_mq_send(claw_mq_t mq, const void *msg, uint32_t size,
+struct claw_mq *claw_mq_create(const char *name,
+                                uint32_t msg_size,
+                                uint32_t max_msgs);
+int  claw_mq_send(struct claw_mq *mq, const void *msg, uint32_t size,
                    uint32_t timeout_ms);
-int  claw_mq_recv(claw_mq_t mq, void *msg, uint32_t size,
+int  claw_mq_recv(struct claw_mq *mq, void *msg, uint32_t size,
                    uint32_t timeout_ms);
-void claw_mq_delete(claw_mq_t mq);
+void claw_mq_delete(struct claw_mq *mq);
 
 /* ---------------- Software Timer ------------------------ */
 
-claw_timer_t claw_timer_create(const char *name,
-                                void (*callback)(void *arg),
-                                void *arg,
-                                uint32_t period_ms,
-                                int repeat);
-void claw_timer_start(claw_timer_t timer);
-void claw_timer_stop(claw_timer_t timer);
-void claw_timer_delete(claw_timer_t timer);
+struct claw_timer *claw_timer_create(const char *name,
+                                     void (*callback)(void *arg),
+                                     void *arg,
+                                     uint32_t period_ms,
+                                     int repeat);
+void claw_timer_start(struct claw_timer *timer);
+void claw_timer_stop(struct claw_timer *timer);
+void claw_timer_delete(struct claw_timer *timer);
 
 /* ---------------- Memory -------------------------------- */
 

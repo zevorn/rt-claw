@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  *
  * Telegram Bot IM integration via HTTP long polling.
+ * OOP: private context struct embedding struct claw_service.
  *
  * Protocol:
  *   1. getUpdates with timeout=30 to long-poll for new messages
@@ -10,12 +11,14 @@
  *   3. update_id offset provides natural dedup (no dedup table needed)
  *
  * Three worker threads:
- *   - tg_poll:     getUpdates loop → inbound queue
- *   - tg_ai:       inbound queue → ai_chat() → outbound queue
- *   - tg_out:      outbound queue → sendMessage API
+ *   - tg_poll:     getUpdates loop -> inbound queue
+ *   - tg_ai:       inbound queue -> ai_chat() -> outbound queue
+ *   - tg_out:      outbound queue -> sendMessage API
  */
 
 #include "osal/claw_os.h"
+#include "claw/core/claw_service.h"
+#include "utils/list.h"
 #include "claw_config.h"
 #include "claw/services/im/telegram.h"
 #include "claw/services/im/im_util.h"
@@ -58,19 +61,6 @@
 #define CHAT_ID_MAX         24
 
 /* ------------------------------------------------------------------ */
-/*  State                                                              */
-/* ------------------------------------------------------------------ */
-
-static char s_bot_token[BOT_TOKEN_MAX];
-static char s_api_base[API_BASE_MAX];
-static int64_t s_update_offset;
-static claw_mq_t s_inbound_q;
-static claw_mq_t s_outbound_q;
-static claw_thread_t s_ai_thread;
-static claw_thread_t s_out_thread;
-static claw_thread_t s_poll_thread;
-
-/* ------------------------------------------------------------------ */
 /*  Message structures                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -85,16 +75,40 @@ typedef struct {
 } tg_outbound_t;
 
 /* ------------------------------------------------------------------ */
+/*  Service context — all state lives here, no file-scope globals      */
+/* ------------------------------------------------------------------ */
+
+struct telegram_ctx {
+    struct claw_service    base;           /* MUST be first member */
+
+    char                   bot_token[BOT_TOKEN_MAX];
+    char                   api_base[API_BASE_MAX];
+    int64_t                update_offset;
+
+    struct claw_mq        *inbound_q;
+    struct claw_mq        *outbound_q;
+
+    struct claw_thread    *ai_thread;
+    struct claw_thread    *out_thread;
+    struct claw_thread    *poll_thread;
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct telegram_ctx, base);
+
+/* Singleton — tentative definition; full initializer at file end */
+static struct telegram_ctx s_tg;
+
+/* ------------------------------------------------------------------ */
 /*  HTTP helper (platform-independent via OSAL)                        */
 /* ------------------------------------------------------------------ */
 
-static int tg_api_post(const char *method, const char *body,
-                        char *resp, size_t resp_size,
-                        int timeout_ms)
+static int tg_api_post(struct telegram_ctx *ctx, const char *method,
+                       const char *body, char *resp, size_t resp_size,
+                       int timeout_ms)
 {
     (void)timeout_ms;
     char url[256];
-    snprintf(url, sizeof(url), "%s/%s", s_api_base, method);
+    snprintf(url, sizeof(url), "%s/%s", ctx->api_base, method);
 
     claw_net_header_t hdrs[1];
     hdrs[0].key = "Content-Type";
@@ -118,14 +132,14 @@ static int tg_api_post(const char *method, const char *body,
 /* ------------------------------------------------------------------ */
 
 /* Send "typing" chat action indicator */
-static void send_chat_action(const char *chat_id)
+static void send_chat_action(struct telegram_ctx *ctx, const char *chat_id)
 {
     char body[128];
     snprintf(body, sizeof(body),
              "{\"chat_id\":%s,\"action\":\"typing\"}", chat_id);
 
     char resp[256];
-    tg_api_post("sendChatAction", body, resp, sizeof(resp),
+    tg_api_post(ctx, "sendChatAction", body, resp, sizeof(resp),
                 HTTP_ACTION_TIMEOUT_MS);
 }
 
@@ -134,7 +148,8 @@ static void send_chat_action(const char *chat_id)
  * Telegram supports MarkdownV2 but it's strict with escaping,
  * so we use plain text for reliability on embedded.
  */
-static int send_one_message(const char *chat_id, const char *text)
+static int send_one_message(struct telegram_ctx *ctx, const char *chat_id,
+                            const char *text)
 {
     cJSON *body = cJSON_CreateObject();
     cJSON_AddRawToObject(body, "chat_id", chat_id);
@@ -153,7 +168,7 @@ static int send_one_message(const char *chat_id, const char *text)
     }
     resp[0] = '\0';
 
-    int ret = tg_api_post("sendMessage", body_str, resp, 1024,
+    int ret = tg_api_post(ctx, "sendMessage", body_str, resp, 1024,
                            HTTP_SEND_TIMEOUT_MS);
     if (ret != CLAW_OK) {
         CLAW_LOGE(TAG, "sendMessage failed: %.200s", resp);
@@ -168,11 +183,12 @@ static int send_one_message(const char *chat_id, const char *text)
  * Send reply with auto-chunking for messages > TG_MAX_MSG_LEN.
  * Split at the last newline before the limit.
  */
-static int send_reply(const char *chat_id, const char *text)
+static int send_reply(struct telegram_ctx *ctx, const char *chat_id,
+                      const char *text)
 {
     size_t total = strlen(text);
     if (total <= TG_MAX_MSG_LEN) {
-        return send_one_message(chat_id, text);
+        return send_one_message(ctx, chat_id, text);
     }
 
     const char *p = text;
@@ -191,7 +207,7 @@ static int send_reply(const char *chat_id, const char *text)
         chunk_buf[chunk] = '\0';
 
         CLAW_LOGI(TAG, "send part %d (%d bytes)", part, (int)chunk);
-        int ret = send_one_message(chat_id, chunk_buf);
+        int ret = send_one_message(ctx, chat_id, chunk_buf);
         claw_free(chunk_buf);
 
         if (ret != CLAW_OK) {
@@ -206,7 +222,8 @@ static int send_reply(const char *chat_id, const char *text)
 }
 
 /* Forward declaration */
-static void enqueue_reply(const char *chat_id, const char *text);
+static void enqueue_reply(struct telegram_ctx *ctx, const char *chat_id,
+                          const char *text);
 
 /* ------------------------------------------------------------------ */
 /*  Scheduled-task reply callback                                      */
@@ -215,7 +232,7 @@ static void enqueue_reply(const char *chat_id, const char *text);
 static void sched_reply_to_telegram(const char *target, const char *text)
 {
     if (target && target[0] != '\0' && text && text[0] != '\0') {
-        enqueue_reply(target, text);
+        enqueue_reply(&s_tg, target, text);
     }
 }
 
@@ -225,11 +242,11 @@ static void sched_reply_to_telegram(const char *target, const char *text)
 
 static void tg_outbound_thread(void *arg)
 {
-    (void)arg;
+    struct telegram_ctx *ctx = (struct telegram_ctx *)arg;
     tg_outbound_t msg;
 
     while (!claw_thread_should_exit()) {
-        if (claw_mq_recv(s_outbound_q, &msg, sizeof(msg),
+        if (claw_mq_recv(ctx->outbound_q, &msg, sizeof(msg),
                          1000) != CLAW_OK) {
             continue;
         }
@@ -240,7 +257,7 @@ static void tg_outbound_thread(void *arg)
         CLAW_LOGI(TAG, "[%lu ms] >>> sending: \"%.80s%s\"",
                   (unsigned long)claw_tick_ms(), msg.text,
                   strlen(msg.text) > 80 ? "..." : "");
-        send_reply(msg.chat_id, msg.text);
+        send_reply(ctx, msg.chat_id, msg.text);
         CLAW_LOGI(TAG, "[%lu ms] >>> sent (heap=%u)",
                   (unsigned long)claw_tick_ms(),
                   (unsigned)claw_tick_ms());
@@ -248,7 +265,8 @@ static void tg_outbound_thread(void *arg)
     }
 }
 
-static void enqueue_reply(const char *chat_id, const char *text)
+static void enqueue_reply(struct telegram_ctx *ctx, const char *chat_id,
+                          const char *text)
 {
     size_t len = strlen(text);
     char *copy = claw_malloc(len + 1);
@@ -262,7 +280,7 @@ static void enqueue_reply(const char *chat_id, const char *text)
     snprintf(msg.chat_id, sizeof(msg.chat_id), "%s", chat_id);
     msg.text = copy;
 
-    if (claw_mq_send(s_outbound_q, &msg, sizeof(msg), 1000)
+    if (claw_mq_send(ctx->outbound_q, &msg, sizeof(msg), 1000)
             != CLAW_OK) {
         CLAW_LOGW(TAG, "outbound queue full, dropping reply");
         claw_free(copy);
@@ -270,12 +288,12 @@ static void enqueue_reply(const char *chat_id, const char *text)
 }
 
 /* ------------------------------------------------------------------ */
-/*  AI worker thread — inbound queue → ai_chat → outbound queue       */
+/*  AI worker thread — inbound queue -> ai_chat -> outbound queue      */
 /* ------------------------------------------------------------------ */
 
 static void tg_ai_worker(void *arg)
 {
-    (void)arg;
+    struct telegram_ctx *ctx = (struct telegram_ctx *)arg;
     char *reply = claw_malloc(REPLY_BUF_SIZE);
     if (!reply) {
         CLAW_LOGE(TAG, "worker: no memory");
@@ -285,7 +303,7 @@ static void tg_ai_worker(void *arg)
     tg_inbound_t in;
 
     while (!claw_thread_should_exit()) {
-        if (claw_mq_recv(s_inbound_q, &in, sizeof(in),
+        if (claw_mq_recv(ctx->inbound_q, &in, sizeof(in),
                          1000) != CLAW_OK) {
             continue;
         }
@@ -303,7 +321,7 @@ static void tg_ai_worker(void *arg)
                     ai_skill_try_command(argv[0], argc, argv,
                                          cmd_reply,
                                          REPLY_BUF_SIZE) == CLAW_OK) {
-                    enqueue_reply(in.chat_id, cmd_reply);
+                    enqueue_reply(ctx, in.chat_id, cmd_reply);
                     claw_free(cmd_reply);
                     continue;
                 }
@@ -314,7 +332,7 @@ static void tg_ai_worker(void *arg)
 #endif
 
         /* Typing indicator before AI call */
-        send_chat_action(in.chat_id);
+        send_chat_action(ctx, in.chat_id);
 
         ai_set_channel(AI_CHANNEL_TELEGRAM);
         ai_set_channel_hint(
@@ -340,12 +358,12 @@ static void tg_ai_worker(void *arg)
         sched_set_reply_context(NULL, NULL);
 
         if (ret == CLAW_OK && reply[0] != '\0') {
-            enqueue_reply(in.chat_id, reply);
+            enqueue_reply(ctx, in.chat_id, reply);
         } else {
             if (reply[0] != '\0') {
-                enqueue_reply(in.chat_id, reply);
+                enqueue_reply(ctx, in.chat_id, reply);
             } else {
-                enqueue_reply(in.chat_id,
+                enqueue_reply(ctx, in.chat_id,
                               "[rt-claw] AI engine error");
             }
         }
@@ -360,7 +378,7 @@ static void tg_ai_worker(void *arg)
  * Parse a single Update object from getUpdates response.
  * Extract chat_id (int64) and text from message.
  */
-static void process_update(cJSON *update)
+static void process_update(struct telegram_ctx *ctx, cJSON *update)
 {
     cJSON *uid = cJSON_GetObjectItem(update, "update_id");
     if (!uid || !cJSON_IsNumber(uid)) {
@@ -369,8 +387,8 @@ static void process_update(cJSON *update)
 
     /* Advance offset past this update */
     int64_t id = (int64_t)uid->valuedouble;
-    if (id >= s_update_offset) {
-        s_update_offset = id + 1;
+    if (id >= ctx->update_offset) {
+        ctx->update_offset = id + 1;
     }
 
     cJSON *message = cJSON_GetObjectItem(update, "message");
@@ -406,7 +424,7 @@ static void process_update(cJSON *update)
     snprintf(in.text, sizeof(in.text), "%s", text->valuestring);
     snprintf(in.chat_id, sizeof(in.chat_id), "%s", chat_id_str);
 
-    if (claw_mq_send(s_inbound_q, &in, sizeof(in), 0) != CLAW_OK) {
+    if (claw_mq_send(ctx->inbound_q, &in, sizeof(in), 0) != CLAW_OK) {
         CLAW_LOGW(TAG, "[%lu ms] !!! inbound queue full, dropping",
                   (unsigned long)claw_tick_ms());
     } else {
@@ -417,7 +435,7 @@ static void process_update(cJSON *update)
 
 static void tg_poll_thread(void *arg)
 {
-    (void)arg;
+    struct telegram_ctx *ctx = (struct telegram_ctx *)arg;
 
     CLAW_LOGI(TAG, "poll thread starting");
 
@@ -431,11 +449,11 @@ static void tg_poll_thread(void *arg)
         char body[128];
         snprintf(body, sizeof(body),
                  "{\"offset\":%" PRId64 ",\"timeout\":%d}",
-                 s_update_offset, POLL_TIMEOUT_SEC);
+                 ctx->update_offset, POLL_TIMEOUT_SEC);
 
         resp[0] = '\0';
-        int ret = tg_api_post("getUpdates", body, resp, RESP_BUF_SIZE,
-                               HTTP_POLL_TIMEOUT_MS);
+        int ret = tg_api_post(ctx, "getUpdates", body, resp,
+                               RESP_BUF_SIZE, HTTP_POLL_TIMEOUT_MS);
         if (ret != CLAW_OK) {
             CLAW_LOGW(TAG, "getUpdates failed, retry in %dms",
                       POLL_RETRY_MS);
@@ -462,7 +480,7 @@ static void tg_poll_thread(void *arg)
         if (result && cJSON_IsArray(result)) {
             int count = cJSON_GetArraySize(result);
             for (int i = 0; i < count; i++) {
-                process_update(cJSON_GetArrayItem(result, i));
+                process_update(ctx, cJSON_GetArrayItem(result, i));
             }
         }
 
@@ -471,104 +489,158 @@ static void tg_poll_thread(void *arg)
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public API                                                         */
+/*  OOP lifecycle ops                                                  */
 /* ------------------------------------------------------------------ */
 
-void telegram_set_bot_token(const char *token)
+static claw_err_t telegram_svc_init(struct claw_service *svc)
 {
-    if (token) {
-        snprintf(s_bot_token, sizeof(s_bot_token), "%s", token);
-    }
-}
+    struct telegram_ctx *ctx = container_of(svc, struct telegram_ctx,
+                                            base);
 
-const char *telegram_get_bot_token(void)
-{
-    return s_bot_token;
-}
-
-int telegram_init(void)
-{
-    if (s_bot_token[0] == '\0') {
-        snprintf(s_bot_token, sizeof(s_bot_token),
+    if (ctx->bot_token[0] == '\0') {
+        snprintf(ctx->bot_token, sizeof(ctx->bot_token),
                  "%s", CONFIG_RTCLAW_TELEGRAM_BOT_TOKEN);
     }
 
-    if (s_bot_token[0] == '\0') {
+    if (ctx->bot_token[0] == '\0') {
         CLAW_LOGE(TAG, "no bot token configured");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
     /* Build API base URL: <api_url>/bot<token> */
-    snprintf(s_api_base, sizeof(s_api_base),
-             "%s/bot%s", CONFIG_RTCLAW_TELEGRAM_API_URL, s_bot_token);
+    snprintf(ctx->api_base, sizeof(ctx->api_base),
+             "%s/bot%s", CONFIG_RTCLAW_TELEGRAM_API_URL,
+             ctx->bot_token);
 
-    s_update_offset = 0;
+    ctx->update_offset = 0;
 
-    s_inbound_q = claw_mq_create("tg_in", sizeof(tg_inbound_t),
-                                  INBOUND_DEPTH);
-    s_outbound_q = claw_mq_create("tg_out", sizeof(tg_outbound_t),
-                                   OUTBOUND_DEPTH);
-    if (!s_inbound_q || !s_outbound_q) {
+    ctx->inbound_q = claw_mq_create("tg_in", sizeof(tg_inbound_t),
+                                     INBOUND_DEPTH);
+    ctx->outbound_q = claw_mq_create("tg_out", sizeof(tg_outbound_t),
+                                      OUTBOUND_DEPTH);
+    if (!ctx->inbound_q || !ctx->outbound_q) {
         CLAW_LOGE(TAG, "message queue create failed");
-        return CLAW_ERROR;
+        return CLAW_ERR_NOMEM;
     }
 
     CLAW_LOGI(TAG, "init ok");
     return CLAW_OK;
 }
 
-int telegram_start(void)
+static claw_err_t telegram_svc_start(struct claw_service *svc)
 {
+    struct telegram_ctx *ctx = container_of(svc, struct telegram_ctx,
+                                            base);
 
-    s_ai_thread = claw_thread_create("tg_ai", tg_ai_worker,
-                                      NULL, WORKER_STACK, 10);
-    if (!s_ai_thread) {
+    ctx->ai_thread = claw_thread_create("tg_ai", tg_ai_worker,
+                                         ctx, WORKER_STACK, 10);
+    if (!ctx->ai_thread) {
         CLAW_LOGE(TAG, "failed to create AI worker");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
-    s_out_thread = claw_thread_create("tg_out", tg_outbound_thread,
-                                       NULL, OUTBOUND_STACK, 10);
-    if (!s_out_thread) {
+    ctx->out_thread = claw_thread_create("tg_out", tg_outbound_thread,
+                                          ctx, OUTBOUND_STACK, 10);
+    if (!ctx->out_thread) {
         CLAW_LOGE(TAG, "failed to create outbound thread");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
-    s_poll_thread = claw_thread_create("tg_poll", tg_poll_thread,
-                                        NULL, POLL_STACK, 10);
-    if (!s_poll_thread) {
+    ctx->poll_thread = claw_thread_create("tg_poll", tg_poll_thread,
+                                           ctx, POLL_STACK, 10);
+    if (!ctx->poll_thread) {
         CLAW_LOGE(TAG, "failed to create poll thread");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
     CLAW_LOGI(TAG, "started (3 threads)");
     return CLAW_OK;
 }
 
-void telegram_stop(void)
+static void telegram_svc_stop(struct claw_service *svc)
 {
-    claw_thread_delete(s_poll_thread);
-    s_poll_thread = NULL;
+    struct telegram_ctx *ctx = container_of(svc, struct telegram_ctx,
+                                            base);
 
-    claw_thread_delete(s_ai_thread);
-    s_ai_thread = NULL;
+    claw_thread_delete(ctx->poll_thread);
+    ctx->poll_thread = NULL;
 
-    claw_thread_delete(s_out_thread);
-    s_out_thread = NULL;
+    claw_thread_delete(ctx->ai_thread);
+    ctx->ai_thread = NULL;
 
-    if (s_inbound_q) {
-        claw_mq_delete(s_inbound_q);
-        s_inbound_q = NULL;
+    claw_thread_delete(ctx->out_thread);
+    ctx->out_thread = NULL;
+
+    if (ctx->inbound_q) {
+        claw_mq_delete(ctx->inbound_q);
+        ctx->inbound_q = NULL;
     }
-    if (s_outbound_q) {
-        claw_mq_delete(s_outbound_q);
-        s_outbound_q = NULL;
+    if (ctx->outbound_q) {
+        claw_mq_delete(ctx->outbound_q);
+        ctx->outbound_q = NULL;
     }
 
     CLAW_LOGI(TAG, "stopped");
 }
 
+/* ------------------------------------------------------------------ */
+/*  Public API (delegates to singleton)                                */
+/* ------------------------------------------------------------------ */
+
+void telegram_set_bot_token(const char *token)
+{
+    if (token) {
+        snprintf(s_tg.bot_token, sizeof(s_tg.bot_token), "%s", token);
+    }
+}
+
+const char *telegram_get_bot_token(void)
+{
+    return s_tg.bot_token;
+}
+
+int telegram_init(void)
+{
+    return telegram_svc_init(&s_tg.base) == CLAW_OK
+           ? CLAW_OK : CLAW_ERROR;
+}
+
+int telegram_start(void)
+{
+    return telegram_svc_start(&s_tg.base) == CLAW_OK
+           ? CLAW_OK : CLAW_ERROR;
+}
+
+void telegram_stop(void)
+{
+    telegram_svc_stop(&s_tg.base);
+}
+
 #else /* !CONFIG_RTCLAW_TELEGRAM_ENABLE */
+
+/* Minimal context for disabled builds */
+struct telegram_ctx {
+    struct claw_service base;
+};
+
+static struct telegram_ctx s_tg;
+
+static claw_err_t telegram_svc_init(struct claw_service *svc)
+{
+    (void)svc;
+    return CLAW_OK;
+}
+
+static claw_err_t telegram_svc_start(struct claw_service *svc)
+{
+    (void)svc;
+    return CLAW_OK;
+}
+
+static void telegram_svc_stop(struct claw_service *svc)
+{
+    (void)svc;
+}
 
 int  telegram_init(void)  { return 0; }
 int  telegram_start(void) { return 0; }
@@ -577,3 +649,26 @@ void telegram_set_bot_token(const char *t) { (void)t; }
 const char *telegram_get_bot_token(void)   { return ""; }
 
 #endif /* CONFIG_RTCLAW_TELEGRAM_ENABLE */
+
+/* ------------------------------------------------------------------ */
+/*  OOP service registration                                           */
+/* ------------------------------------------------------------------ */
+
+static const char *telegram_deps[] = { "ai_engine", NULL };
+
+static const struct claw_service_ops telegram_svc_ops = {
+    .init  = telegram_svc_init,
+    .start = telegram_svc_start,
+    .stop  = telegram_svc_stop,
+};
+
+static struct telegram_ctx s_tg = {
+    .base = {
+        .name  = "telegram",
+        .ops   = &telegram_svc_ops,
+        .deps  = telegram_deps,
+        .state = CLAW_SVC_CREATED,
+    },
+};
+
+CLAW_SERVICE_REGISTER(telegram, &s_tg.base);

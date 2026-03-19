@@ -353,3 +353,30 @@ void es8311_audio_beep(int f, int d, int v) { (void)f; (void)d; (void)v; }
 int  es8311_audio_play_sound(const char *n) { (void)n; return -1; }
 
 #endif
+
+/*
+ * OOP driver registration — only on ESP-IDF with codec support.
+ * Falls through to no-op on other platforms (stubs above).
+ */
+#if defined(CLAW_PLATFORM_ESP_IDF) && __has_include("esp_codec_dev.h")
+#include "claw/core/claw_driver.h"
+
+static claw_err_t es8311_drv_probe(struct claw_driver *drv)
+{
+    (void)drv;
+    return CLAW_OK;
+}
+
+static const struct claw_driver_ops es8311_drv_ops = {
+    .probe  = es8311_drv_probe,
+    .remove = NULL,
+};
+
+static struct claw_driver es8311_drv = {
+    .name  = "es8311_audio",
+    .ops   = &es8311_drv_ops,
+    .state = CLAW_DRV_REGISTERED,
+};
+
+CLAW_DRIVER_REGISTER(es8311_audio, &es8311_drv);
+#endif

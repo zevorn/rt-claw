@@ -12,6 +12,8 @@
  * Feishu WebSocket frames use Protobuf encoding (Frame + Header).
  * We implement minimal hand-coded Protobuf encode/decode to avoid
  * pulling in a full protobuf library on an embedded target.
+ *
+ * OOP: private context struct embedding struct claw_service.
  */
 
 #include "osal/claw_os.h"
@@ -22,6 +24,8 @@
 #include "claw/services/ai/ai_skill.h"
 #include "claw/shell/shell_cmd.h"
 #include "claw/tools/claw_tools.h"
+#include "claw/core/claw_service.h"
+#include "utils/list.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -44,9 +48,6 @@
 
 #define FEISHU_CRED_MAX     128
 
-static char s_app_id[FEISHU_CRED_MAX];
-static char s_app_secret[FEISHU_CRED_MAX];
-
 #define WS_EP_URL    "https://open.feishu.cn/callback/ws/endpoint"
 #define TOKEN_URL \
     "https://open.feishu.cn/open-apis/auth/v3/" \
@@ -62,34 +63,81 @@ static char s_app_secret[FEISHU_CRED_MAX];
 #define HTTP_TIMEOUT_MS     15000
 #define TOKEN_MAX_RETRIES   30
 
-/* ------------------------------------------------------------------ */
-/*  State                                                              */
-/* ------------------------------------------------------------------ */
-
-static char s_token[TOKEN_BUF_SIZE];
-static claw_mutex_t s_lock;
-#ifdef CLAW_PLATFORM_ESP_IDF
-static esp_websocket_client_handle_t s_ws_client;
-#elif defined(CLAW_PLATFORM_LINUX)
-static CURL *s_ws_curl;
-#endif
-static volatile int s_ws_connected;
-static claw_thread_t s_ai_thread;
-static claw_thread_t s_out_thread;
-static claw_thread_t s_main_thread;
-
-/* Event dedup ring buffer — drop events already processed */
 #define DEDUP_SLOTS  8
 #define EVENT_ID_MAX 48
-static char s_dedup[DEDUP_SLOTS][EVENT_ID_MAX];
-static int  s_dedup_idx;
-
-/*
- * Stale event filter based on create_time (unix ms from event header).
- * Track the latest create_time seen; drop events older than threshold.
- */
-static uint64_t s_latest_event_ts;
 #define STALE_EVENT_MAX_AGE_MS  60000
+
+#define MSG_TEXT_MAX   1024
+#define CHAT_ID_MAX   128
+#define MSG_ID_MAX    128
+#define WORKER_STACK  16384
+#define OUTBOUND_STACK 8192
+
+#define INBOUND_DEPTH  4
+#define OUTBOUND_DEPTH 4
+
+/* Inbound: from Feishu WebSocket to AI worker */
+typedef struct {
+    char text[MSG_TEXT_MAX];
+    char chat_id[CHAT_ID_MAX];
+    char msg_id[MSG_ID_MAX];
+} feishu_inbound_t;
+
+/* Outbound: from AI worker to HTTP sender */
+typedef struct {
+    char chat_id[CHAT_ID_MAX];
+    char msg_id[MSG_ID_MAX]; /* original msg — for typing reaction */
+    char *text;              /* heap-allocated, consumer frees */
+} feishu_outbound_t;
+
+/* ------------------------------------------------------------------ */
+/*  Service context — all state lives here, no file-scope globals      */
+/* ------------------------------------------------------------------ */
+
+struct feishu_ctx {
+    struct claw_service  base;
+
+    /* Credentials */
+    char                 app_id[FEISHU_CRED_MAX];
+    char                 app_secret[FEISHU_CRED_MAX];
+
+    /* Tenant token (for REST API replies) */
+    char                 token[TOKEN_BUF_SIZE];
+    struct claw_mutex   *lock;
+
+    /* WebSocket handle */
+#ifdef CLAW_PLATFORM_ESP_IDF
+    esp_websocket_client_handle_t ws_client;
+#elif defined(CLAW_PLATFORM_LINUX)
+    CURL                *ws_curl;
+#endif
+    int                  ws_connected; /* cross-thread, guarded by lock */
+
+    /* Worker threads */
+    struct claw_thread  *ai_thread;
+    struct claw_thread  *out_thread;
+    struct claw_thread  *main_thread;
+
+    /* Event dedup ring buffer */
+    char                 dedup[DEDUP_SLOTS][EVENT_ID_MAX];
+    int                  dedup_idx;
+
+    /* Stale event filter */
+    uint64_t             latest_event_ts;
+
+    /* Message queues */
+    struct claw_mq      *inbound_q;
+    struct claw_mq      *outbound_q;
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct feishu_ctx, base);
+
+/* Tentative definition — actual initializer after #endif */
+static struct feishu_ctx s_feishu;
+
+/* ------------------------------------------------------------------ */
+/*  Pure helpers (no state)                                            */
+/* ------------------------------------------------------------------ */
 
 /* Parse decimal string to uint64 (avoids checkpatch strtoull warning) */
 static uint64_t parse_u64(const char *s)
@@ -103,15 +151,15 @@ static uint64_t parse_u64(const char *s)
     return v;
 }
 
-static int dedup_check_and_add(const char *event_id)
+static int dedup_check_and_add(struct feishu_ctx *ctx, const char *event_id)
 {
     for (int i = 0; i < DEDUP_SLOTS; i++) {
-        if (strcmp(s_dedup[i], event_id) == 0) {
+        if (strcmp(ctx->dedup[i], event_id) == 0) {
             return 1; /* duplicate */
         }
     }
-    snprintf(s_dedup[s_dedup_idx], EVENT_ID_MAX, "%s", event_id);
-    s_dedup_idx = (s_dedup_idx + 1) % DEDUP_SLOTS;
+    snprintf(ctx->dedup[ctx->dedup_idx], EVENT_ID_MAX, "%s", event_id);
+    ctx->dedup_idx = (ctx->dedup_idx + 1) % DEDUP_SLOTS;
     return 0;
 }
 
@@ -441,7 +489,7 @@ static int http_post_json(const char *url,
 /*  Token management (for sending replies via REST API)                */
 /* ------------------------------------------------------------------ */
 
-static int refresh_token(void)
+static int refresh_token(struct feishu_ctx *ctx)
 {
     char *resp = claw_malloc(RESP_BUF_SIZE);
     if (!resp) {
@@ -451,7 +499,7 @@ static int refresh_token(void)
     char body[256];
     snprintf(body, sizeof(body),
              "{\"app_id\":\"%s\",\"app_secret\":\"%s\"}",
-             s_app_id, s_app_secret);
+             ctx->app_id, ctx->app_secret);
 
     int ret = http_post_json(TOKEN_URL, NULL, body, resp, RESP_BUF_SIZE);
     if (ret != CLAW_OK) {
@@ -472,20 +520,20 @@ static int refresh_token(void)
         return CLAW_ERROR;
     }
 
-    claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
-    snprintf(s_token, sizeof(s_token), "%s", token->valuestring);
-    claw_mutex_unlock(s_lock);
+    claw_mutex_lock(ctx->lock, CLAW_WAIT_FOREVER);
+    snprintf(ctx->token, sizeof(ctx->token), "%s", token->valuestring);
+    claw_mutex_unlock(ctx->lock);
 
     CLAW_LOGI(TAG, "tenant token refreshed");
     cJSON_Delete(root);
     return CLAW_OK;
 }
 
-static void get_auth_header(char *out, size_t size)
+static void get_auth_header(struct feishu_ctx *ctx, char *out, size_t size)
 {
-    claw_mutex_lock(s_lock, CLAW_WAIT_FOREVER);
-    snprintf(out, size, "Bearer %s", s_token);
-    claw_mutex_unlock(s_lock);
+    claw_mutex_lock(ctx->lock, CLAW_WAIT_FOREVER);
+    snprintf(out, size, "Bearer %s", ctx->token);
+    claw_mutex_unlock(ctx->lock);
 }
 
 /* ------------------------------------------------------------------ */
@@ -540,10 +588,11 @@ static int send_one_card(const char *chat_id, const char *auth,
  * FEISHU_MAX_MSG_LEN are split at the last newline before
  * the limit to avoid breaking mid-sentence.
  */
-static int send_reply(const char *chat_id, const char *text)
+static int send_reply(struct feishu_ctx *ctx,
+                      const char *chat_id, const char *text)
 {
     char auth[TOKEN_BUF_SIZE + 16];
-    get_auth_header(auth, sizeof(auth));
+    get_auth_header(ctx, auth, sizeof(auth));
 
     size_t total = strlen(text);
     if (total <= FEISHU_MAX_MSG_LEN) {
@@ -584,10 +633,11 @@ static int send_reply(const char *chat_id, const char *text)
 /*  Reaction — add an emoji reaction to a user message                 */
 /* ------------------------------------------------------------------ */
 
-static void add_reaction(const char *message_id, const char *emoji_type)
+static void add_reaction(struct feishu_ctx *ctx,
+                         const char *message_id, const char *emoji_type)
 {
     char auth[TOKEN_BUF_SIZE + 16];
-    get_auth_header(auth, sizeof(auth));
+    get_auth_header(ctx, auth, sizeof(auth));
 
     char url[256];
     snprintf(url, sizeof(url),
@@ -612,8 +662,8 @@ static void add_reaction(const char *message_id, const char *emoji_type)
 }
 
 /* Forward declaration — defined after outbound_thread */
-static void enqueue_reply(const char *chat_id, const char *msg_id,
-                          const char *text);
+static void enqueue_reply(struct feishu_ctx *ctx, const char *chat_id,
+                          const char *msg_id, const char *text);
 
 /* ------------------------------------------------------------------ */
 /*  Scheduled-task reply callback — routes results back to Feishu      */
@@ -622,49 +672,23 @@ static void enqueue_reply(const char *chat_id, const char *msg_id,
 static void sched_reply_to_feishu(const char *target, const char *text)
 {
     if (target && target[0] != '\0' && text && text[0] != '\0') {
-        enqueue_reply(target, NULL, text);
+        enqueue_reply(&s_feishu, target, NULL, text);
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Message bus — inbound queue (WS→AI) + outbound queue (AI→HTTP)     */
+/*  Message bus — inbound queue (WS->AI) + outbound queue (AI->HTTP)   */
 /* ------------------------------------------------------------------ */
-
-#define MSG_TEXT_MAX   1024
-#define CHAT_ID_MAX   128
-#define MSG_ID_MAX    128
-#define WORKER_STACK  16384
-#define OUTBOUND_STACK 8192
-
-#define INBOUND_DEPTH  4
-#define OUTBOUND_DEPTH 4
-
-/* Inbound: from Feishu WebSocket to AI worker */
-typedef struct {
-    char text[MSG_TEXT_MAX];
-    char chat_id[CHAT_ID_MAX];
-    char msg_id[MSG_ID_MAX];
-} feishu_inbound_t;
-
-/* Outbound: from AI worker to HTTP sender */
-typedef struct {
-    char chat_id[CHAT_ID_MAX];
-    char msg_id[MSG_ID_MAX]; /* original msg — for typing reaction */
-    char *text;              /* heap-allocated, consumer frees */
-} feishu_outbound_t;
-
-static claw_mq_t s_inbound_q;
-static claw_mq_t s_outbound_q;
 
 /* ---- Outbound dispatch thread ---- */
 
 static void outbound_thread(void *arg)
 {
-    (void)arg;
+    struct feishu_ctx *ctx = arg;
     feishu_outbound_t msg;
 
     while (!claw_thread_should_exit()) {
-        if (claw_mq_recv(s_outbound_q, &msg, sizeof(msg),
+        if (claw_mq_recv(ctx->outbound_q, &msg, sizeof(msg),
                          1000) != CLAW_OK) {
             continue;
         }
@@ -675,7 +699,7 @@ static void outbound_thread(void *arg)
         CLAW_LOGI(TAG, "[%lu ms] >>> sending: \"%.80s%s\"",
                   (unsigned long)claw_tick_ms(), msg.text,
                   strlen(msg.text) > 80 ? "..." : "");
-        send_reply(msg.chat_id, msg.text);
+        send_reply(ctx, msg.chat_id, msg.text);
         CLAW_LOGI(TAG, "[%lu ms] >>> sent (heap=%u)",
                   (unsigned long)claw_tick_ms(),
                   (unsigned)claw_tick_ms());
@@ -683,8 +707,8 @@ static void outbound_thread(void *arg)
     }
 }
 
-static void enqueue_reply(const char *chat_id, const char *msg_id,
-                          const char *text)
+static void enqueue_reply(struct feishu_ctx *ctx, const char *chat_id,
+                          const char *msg_id, const char *text)
 {
     size_t len = strlen(text);
     char *copy = claw_malloc(len + 1);
@@ -700,7 +724,7 @@ static void enqueue_reply(const char *chat_id, const char *msg_id,
              msg_id ? msg_id : "");
     msg.text = copy;
 
-    if (claw_mq_send(s_outbound_q, &msg, sizeof(msg), 1000)
+    if (claw_mq_send(ctx->outbound_q, &msg, sizeof(msg), 1000)
             != CLAW_OK) {
         CLAW_LOGW(TAG, "outbound queue full, dropping reply");
         claw_free(copy);
@@ -711,7 +735,7 @@ static void enqueue_reply(const char *chat_id, const char *msg_id,
 
 static void ai_worker_thread(void *arg)
 {
-    (void)arg;
+    struct feishu_ctx *ctx = arg;
     char *reply = claw_malloc(REPLY_BUF_SIZE);
     if (!reply) {
         CLAW_LOGE(TAG, "worker: no memory");
@@ -721,7 +745,7 @@ static void ai_worker_thread(void *arg)
     feishu_inbound_t in;
 
     while (!claw_thread_should_exit()) {
-        if (claw_mq_recv(s_inbound_q, &in, sizeof(in),
+        if (claw_mq_recv(ctx->inbound_q, &in, sizeof(in),
                          1000) != CLAW_OK) {
             continue;
         }
@@ -739,7 +763,7 @@ static void ai_worker_thread(void *arg)
                     ai_skill_try_command(argv[0], argc, argv,
                                          cmd_reply,
                                          REPLY_BUF_SIZE) == CLAW_OK) {
-                    enqueue_reply(in.chat_id, in.msg_id, cmd_reply);
+                    enqueue_reply(ctx, in.chat_id, in.msg_id, cmd_reply);
                     claw_free(cmd_reply);
                     continue;
                 }
@@ -751,7 +775,7 @@ static void ai_worker_thread(void *arg)
 
         /* Immediate typing indicator — before AI call */
         if (in.msg_id[0] != '\0') {
-            add_reaction(in.msg_id, "Typing");
+            add_reaction(ctx, in.msg_id, "Typing");
         }
 
         ai_set_channel(AI_CHANNEL_FEISHU);
@@ -779,7 +803,7 @@ static void ai_worker_thread(void *arg)
         sched_set_reply_context(NULL, NULL);
 
         if (ret == CLAW_OK && reply[0] != '\0') {
-            enqueue_reply(in.chat_id, in.msg_id, reply);
+            enqueue_reply(ctx, in.chat_id, in.msg_id, reply);
         } else {
             /*
              * Forward the actual error message from ai_chat()
@@ -787,9 +811,9 @@ static void ai_worker_thread(void *arg)
              * failed", "no API key", "AI is busy").
              */
             if (reply[0] != '\0') {
-                enqueue_reply(in.chat_id, in.msg_id, reply);
+                enqueue_reply(ctx, in.chat_id, in.msg_id, reply);
             } else {
-                enqueue_reply(in.chat_id, in.msg_id,
+                enqueue_reply(ctx, in.chat_id, in.msg_id,
                               "[rt-claw] AI engine error");
             }
         }
@@ -800,7 +824,7 @@ static void ai_worker_thread(void *arg)
 /*  Process incoming event payload (JSON inside protobuf frame)        */
 /* ------------------------------------------------------------------ */
 
-static void handle_message_event(cJSON *event)
+static void handle_message_event(struct feishu_ctx *ctx, cJSON *event)
 {
     cJSON *message = cJSON_GetObjectItem(event, "message");
     if (!message) {
@@ -852,7 +876,7 @@ static void handle_message_event(cJSON *event)
              chat_id->valuestring);
     snprintf(in.msg_id, sizeof(in.msg_id), "%s", mid);
 
-    if (claw_mq_send(s_inbound_q, &in, sizeof(in), 0) != CLAW_OK) {
+    if (claw_mq_send(ctx->inbound_q, &in, sizeof(in), 0) != CLAW_OK) {
         CLAW_LOGW(TAG, "[%lu ms] !!! inbound queue full, "
                   "dropping msg_id=%s",
                   (unsigned long)claw_tick_ms(), mid);
@@ -864,7 +888,8 @@ static void handle_message_event(cJSON *event)
     cJSON_Delete(content);
 }
 
-static void process_event_payload(const uint8_t *data, int len)
+static void process_event_payload(struct feishu_ctx *ctx,
+                                  const uint8_t *data, int len)
 {
     cJSON *root = cJSON_ParseWithLength((const char *)data, len);
     if (!root) {
@@ -879,7 +904,7 @@ static void process_event_payload(const uint8_t *data, int len)
         /* Dedup by event_id */
         cJSON *eid = cJSON_GetObjectItem(header, "event_id");
         if (eid && cJSON_IsString(eid)) {
-            if (dedup_check_and_add(eid->valuestring)) {
+            if (dedup_check_and_add(ctx, eid->valuestring)) {
                 CLAW_LOGW(TAG, "[%lu ms] dup event_id=%s, dropped",
                           (unsigned long)claw_tick_ms(),
                           eid->valuestring);
@@ -892,18 +917,18 @@ static void process_event_payload(const uint8_t *data, int len)
         cJSON *ct = cJSON_GetObjectItem(header, "create_time");
         if (ct && cJSON_IsString(ct)) {
             uint64_t ts = parse_u64(ct->valuestring);
-            if (s_latest_event_ts > 0 &&
-                ts + STALE_EVENT_MAX_AGE_MS < s_latest_event_ts) {
+            if (ctx->latest_event_ts > 0 &&
+                ts + STALE_EVENT_MAX_AGE_MS < ctx->latest_event_ts) {
                 CLAW_LOGW(TAG, "[%lu ms] stale event "
                           "(create_time=%llu, latest=%llu), dropped",
                           (unsigned long)claw_tick_ms(),
                           (unsigned long long)ts,
-                          (unsigned long long)s_latest_event_ts);
+                          (unsigned long long)ctx->latest_event_ts);
                 cJSON_Delete(root);
                 return;
             }
-            if (ts > s_latest_event_ts) {
-                s_latest_event_ts = ts;
+            if (ts > ctx->latest_event_ts) {
+                ctx->latest_event_ts = ts;
             }
         }
 
@@ -913,7 +938,7 @@ static void process_event_payload(const uint8_t *data, int len)
                        "im.message.receive_v1") == 0) {
                 cJSON *event = cJSON_GetObjectItem(root, "event");
                 if (event) {
-                    handle_message_event(event);
+                    handle_message_event(ctx, event);
                 }
             } else {
                 CLAW_LOGI(TAG, "unhandled event: %s",
@@ -929,29 +954,34 @@ static void process_event_payload(const uint8_t *data, int len)
 /*  WebSocket send helper                                              */
 /* ------------------------------------------------------------------ */
 
-static int ws_send_bin(const uint8_t *data, int len)
+static int ws_send_bin(struct feishu_ctx *ctx,
+                       const uint8_t *data, int len)
 {
     if (len <= 0) {
         return CLAW_ERROR;
     }
 #ifdef CLAW_PLATFORM_ESP_IDF
-    if (s_ws_client) {
+    if (ctx->ws_client) {
         esp_websocket_client_send_bin(
-            s_ws_client, (const char *)data, len,
+            ctx->ws_client, (const char *)data, len,
             portMAX_DELAY);
     }
 #elif defined(CLAW_PLATFORM_LINUX)
-    if (s_ws_curl) {
+    if (ctx->ws_curl) {
         size_t sent = 0;
-        curl_ws_send(s_ws_curl, data, (size_t)len,
+        curl_ws_send(ctx->ws_curl, data, (size_t)len,
                      &sent, 0, CURLWS_BINARY);
     }
+#else
+    (void)ctx;
+    (void)data;
 #endif
     return CLAW_OK;
 }
 
 /* Handle a received WebSocket frame (called from event/poll) */
-static void ws_handle_frame(const uint8_t *data, size_t len,
+static void ws_handle_frame(struct feishu_ctx *ctx,
+                            const uint8_t *data, size_t len,
                             int is_binary)
 {
     if (is_binary && len > 0) {
@@ -962,7 +992,7 @@ static void ws_handle_frame(const uint8_t *data, size_t len,
                 uint8_t pong[64];
                 int plen = build_pong_frame(pong,
                                             sizeof(pong));
-                ws_send_bin(pong, plen);
+                ws_send_bin(ctx, pong, plen);
                 CLAW_LOGD(TAG, "ping/pong");
             } else if (f.method == 1 && f.payload &&
                        f.payload_len > 0) {
@@ -973,14 +1003,14 @@ static void ws_handle_frame(const uint8_t *data, size_t len,
                     int alen = build_ack_frame(
                         ack, sizeof(ack),
                         f.msg_id, f.msg_id_len);
-                    ws_send_bin(ack, alen);
+                    ws_send_bin(ctx, ack, alen);
                 }
-                process_event_payload(f.payload,
+                process_event_payload(ctx, f.payload,
                                       f.payload_len);
             }
         }
     } else if (!is_binary && len > 0) {
-        process_event_payload(data, len);
+        process_event_payload(ctx, data, len);
     }
 }
 
@@ -993,27 +1023,27 @@ static void ws_handle_frame(const uint8_t *data, size_t len,
 static void ws_event_handler(void *arg, esp_event_base_t base,
                              int32_t event_id, void *event_data)
 {
-    (void)arg;
+    struct feishu_ctx *ctx = arg;
     (void)base;
     esp_websocket_event_data_t *ws = event_data;
 
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
         CLAW_LOGI(TAG, "ws connected");
-        s_ws_connected = 1;
+        ctx->ws_connected = 1;
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
         CLAW_LOGW(TAG, "ws disconnected");
-        s_ws_connected = 0;
+        ctx->ws_connected = 0;
         break;
     case WEBSOCKET_EVENT_DATA:
-        ws_handle_frame((const uint8_t *)ws->data_ptr,
+        ws_handle_frame(ctx, (const uint8_t *)ws->data_ptr,
                         ws->data_len,
                         ws->op_code == 0x02);
         break;
     case WEBSOCKET_EVENT_ERROR:
         CLAW_LOGE(TAG, "ws error");
-        s_ws_connected = 0;
+        ctx->ws_connected = 0;
         break;
     default:
         break;
@@ -1026,7 +1056,7 @@ static void ws_event_handler(void *arg, esp_event_base_t base,
 /*  Fetch WebSocket endpoint and connect                               */
 /* ------------------------------------------------------------------ */
 
-static int connect_ws(void)
+static int connect_ws(struct feishu_ctx *ctx)
 {
     char *resp = claw_malloc(RESP_BUF_SIZE);
     if (!resp) {
@@ -1036,7 +1066,7 @@ static int connect_ws(void)
     char body[256];
     snprintf(body, sizeof(body),
              "{\"AppID\":\"%s\",\"AppSecret\":\"%s\"}",
-             s_app_id, s_app_secret);
+             ctx->app_id, ctx->app_secret);
 
     int ret = http_post_json(WS_EP_URL, NULL, body,
                              resp, RESP_BUF_SIZE);
@@ -1086,40 +1116,40 @@ static int connect_ws(void)
         .network_timeout_ms = 10000,
     };
 
-    s_ws_client = esp_websocket_client_init(&ws_cfg);
+    ctx->ws_client = esp_websocket_client_init(&ws_cfg);
     cJSON_Delete(root);
-    if (!s_ws_client) {
+    if (!ctx->ws_client) {
         return CLAW_ERROR;
     }
 
-    esp_websocket_register_events(s_ws_client,
-        WEBSOCKET_EVENT_ANY, ws_event_handler, NULL);
-    esp_err_t err = esp_websocket_client_start(s_ws_client);
+    esp_websocket_register_events(ctx->ws_client,
+        WEBSOCKET_EVENT_ANY, ws_event_handler, ctx);
+    esp_err_t err = esp_websocket_client_start(ctx->ws_client);
     if (err != ESP_OK) {
         CLAW_LOGE(TAG, "ws start failed: %d", err);
-        esp_websocket_client_destroy(s_ws_client);
-        s_ws_client = NULL;
+        esp_websocket_client_destroy(ctx->ws_client);
+        ctx->ws_client = NULL;
         return CLAW_ERROR;
     }
 #elif defined(CLAW_PLATFORM_LINUX)
-    s_ws_curl = curl_easy_init();
-    if (!s_ws_curl) {
+    ctx->ws_curl = curl_easy_init();
+    if (!ctx->ws_curl) {
         cJSON_Delete(root);
         return CLAW_ERROR;
     }
-    curl_easy_setopt(s_ws_curl, CURLOPT_URL,
+    curl_easy_setopt(ctx->ws_curl, CURLOPT_URL,
                      url_obj->valuestring);
-    curl_easy_setopt(s_ws_curl, CURLOPT_CONNECT_ONLY, 2L);
-    CURLcode res = curl_easy_perform(s_ws_curl);
+    curl_easy_setopt(ctx->ws_curl, CURLOPT_CONNECT_ONLY, 2L);
+    CURLcode res = curl_easy_perform(ctx->ws_curl);
     cJSON_Delete(root);
     if (res != CURLE_OK) {
         CLAW_LOGE(TAG, "ws connect failed: %s",
                   curl_easy_strerror(res));
-        curl_easy_cleanup(s_ws_curl);
-        s_ws_curl = NULL;
+        curl_easy_cleanup(ctx->ws_curl);
+        ctx->ws_curl = NULL;
         return CLAW_ERROR;
     }
-    s_ws_connected = 1;
+    ctx->ws_connected = 1;
 #else
     cJSON_Delete(root);
     return CLAW_ERROR;
@@ -1134,14 +1164,14 @@ static int connect_ws(void)
 
 static void feishu_thread(void *arg)
 {
-    (void)arg;
+    struct feishu_ctx *ctx = arg;
 
-    CLAW_LOGI(TAG, "service starting (app_id=%s)", s_app_id);
+    CLAW_LOGI(TAG, "service starting (app_id=%s)", ctx->app_id);
 
     /* Fetch tenant token first (needed for sending replies) */
     int retries = 0;
 
-    while (refresh_token() != CLAW_OK) {
+    while (refresh_token(ctx) != CLAW_OK) {
         if (claw_thread_should_exit()) {
             return;
         }
@@ -1160,7 +1190,7 @@ static void feishu_thread(void *arg)
     CLAW_LOGI(TAG, "token acquired");
 
     /* Connect WebSocket long connection */
-    while (connect_ws() != CLAW_OK) {
+    while (connect_ws(ctx) != CLAW_OK) {
         if (claw_thread_should_exit()) {
             return;
         }
@@ -1176,19 +1206,19 @@ static void feishu_thread(void *arg)
     while (!claw_thread_should_exit()) {
 #ifdef CLAW_PLATFORM_LINUX
         /* Linux: poll WebSocket for incoming frames */
-        if (s_ws_curl && s_ws_connected) {
+        if (ctx->ws_curl && ctx->ws_connected) {
             const struct curl_ws_frame *meta = NULL;
             uint8_t buf[4096];
             size_t nread = 0;
-            CURLcode rc = curl_ws_recv(s_ws_curl, buf,
+            CURLcode rc = curl_ws_recv(ctx->ws_curl, buf,
                 sizeof(buf), &nread, &meta);
             if (rc == CURLE_OK && nread > 0 && meta) {
                 int binary = (meta->flags & CURLWS_BINARY);
-                ws_handle_frame(buf, nread, binary);
+                ws_handle_frame(ctx, buf, nread, binary);
             } else if (rc == CURLE_AGAIN) {
                 claw_thread_delay_ms(100);
             } else if (rc != CURLE_OK) {
-                s_ws_connected = 0;
+                ctx->ws_connected = 0;
             }
         } else {
             claw_thread_delay_ms(1000);
@@ -1199,173 +1229,185 @@ static void feishu_thread(void *arg)
 
         /* Periodic token refresh */
         if (claw_tick_ms() - last_refresh >= TOKEN_REFRESH_MS) {
-            refresh_token();
+            refresh_token(ctx);
             last_refresh = claw_tick_ms();
         }
 
         /* Reconnect on disconnect */
-        if (!s_ws_connected) {
+        if (!ctx->ws_connected) {
             CLAW_LOGW(TAG, "ws lost, reconnecting...");
 #ifdef CLAW_PLATFORM_ESP_IDF
-            if (s_ws_client) {
-                esp_websocket_client_destroy(s_ws_client);
-                s_ws_client = NULL;
+            if (ctx->ws_client) {
+                esp_websocket_client_destroy(ctx->ws_client);
+                ctx->ws_client = NULL;
             }
 #elif defined(CLAW_PLATFORM_LINUX)
-            if (s_ws_curl) {
-                curl_easy_cleanup(s_ws_curl);
-                s_ws_curl = NULL;
+            if (ctx->ws_curl) {
+                curl_easy_cleanup(ctx->ws_curl);
+                ctx->ws_curl = NULL;
             }
 #endif
             claw_thread_delay_ms(WS_RECONNECT_MS);
-            connect_ws();
+            connect_ws(ctx);
         }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public API                                                         */
+/*  Public API (via static singleton)                                  */
 /* ------------------------------------------------------------------ */
 
 void feishu_set_app_id(const char *app_id)
 {
     if (app_id) {
-        snprintf(s_app_id, sizeof(s_app_id), "%s", app_id);
+        snprintf(s_feishu.app_id, sizeof(s_feishu.app_id),
+                 "%s", app_id);
     }
 }
 
 void feishu_set_app_secret(const char *app_secret)
 {
     if (app_secret) {
-        snprintf(s_app_secret, sizeof(s_app_secret), "%s", app_secret);
+        snprintf(s_feishu.app_secret, sizeof(s_feishu.app_secret),
+                 "%s", app_secret);
     }
 }
 
-const char *feishu_get_app_id(void)     { return s_app_id; }
-const char *feishu_get_app_secret(void) { return s_app_secret; }
+const char *feishu_get_app_id(void)     { return s_feishu.app_id; }
+const char *feishu_get_app_secret(void) { return s_feishu.app_secret; }
 
-int feishu_init(void)
+/* ------------------------------------------------------------------ */
+/*  OOP lifecycle ops                                                  */
+/* ------------------------------------------------------------------ */
+
+static claw_err_t feishu_svc_init(struct claw_service *svc)
 {
+    struct feishu_ctx *ctx = container_of(svc, struct feishu_ctx, base);
+
     /* Initialize from compile-time defaults if not set via setter */
-    if (s_app_id[0] == '\0') {
-        snprintf(s_app_id, sizeof(s_app_id),
+    if (ctx->app_id[0] == '\0') {
+        snprintf(ctx->app_id, sizeof(ctx->app_id),
                  "%s", CONFIG_RTCLAW_FEISHU_APP_ID);
     }
-    if (s_app_secret[0] == '\0') {
-        snprintf(s_app_secret, sizeof(s_app_secret),
+    if (ctx->app_secret[0] == '\0') {
+        snprintf(ctx->app_secret, sizeof(ctx->app_secret),
                  "%s", CONFIG_RTCLAW_FEISHU_APP_SECRET);
     }
 
-    if (s_app_id[0] == '\0' || s_app_secret[0] == '\0') {
+    if (ctx->app_id[0] == '\0' || ctx->app_secret[0] == '\0') {
         CLAW_LOGE(TAG, "no credentials configured");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
-    s_lock = claw_mutex_create("feishu");
-    if (!s_lock) {
-        return CLAW_ERROR;
+    ctx->lock = claw_mutex_create("feishu");
+    if (!ctx->lock) {
+        return CLAW_ERR_GENERIC;
     }
 
-    s_inbound_q = claw_mq_create("fs_in",
-                                  sizeof(feishu_inbound_t),
-                                  INBOUND_DEPTH);
-    s_outbound_q = claw_mq_create("fs_out",
-                                   sizeof(feishu_outbound_t),
-                                   OUTBOUND_DEPTH);
-    if (!s_inbound_q || !s_outbound_q) {
+    ctx->inbound_q = claw_mq_create("fs_in",
+                                     sizeof(feishu_inbound_t),
+                                     INBOUND_DEPTH);
+    ctx->outbound_q = claw_mq_create("fs_out",
+                                      sizeof(feishu_outbound_t),
+                                      OUTBOUND_DEPTH);
+    if (!ctx->inbound_q || !ctx->outbound_q) {
         CLAW_LOGE(TAG, "message queue create failed");
-        return CLAW_ERROR;
+        return CLAW_ERR_NOMEM;
     }
 
-    s_token[0] = '\0';
+    ctx->token[0] = '\0';
 #ifdef CLAW_PLATFORM_ESP_IDF
-    s_ws_client = NULL;
+    ctx->ws_client = NULL;
 #elif defined(CLAW_PLATFORM_LINUX)
-    s_ws_curl = NULL;
+    ctx->ws_curl = NULL;
 #endif
-    s_ws_connected = 0;
+    ctx->ws_connected = 0;
     CLAW_LOGI(TAG, "init ok");
     return CLAW_OK;
 }
 
-int feishu_start(void)
+static claw_err_t feishu_svc_start(struct claw_service *svc)
 {
-    /* AI worker: inbound queue → ai_chat → outbound queue */
-    s_ai_thread = claw_thread_create("fs_ai", ai_worker_thread,
-                                      NULL, WORKER_STACK, 10);
-    if (!s_ai_thread) {
+    struct feishu_ctx *ctx = container_of(svc, struct feishu_ctx, base);
+
+    /* AI worker: inbound queue -> ai_chat -> outbound queue */
+    ctx->ai_thread = claw_thread_create("fs_ai", ai_worker_thread,
+                                         ctx, WORKER_STACK, 10);
+    if (!ctx->ai_thread) {
         CLAW_LOGE(TAG, "failed to create AI worker");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
-    /* Outbound dispatch: outbound queue → send_reply (HTTP) */
-    s_out_thread = claw_thread_create("fs_out", outbound_thread,
-                                       NULL, OUTBOUND_STACK, 10);
-    if (!s_out_thread) {
+    /* Outbound dispatch: outbound queue -> send_reply (HTTP) */
+    ctx->out_thread = claw_thread_create("fs_out", outbound_thread,
+                                          ctx, OUTBOUND_STACK, 10);
+    if (!ctx->out_thread) {
         CLAW_LOGE(TAG, "failed to create outbound thread");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
     /* Feishu WebSocket connection thread */
-    s_main_thread = claw_thread_create("feishu", feishu_thread,
-                                        NULL, 8192, 10);
-    if (!s_main_thread) {
+    ctx->main_thread = claw_thread_create("feishu", feishu_thread,
+                                           ctx, 8192, 10);
+    if (!ctx->main_thread) {
         CLAW_LOGE(TAG, "failed to create thread");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
     return CLAW_OK;
 }
 
-void feishu_stop(void)
+static void feishu_svc_stop(struct claw_service *svc)
 {
+    struct feishu_ctx *ctx = container_of(svc, struct feishu_ctx, base);
+
     /*
      * Signal disconnected so main thread's recv loop
      * exits on its next timeout cycle, then join threads
      * before destroying handles.
      */
-    s_ws_connected = 0;
+    ctx->ws_connected = 0;
 
 #ifdef CLAW_PLATFORM_ESP_IDF
     /* ESP-IDF WS client has its own stop that unblocks */
-    if (s_ws_client) {
-        esp_websocket_client_stop(s_ws_client);
+    if (ctx->ws_client) {
+        esp_websocket_client_stop(ctx->ws_client);
     }
 #endif
 
     /* Join threads first (they check exit flag) */
-    claw_thread_delete(s_main_thread);
-    s_main_thread = NULL;
+    claw_thread_delete(ctx->main_thread);
+    ctx->main_thread = NULL;
 
-    claw_thread_delete(s_ai_thread);
-    s_ai_thread = NULL;
+    claw_thread_delete(ctx->ai_thread);
+    ctx->ai_thread = NULL;
 
-    claw_thread_delete(s_out_thread);
-    s_out_thread = NULL;
+    claw_thread_delete(ctx->out_thread);
+    ctx->out_thread = NULL;
 
     /* Now safe to destroy handles — no thread using them */
 #ifdef CLAW_PLATFORM_ESP_IDF
-    if (s_ws_client) {
-        esp_websocket_client_destroy(s_ws_client);
-        s_ws_client = NULL;
+    if (ctx->ws_client) {
+        esp_websocket_client_destroy(ctx->ws_client);
+        ctx->ws_client = NULL;
     }
 #elif defined(CLAW_PLATFORM_LINUX)
-    if (s_ws_curl) {
-        curl_easy_cleanup(s_ws_curl);
-        s_ws_curl = NULL;
+    if (ctx->ws_curl) {
+        curl_easy_cleanup(ctx->ws_curl);
+        ctx->ws_curl = NULL;
     }
 #endif
 
-    if (s_inbound_q) {
-        claw_mq_delete(s_inbound_q);
-        s_inbound_q = NULL;
+    if (ctx->inbound_q) {
+        claw_mq_delete(ctx->inbound_q);
+        ctx->inbound_q = NULL;
     }
-    if (s_outbound_q) {
-        claw_mq_delete(s_outbound_q);
-        s_outbound_q = NULL;
+    if (ctx->outbound_q) {
+        claw_mq_delete(ctx->outbound_q);
+        ctx->outbound_q = NULL;
     }
-    if (s_lock) {
-        claw_mutex_delete(s_lock);
-        s_lock = NULL;
+    if (ctx->lock) {
+        claw_mutex_delete(ctx->lock);
+        ctx->lock = NULL;
     }
 
     CLAW_LOGI(TAG, "stopped");
@@ -1373,12 +1415,58 @@ void feishu_stop(void)
 
 #else /* !CONFIG_RTCLAW_FEISHU_ENABLE */
 
-int  feishu_init(void)  { return 0; }
-int  feishu_start(void) { return 0; }
-void feishu_stop(void)  {}
+/* Minimal context when Feishu is disabled */
+struct feishu_ctx {
+    struct claw_service base;
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct feishu_ctx, base);
+
+static struct feishu_ctx s_feishu;
+
 void feishu_set_app_id(const char *id)     { (void)id; }
 void feishu_set_app_secret(const char *s)  { (void)s; }
 const char *feishu_get_app_id(void)        { return ""; }
 const char *feishu_get_app_secret(void)    { return ""; }
 
+static claw_err_t feishu_svc_init(struct claw_service *svc)
+{
+    (void)svc;
+    return CLAW_OK;
+}
+
+static claw_err_t feishu_svc_start(struct claw_service *svc)
+{
+    (void)svc;
+    return CLAW_OK;
+}
+
+static void feishu_svc_stop(struct claw_service *svc)
+{
+    (void)svc;
+}
+
 #endif /* CONFIG_RTCLAW_FEISHU_ENABLE */
+
+/* ------------------------------------------------------------------ */
+/*  OOP service registration                                           */
+/* ------------------------------------------------------------------ */
+
+static const char *feishu_deps[] = { "ai_engine", NULL };
+
+static const struct claw_service_ops feishu_svc_ops = {
+    .init  = feishu_svc_init,
+    .start = feishu_svc_start,
+    .stop  = feishu_svc_stop,
+};
+
+static struct feishu_ctx s_feishu = {
+    .base = {
+        .name  = "feishu",
+        .ops   = &feishu_svc_ops,
+        .deps  = feishu_deps,
+        .state = CLAW_SVC_CREATED,
+    },
+};
+
+CLAW_SERVICE_REGISTER(feishu, &s_feishu.base);

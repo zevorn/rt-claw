@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  *
  * OSAL implementation for Linux (POSIX pthreads).
+ * Uses struct embedding (Linux kernel OOP style) with container_of.
  */
 
 #include "osal/claw_os.h"
@@ -17,6 +18,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <sched.h>
+
+#include "utils/list.h"  /* for container_of */
 
 /* ---------- helpers ---------- */
 
@@ -33,18 +36,19 @@ static void ms_to_abstime(uint32_t ms, struct timespec *ts)
 
 /* ---------- Thread ---------- */
 
-typedef struct {
-    pthread_t       handle;
-    void          (*entry)(void *arg);
-    void           *arg;
-    atomic_bool     exit_flag;
-} linux_thread_t;
+struct linux_thread {
+    struct claw_thread  base;       /* MUST be first */
+    pthread_t           handle;
+    void              (*entry)(void *arg);
+    void               *arg;
+    atomic_bool         exit_flag;
+};
 
-static _Thread_local linux_thread_t *s_tls_self;
+static _Thread_local struct linux_thread *s_tls_self;
 
 static void *thread_wrapper(void *param)
 {
-    linux_thread_t *t = (linux_thread_t *)param;
+    struct linux_thread *t = (struct linux_thread *)param;
     s_tls_self = t;
     t->entry(t->arg);
     return NULL;
@@ -52,28 +56,30 @@ static void *thread_wrapper(void *param)
 
 int claw_thread_should_exit(void)
 {
-    linux_thread_t *t = s_tls_self;
+    struct linux_thread *t = s_tls_self;
     if (t) {
         return atomic_load(&t->exit_flag) ? 1 : 0;
     }
     return 0;
 }
 
-claw_thread_t claw_thread_create(const char *name,
-                                  void (*entry)(void *arg),
-                                  void *arg,
-                                  uint32_t stack_size,
-                                  uint32_t priority)
+struct claw_thread *claw_thread_create(const char *name,
+                                       void (*entry)(void *arg),
+                                       void *arg,
+                                       uint32_t stack_size,
+                                       uint32_t priority)
 {
-    (void)name;
     (void)stack_size;
     (void)priority;
 
-    linux_thread_t *t = malloc(sizeof(*t));
+    struct linux_thread *t = malloc(sizeof(*t));
     if (!t) {
         return NULL;
     }
 
+    t->base.name = name;
+    t->base.priority = priority;
+    t->base.stack_size = stack_size;
     t->entry = entry;
     t->arg = arg;
     atomic_init(&t->exit_flag, false);
@@ -90,16 +96,17 @@ claw_thread_t claw_thread_create(const char *name,
         return NULL;
     }
 
-    return (claw_thread_t)t;
+    return &t->base;
 }
 
-void claw_thread_delete(claw_thread_t thread)
+void claw_thread_delete(struct claw_thread *thread)
 {
     if (!thread) {
         return;
     }
 
-    linux_thread_t *t = (linux_thread_t *)thread;
+    struct linux_thread *t = container_of(thread,
+                                          struct linux_thread, base);
     atomic_store(&t->exit_flag, true);
     pthread_join(t->handle, NULL);
     free(t);
@@ -130,34 +137,46 @@ void claw_thread_yield(void)
 
 /* ---------- Mutex ---------- */
 
-claw_mutex_t claw_mutex_create(const char *name)
+struct linux_mutex {
+    struct claw_mutex   base;       /* MUST be first */
+    pthread_mutex_t     handle;
+};
+
+struct claw_mutex *claw_mutex_create(const char *name)
 {
-    (void)name;
-    pthread_mutex_t *m = malloc(sizeof(*m));
+    struct linux_mutex *m = malloc(sizeof(*m));
     if (!m) {
         return NULL;
     }
-    pthread_mutex_init(m, NULL);
-    return (claw_mutex_t)m;
+
+    m->base.name = name;
+    pthread_mutex_init(&m->handle, NULL);
+    return &m->base;
 }
 
-int claw_mutex_lock(claw_mutex_t mutex, uint32_t timeout_ms)
+int claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms)
 {
     if (!mutex) {
         return CLAW_ERROR;
     }
-    pthread_mutex_t *m = (pthread_mutex_t *)mutex;
+    if (!mutex) {
+        return CLAW_ERR_INVALID;
+    }
+    struct linux_mutex *m = container_of(mutex,
+                                         struct linux_mutex, base);
 
     if (timeout_ms == CLAW_WAIT_FOREVER) {
-        return (pthread_mutex_lock(m) == 0) ? CLAW_OK : CLAW_ERROR;
+        return (pthread_mutex_lock(&m->handle) == 0)
+               ? CLAW_OK : CLAW_ERROR;
     }
     if (timeout_ms == CLAW_NO_WAIT) {
-        return (pthread_mutex_trylock(m) == 0) ? CLAW_OK : CLAW_TIMEOUT;
+        return (pthread_mutex_trylock(&m->handle) == 0)
+               ? CLAW_OK : CLAW_TIMEOUT;
     }
 
     struct timespec ts;
     ms_to_abstime(timeout_ms, &ts);
-    int ret = pthread_mutex_timedlock(m, &ts);
+    int ret = pthread_mutex_timedlock(&m->handle, &ts);
     if (ret == 0) {
         return CLAW_OK;
     }
@@ -167,43 +186,56 @@ int claw_mutex_lock(claw_mutex_t mutex, uint32_t timeout_ms)
     return CLAW_ERROR;
 }
 
-void claw_mutex_unlock(claw_mutex_t mutex)
+void claw_mutex_unlock(struct claw_mutex *mutex)
 {
     if (mutex) {
-        pthread_mutex_unlock((pthread_mutex_t *)mutex);
+        struct linux_mutex *m = container_of(mutex,
+                                             struct linux_mutex, base);
+        pthread_mutex_unlock(&m->handle);
     }
 }
 
-void claw_mutex_delete(claw_mutex_t mutex)
+void claw_mutex_delete(struct claw_mutex *mutex)
 {
     if (mutex) {
-        pthread_mutex_destroy((pthread_mutex_t *)mutex);
-        free(mutex);
+        struct linux_mutex *m = container_of(mutex,
+                                             struct linux_mutex, base);
+        pthread_mutex_destroy(&m->handle);
+        free(m);
     }
 }
 
 /* ---------- Semaphore ---------- */
 
-claw_sem_t claw_sem_create(const char *name, uint32_t init_value)
+struct linux_sem {
+    struct claw_sem     base;       /* MUST be first */
+    sem_t               handle;
+};
+
+struct claw_sem *claw_sem_create(const char *name, uint32_t init_value)
 {
-    (void)name;
-    sem_t *s = malloc(sizeof(*s));
+    struct linux_sem *s = malloc(sizeof(*s));
     if (!s) {
         return NULL;
     }
-    sem_init(s, 0, init_value);
-    return (claw_sem_t)s;
+
+    s->base.name = name;
+    sem_init(&s->handle, 0, init_value);
+    return &s->base;
 }
 
-int claw_sem_take(claw_sem_t sem, uint32_t timeout_ms)
+int claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms)
 {
     if (!sem) {
         return CLAW_ERROR;
     }
-    sem_t *s = (sem_t *)sem;
+    if (!sem) {
+        return CLAW_ERR_INVALID;
+    }
+    struct linux_sem *s = container_of(sem, struct linux_sem, base);
 
     if (timeout_ms == CLAW_WAIT_FOREVER) {
-        while (sem_wait(s) != 0) {
+        while (sem_wait(&s->handle) != 0) {
             if (errno != EINTR) {
                 return CLAW_ERROR;
             }
@@ -211,12 +243,12 @@ int claw_sem_take(claw_sem_t sem, uint32_t timeout_ms)
         return CLAW_OK;
     }
     if (timeout_ms == CLAW_NO_WAIT) {
-        return (sem_trywait(s) == 0) ? CLAW_OK : CLAW_TIMEOUT;
+        return (sem_trywait(&s->handle) == 0) ? CLAW_OK : CLAW_TIMEOUT;
     }
 
     struct timespec ts;
     ms_to_abstime(timeout_ms, &ts);
-    while (sem_timedwait(s, &ts) != 0) {
+    while (sem_timedwait(&s->handle, &ts) != 0) {
         if (errno == ETIMEDOUT) {
             return CLAW_TIMEOUT;
         }
@@ -227,41 +259,41 @@ int claw_sem_take(claw_sem_t sem, uint32_t timeout_ms)
     return CLAW_OK;
 }
 
-void claw_sem_give(claw_sem_t sem)
+void claw_sem_give(struct claw_sem *sem)
 {
     if (sem) {
-        sem_post((sem_t *)sem);
+        struct linux_sem *s = container_of(sem, struct linux_sem, base);
+        sem_post(&s->handle);
     }
 }
 
-void claw_sem_delete(claw_sem_t sem)
+void claw_sem_delete(struct claw_sem *sem)
 {
     if (sem) {
-        sem_destroy((sem_t *)sem);
-        free(sem);
+        struct linux_sem *s = container_of(sem, struct linux_sem, base);
+        sem_destroy(&s->handle);
+        free(s);
     }
 }
 
 /* ---------- Message Queue ---------- */
 
-typedef struct {
-    pthread_mutex_t lock;
-    pthread_cond_t  not_empty;
-    pthread_cond_t  not_full;
-    uint8_t        *buf;
-    uint32_t        msg_size;
-    uint32_t        capacity;
-    uint32_t        count;
-    uint32_t        head;
-    uint32_t        tail;
-} linux_mq_t;
+struct linux_mq {
+    struct claw_mq      base;       /* MUST be first */
+    pthread_mutex_t     lock;
+    pthread_cond_t      not_empty;
+    pthread_cond_t      not_full;
+    uint8_t            *buf;
+    uint32_t            count;
+    uint32_t            head;
+    uint32_t            tail;
+};
 
-claw_mq_t claw_mq_create(const char *name,
-                           uint32_t msg_size,
-                           uint32_t max_msgs)
+struct claw_mq *claw_mq_create(const char *name,
+                                uint32_t msg_size,
+                                uint32_t max_msgs)
 {
-    (void)name;
-    linux_mq_t *mq = malloc(sizeof(*mq));
+    struct linux_mq *mq = malloc(sizeof(*mq));
     if (!mq) {
         return NULL;
     }
@@ -272,42 +304,45 @@ claw_mq_t claw_mq_create(const char *name,
         return NULL;
     }
 
+    mq->base.name     = name;
+    mq->base.msg_size = msg_size;
+    mq->base.max_msgs = max_msgs;
+
     pthread_mutex_init(&mq->lock, NULL);
     pthread_cond_init(&mq->not_empty, NULL);
     pthread_cond_init(&mq->not_full, NULL);
-    mq->msg_size = msg_size;
-    mq->capacity = max_msgs;
     mq->count = 0;
     mq->head = 0;
     mq->tail = 0;
 
-    return (claw_mq_t)mq;
+    return &mq->base;
 }
 
-int claw_mq_send(claw_mq_t mq_handle, const void *msg, uint32_t size,
+int claw_mq_send(struct claw_mq *mq_handle, const void *msg, uint32_t size,
                   uint32_t timeout_ms)
 {
     if (!mq_handle) {
         return CLAW_ERROR;
     }
     (void)size;
-    linux_mq_t *mq = (linux_mq_t *)mq_handle;
+    struct linux_mq *mq = container_of(mq_handle,
+                                        struct linux_mq, base);
 
     pthread_mutex_lock(&mq->lock);
 
-    if (mq->count >= mq->capacity) {
+    if (mq->count >= mq->base.max_msgs) {
         if (timeout_ms == CLAW_NO_WAIT) {
             pthread_mutex_unlock(&mq->lock);
             return CLAW_TIMEOUT;
         }
         if (timeout_ms == CLAW_WAIT_FOREVER) {
-            while (mq->count >= mq->capacity) {
+            while (mq->count >= mq->base.max_msgs) {
                 pthread_cond_wait(&mq->not_full, &mq->lock);
             }
         } else {
             struct timespec ts;
             ms_to_abstime(timeout_ms, &ts);
-            while (mq->count >= mq->capacity) {
+            while (mq->count >= mq->base.max_msgs) {
                 int ret = pthread_cond_timedwait(&mq->not_full,
                                                   &mq->lock, &ts);
                 if (ret == ETIMEDOUT) {
@@ -318,8 +353,9 @@ int claw_mq_send(claw_mq_t mq_handle, const void *msg, uint32_t size,
         }
     }
 
-    memcpy(mq->buf + mq->tail * mq->msg_size, msg, mq->msg_size);
-    mq->tail = (mq->tail + 1) % mq->capacity;
+    memcpy(mq->buf + mq->tail * mq->base.msg_size,
+           msg, mq->base.msg_size);
+    mq->tail = (mq->tail + 1) % mq->base.max_msgs;
     mq->count++;
 
     pthread_cond_signal(&mq->not_empty);
@@ -327,14 +363,15 @@ int claw_mq_send(claw_mq_t mq_handle, const void *msg, uint32_t size,
     return CLAW_OK;
 }
 
-int claw_mq_recv(claw_mq_t mq_handle, void *msg, uint32_t size,
+int claw_mq_recv(struct claw_mq *mq_handle, void *msg, uint32_t size,
                   uint32_t timeout_ms)
 {
     if (!mq_handle) {
         return CLAW_ERROR;
     }
     (void)size;
-    linux_mq_t *mq = (linux_mq_t *)mq_handle;
+    struct linux_mq *mq = container_of(mq_handle,
+                                        struct linux_mq, base);
 
     pthread_mutex_lock(&mq->lock);
 
@@ -361,8 +398,9 @@ int claw_mq_recv(claw_mq_t mq_handle, void *msg, uint32_t size,
         }
     }
 
-    memcpy(msg, mq->buf + mq->head * mq->msg_size, mq->msg_size);
-    mq->head = (mq->head + 1) % mq->capacity;
+    memcpy(msg, mq->buf + mq->head * mq->base.msg_size,
+           mq->base.msg_size);
+    mq->head = (mq->head + 1) % mq->base.max_msgs;
     mq->count--;
 
     pthread_cond_signal(&mq->not_full);
@@ -370,12 +408,13 @@ int claw_mq_recv(claw_mq_t mq_handle, void *msg, uint32_t size,
     return CLAW_OK;
 }
 
-void claw_mq_delete(claw_mq_t mq_handle)
+void claw_mq_delete(struct claw_mq *mq_handle)
 {
     if (!mq_handle) {
         return;
     }
-    linux_mq_t *mq = (linux_mq_t *)mq_handle;
+    struct linux_mq *mq = container_of(mq_handle,
+                                        struct linux_mq, base);
     pthread_mutex_destroy(&mq->lock);
     pthread_cond_destroy(&mq->not_empty);
     pthread_cond_destroy(&mq->not_full);
@@ -385,22 +424,20 @@ void claw_mq_delete(claw_mq_t mq_handle)
 
 /* ---------- Timer ---------- */
 
-typedef struct linux_timer linux_timer_t;
 struct linux_timer {
-    void          (*callback)(void *arg);
-    void           *arg;
-    uint32_t        period_ms;
-    int             repeat;
-    atomic_bool     running;
-    atomic_bool     deleted;
-    pthread_t       thread;
-    pthread_mutex_t lock;
-    pthread_cond_t  cond;
+    struct claw_timer   base;       /* MUST be first */
+    void              (*callback)(void *arg);
+    void               *arg;
+    atomic_bool         running;
+    atomic_bool         deleted;
+    pthread_t           thread;
+    pthread_mutex_t     lock;
+    pthread_cond_t      cond;
 };
 
 static void *timer_thread_fn(void *param)
 {
-    linux_timer_t *t = (linux_timer_t *)param;
+    struct linux_timer *t = (struct linux_timer *)param;
 
     pthread_mutex_lock(&t->lock);
     while (!atomic_load(&t->deleted)) {
@@ -414,7 +451,7 @@ static void *timer_thread_fn(void *param)
 
         /* Sleep for period */
         struct timespec ts;
-        ms_to_abstime(t->period_ms, &ts);
+        ms_to_abstime(t->base.period_ms, &ts);
         int ret = pthread_cond_timedwait(&t->cond, &t->lock, &ts);
 
         if (atomic_load(&t->deleted)) {
@@ -429,7 +466,7 @@ static void *timer_thread_fn(void *param)
             t->callback(t->arg);
             pthread_mutex_lock(&t->lock);
 
-            if (!t->repeat) {
+            if (!t->base.repeat) {
                 atomic_store(&t->running, false);
             }
         }
@@ -438,22 +475,22 @@ static void *timer_thread_fn(void *param)
     return NULL;
 }
 
-claw_timer_t claw_timer_create(const char *name,
-                                void (*callback)(void *arg),
-                                void *arg,
-                                uint32_t period_ms,
-                                int repeat)
+struct claw_timer *claw_timer_create(const char *name,
+                                     void (*callback)(void *arg),
+                                     void *arg,
+                                     uint32_t period_ms,
+                                     int repeat)
 {
-    (void)name;
-    linux_timer_t *t = malloc(sizeof(*t));
+    struct linux_timer *t = malloc(sizeof(*t));
     if (!t) {
         return NULL;
     }
 
+    t->base.name      = name;
+    t->base.period_ms = period_ms;
+    t->base.repeat    = repeat;
     t->callback  = callback;
     t->arg       = arg;
-    t->period_ms = period_ms;
-    t->repeat    = repeat;
     atomic_init(&t->running, false);
     atomic_init(&t->deleted, false);
     pthread_mutex_init(&t->lock, NULL);
@@ -466,39 +503,42 @@ claw_timer_t claw_timer_create(const char *name,
         return NULL;
     }
 
-    return (claw_timer_t)t;
+    return &t->base;
 }
 
-void claw_timer_start(claw_timer_t timer)
+void claw_timer_start(struct claw_timer *timer)
 {
     if (!timer) {
         return;
     }
-    linux_timer_t *t = (linux_timer_t *)timer;
+    struct linux_timer *t = container_of(timer,
+                                         struct linux_timer, base);
     pthread_mutex_lock(&t->lock);
     atomic_store(&t->running, true);
     pthread_cond_signal(&t->cond);
     pthread_mutex_unlock(&t->lock);
 }
 
-void claw_timer_stop(claw_timer_t timer)
+void claw_timer_stop(struct claw_timer *timer)
 {
     if (!timer) {
         return;
     }
-    linux_timer_t *t = (linux_timer_t *)timer;
+    struct linux_timer *t = container_of(timer,
+                                         struct linux_timer, base);
     pthread_mutex_lock(&t->lock);
     atomic_store(&t->running, false);
     pthread_cond_signal(&t->cond);
     pthread_mutex_unlock(&t->lock);
 }
 
-void claw_timer_delete(claw_timer_t timer)
+void claw_timer_delete(struct claw_timer *timer)
 {
     if (!timer) {
         return;
     }
-    linux_timer_t *t = (linux_timer_t *)timer;
+    struct linux_timer *t = container_of(timer,
+                                         struct linux_timer, base);
     pthread_mutex_lock(&t->lock);
     atomic_store(&t->deleted, true);
     pthread_cond_signal(&t->cond);

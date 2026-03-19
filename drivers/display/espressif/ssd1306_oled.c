@@ -315,3 +315,26 @@ void ssd1306_progress_bar(int row, int percent) { (void)row; (void)percent; }
 void ssd1306_set_pixel(int x, int y, int on) { (void)x; (void)y; (void)on; }
 
 #endif
+
+/* OOP driver registration */
+#include "claw/core/claw_driver.h"
+
+static claw_err_t ssd1306_drv_probe(struct claw_driver *drv)
+{
+    (void)drv;
+    /* Actual init requires pin config, deferred to platform board_init */
+    return CLAW_OK;
+}
+
+static const struct claw_driver_ops ssd1306_drv_ops = {
+    .probe  = ssd1306_drv_probe,
+    .remove = NULL,
+};
+
+static struct claw_driver ssd1306_drv = {
+    .name  = "ssd1306_oled",
+    .ops   = &ssd1306_drv_ops,
+    .state = CLAW_DRV_REGISTERED,
+};
+
+CLAW_DRIVER_REGISTER(ssd1306_oled, &ssd1306_drv);

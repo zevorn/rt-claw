@@ -38,7 +38,7 @@ typedef struct {
 
 static mem_entry_t s_entries[MEM_MAX_MSGS];
 static int         s_count;
-static claw_mutex_t s_lock;
+static struct claw_mutex *s_lock;
 
 /*
  * Drop the oldest user+assistant pair for a given channel.

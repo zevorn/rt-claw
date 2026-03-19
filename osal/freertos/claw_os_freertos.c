@@ -3,9 +3,13 @@
  * SPDX-License-Identifier: MIT
  *
  * OSAL implementation for FreeRTOS (ESP-IDF and standalone).
+ * Uses struct embedding (Linux kernel OOP style): each OSAL
+ * primitive has a private sub-struct with the base as its first
+ * member, recovered via container_of().
  */
 
 #include "osal/claw_os.h"
+#include "utils/list.h"  /* container_of */
 
 #ifdef CLAW_PLATFORM_ESP_IDF
   #include "freertos/FreeRTOS.h"
@@ -30,54 +34,88 @@
 
 static inline TickType_t ms_to_ticks(uint32_t ms)
 {
-    if (ms == CLAW_WAIT_FOREVER)
+    if (ms == CLAW_WAIT_FOREVER) {
         return portMAX_DELAY;
+    }
     return pdMS_TO_TICKS(ms);
 }
 
-/* ---------- Thread ---------- */
+/* ---------- private sub-structs ---------- */
 
-typedef struct {
-    void (*entry)(void *arg);
-    void *arg;
-} thread_wrap_t;
+struct freertos_thread {
+    struct claw_thread  base;   /* MUST be first */
+    TaskHandle_t        handle;
+    void              (*entry)(void *arg);
+    void               *arg;
+};
+
+struct freertos_mutex {
+    struct claw_mutex   base;   /* MUST be first */
+    SemaphoreHandle_t   handle;
+};
+
+struct freertos_sem {
+    struct claw_sem     base;   /* MUST be first */
+    SemaphoreHandle_t   handle;
+};
+
+struct freertos_mq {
+    struct claw_mq      base;   /* MUST be first */
+    QueueHandle_t       handle;
+};
+
+struct freertos_timer {
+    struct claw_timer   base;   /* MUST be first */
+    TimerHandle_t       handle;
+    void              (*callback)(void *arg);
+    void               *arg;
+};
+
+/* ---------- Thread ---------- */
 
 static void thread_wrapper(void *param)
 {
-    thread_wrap_t w = *(thread_wrap_t *)param;
-    vPortFree(param);
-    w.entry(w.arg);
+    struct freertos_thread *ft = param;
+    ft->entry(ft->arg);
     /* Auto-delete when thread function returns */
     vTaskDelete(NULL);
 }
 
-claw_thread_t claw_thread_create(const char *name,
-                                  void (*entry)(void *arg),
-                                  void *arg,
-                                  uint32_t stack_size,
-                                  uint32_t priority)
+struct claw_thread *claw_thread_create(const char *name,
+                                       void (*entry)(void *arg),
+                                       void *arg,
+                                       uint32_t stack_size,
+                                       uint32_t priority)
 {
-    TaskHandle_t handle = NULL;
-    thread_wrap_t *w = pvPortMalloc(sizeof(*w));
-    if (!w) {
+    struct freertos_thread *ft = pvPortMalloc(sizeof(*ft));
+    if (!ft) {
         return NULL;
     }
-    w->entry = entry;
-    w->arg = arg;
+    ft->base.name = name;
+    ft->base.priority = priority;
+    ft->base.stack_size = stack_size;
+    ft->entry = entry;
+    ft->arg = arg;
 
     BaseType_t ret = xTaskCreate(thread_wrapper, name,
                                  stack_size / sizeof(StackType_t),
-                                 w, priority, &handle);
+                                 ft, priority, &ft->handle);
     if (ret != pdPASS) {
-        vPortFree(w);
+        vPortFree(ft);
         return NULL;
     }
-    return (claw_thread_t)handle;
+    return &ft->base;
 }
 
-void claw_thread_delete(claw_thread_t thread)
+void claw_thread_delete(struct claw_thread *thread)
 {
-    vTaskDelete((TaskHandle_t)thread);
+    if (!thread) {
+        return;
+    }
+    struct freertos_thread *ft = container_of(thread,
+                                              struct freertos_thread, base);
+    vTaskDelete(ft->handle);
+    vPortFree(ft);
 }
 
 void claw_thread_delay_ms(uint32_t ms)
@@ -97,144 +135,217 @@ int claw_thread_should_exit(void)
 
 /* ---------- Mutex ---------- */
 
-claw_mutex_t claw_mutex_create(const char *name)
+struct claw_mutex *claw_mutex_create(const char *name)
 {
-    (void)name;
-    return (claw_mutex_t)xSemaphoreCreateMutex();
+    struct freertos_mutex *fm = pvPortMalloc(sizeof(*fm));
+    if (!fm) {
+        return NULL;
+    }
+    fm->base.name = name;
+    fm->handle = xSemaphoreCreateMutex();
+    if (!fm->handle) {
+        vPortFree(fm);
+        return NULL;
+    }
+    return &fm->base;
 }
 
-int claw_mutex_lock(claw_mutex_t mutex, uint32_t timeout_ms)
+int claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms)
 {
-    if (xSemaphoreTake((SemaphoreHandle_t)mutex, ms_to_ticks(timeout_ms)) == pdTRUE)
+    if (!mutex) {
+        return CLAW_ERR_INVALID;
+    }
+    struct freertos_mutex *fm = container_of(mutex,
+                                             struct freertos_mutex, base);
+    if (xSemaphoreTake(fm->handle, ms_to_ticks(timeout_ms)) == pdTRUE) {
         return CLAW_OK;
+    }
     return CLAW_TIMEOUT;
 }
 
-void claw_mutex_unlock(claw_mutex_t mutex)
+void claw_mutex_unlock(struct claw_mutex *mutex)
 {
-    xSemaphoreGive((SemaphoreHandle_t)mutex);
+    struct freertos_mutex *fm = container_of(mutex,
+                                             struct freertos_mutex, base);
+    xSemaphoreGive(fm->handle);
 }
 
-void claw_mutex_delete(claw_mutex_t mutex)
+void claw_mutex_delete(struct claw_mutex *mutex)
 {
-    vSemaphoreDelete((SemaphoreHandle_t)mutex);
+    if (!mutex) {
+        return;
+    }
+    struct freertos_mutex *fm = container_of(mutex,
+                                             struct freertos_mutex, base);
+    vSemaphoreDelete(fm->handle);
+    vPortFree(fm);
 }
 
 /* ---------- Semaphore ---------- */
 
-claw_sem_t claw_sem_create(const char *name, uint32_t init_value)
+struct claw_sem *claw_sem_create(const char *name, uint32_t init_value)
 {
-    (void)name;
-    return (claw_sem_t)xSemaphoreCreateCounting(UINT32_MAX, init_value);
+    struct freertos_sem *fs = pvPortMalloc(sizeof(*fs));
+    if (!fs) {
+        return NULL;
+    }
+    fs->base.name = name;
+    fs->handle = xSemaphoreCreateCounting(UINT32_MAX, init_value);
+    if (!fs->handle) {
+        vPortFree(fs);
+        return NULL;
+    }
+    return &fs->base;
 }
 
-int claw_sem_take(claw_sem_t sem, uint32_t timeout_ms)
+int claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms)
 {
-    if (xSemaphoreTake((SemaphoreHandle_t)sem, ms_to_ticks(timeout_ms)) == pdTRUE)
+    if (!sem) {
+        return CLAW_ERR_INVALID;
+    }
+    struct freertos_sem *fs = container_of(sem,
+                                           struct freertos_sem, base);
+    if (xSemaphoreTake(fs->handle, ms_to_ticks(timeout_ms)) == pdTRUE) {
         return CLAW_OK;
+    }
     return CLAW_TIMEOUT;
 }
 
-void claw_sem_give(claw_sem_t sem)
+void claw_sem_give(struct claw_sem *sem)
 {
-    xSemaphoreGive((SemaphoreHandle_t)sem);
+    struct freertos_sem *fs = container_of(sem,
+                                           struct freertos_sem, base);
+    xSemaphoreGive(fs->handle);
 }
 
-void claw_sem_delete(claw_sem_t sem)
+void claw_sem_delete(struct claw_sem *sem)
 {
-    vSemaphoreDelete((SemaphoreHandle_t)sem);
+    if (!sem) {
+        return;
+    }
+    struct freertos_sem *fs = container_of(sem,
+                                           struct freertos_sem, base);
+    vSemaphoreDelete(fs->handle);
+    vPortFree(fs);
 }
 
 /* ---------- Message Queue ---------- */
 
-claw_mq_t claw_mq_create(const char *name,
-                           uint32_t msg_size,
-                           uint32_t max_msgs)
+struct claw_mq *claw_mq_create(const char *name,
+                                uint32_t msg_size,
+                                uint32_t max_msgs)
 {
-    (void)name;
-    return (claw_mq_t)xQueueCreate(max_msgs, msg_size);
+    struct freertos_mq *fmq = pvPortMalloc(sizeof(*fmq));
+    if (!fmq) {
+        return NULL;
+    }
+    fmq->base.name = name;
+    fmq->base.msg_size = msg_size;
+    fmq->base.max_msgs = max_msgs;
+    fmq->handle = xQueueCreate(max_msgs, msg_size);
+    if (!fmq->handle) {
+        vPortFree(fmq);
+        return NULL;
+    }
+    return &fmq->base;
 }
 
-int claw_mq_send(claw_mq_t mq, const void *msg, uint32_t size,
+int claw_mq_send(struct claw_mq *mq, const void *msg, uint32_t size,
                   uint32_t timeout_ms)
 {
     (void)size; /* FreeRTOS queue item size is fixed at creation */
-    if (xQueueSend((QueueHandle_t)mq, msg, ms_to_ticks(timeout_ms)) == pdTRUE)
+    struct freertos_mq *fmq = container_of(mq,
+                                            struct freertos_mq, base);
+    if (xQueueSend(fmq->handle, msg, ms_to_ticks(timeout_ms)) == pdTRUE) {
         return CLAW_OK;
+    }
     return CLAW_TIMEOUT;
 }
 
-int claw_mq_recv(claw_mq_t mq, void *msg, uint32_t size,
+int claw_mq_recv(struct claw_mq *mq, void *msg, uint32_t size,
                   uint32_t timeout_ms)
 {
     (void)size;
-    if (xQueueReceive((QueueHandle_t)mq, msg, ms_to_ticks(timeout_ms)) == pdTRUE)
+    struct freertos_mq *fmq = container_of(mq,
+                                            struct freertos_mq, base);
+    if (xQueueReceive(fmq->handle, msg, ms_to_ticks(timeout_ms)) == pdTRUE) {
         return CLAW_OK;
+    }
     return CLAW_TIMEOUT;
 }
 
-void claw_mq_delete(claw_mq_t mq)
+void claw_mq_delete(struct claw_mq *mq)
 {
-    vQueueDelete((QueueHandle_t)mq);
+    if (!mq) {
+        return;
+    }
+    struct freertos_mq *fmq = container_of(mq,
+                                            struct freertos_mq, base);
+    vQueueDelete(fmq->handle);
+    vPortFree(fmq);
 }
 
 /* ---------- Timer ---------- */
 
-typedef struct {
-    void (*callback)(void *arg);
-    void *arg;
-} timer_ctx_t;
-
 static void timer_trampoline(TimerHandle_t xTimer)
 {
-    timer_ctx_t *ctx = (timer_ctx_t *)pvTimerGetTimerID(xTimer);
-    if (ctx && ctx->callback) {
-        ctx->callback(ctx->arg);
+    struct freertos_timer *ft =
+        (struct freertos_timer *)pvTimerGetTimerID(xTimer);
+    if (ft && ft->callback) {
+        ft->callback(ft->arg);
     }
 }
 
-claw_timer_t claw_timer_create(const char *name,
-                                void (*callback)(void *arg),
-                                void *arg,
-                                uint32_t period_ms,
-                                int repeat)
+struct claw_timer *claw_timer_create(const char *name,
+                                     void (*callback)(void *arg),
+                                     void *arg,
+                                     uint32_t period_ms,
+                                     int repeat)
 {
-    timer_ctx_t *ctx = pvPortMalloc(sizeof(*ctx));
-    if (!ctx) {
+    struct freertos_timer *ft = pvPortMalloc(sizeof(*ft));
+    if (!ft) {
         return NULL;
     }
-    ctx->callback = callback;
-    ctx->arg = arg;
+    ft->base.name = name;
+    ft->base.period_ms = period_ms;
+    ft->base.repeat = repeat;
+    ft->callback = callback;
+    ft->arg = arg;
 
-    TimerHandle_t t = xTimerCreate(name, pdMS_TO_TICKS(period_ms),
-                                    repeat ? pdTRUE : pdFALSE,
-                                    ctx,
-                                    timer_trampoline);
-    if (!t) {
-        vPortFree(ctx);
+    ft->handle = xTimerCreate(name, pdMS_TO_TICKS(period_ms),
+                               repeat ? pdTRUE : pdFALSE,
+                               ft,
+                               timer_trampoline);
+    if (!ft->handle) {
+        vPortFree(ft);
         return NULL;
     }
-    return (claw_timer_t)t;
+    return &ft->base;
 }
 
-void claw_timer_start(claw_timer_t timer)
+void claw_timer_start(struct claw_timer *timer)
 {
-    xTimerStart((TimerHandle_t)timer, 0);
+    struct freertos_timer *ft = container_of(timer,
+                                             struct freertos_timer, base);
+    xTimerStart(ft->handle, 0);
 }
 
-void claw_timer_stop(claw_timer_t timer)
+void claw_timer_stop(struct claw_timer *timer)
 {
-    xTimerStop((TimerHandle_t)timer, 0);
+    struct freertos_timer *ft = container_of(timer,
+                                             struct freertos_timer, base);
+    xTimerStop(ft->handle, 0);
 }
 
-void claw_timer_delete(claw_timer_t timer)
+void claw_timer_delete(struct claw_timer *timer)
 {
-    TimerHandle_t t = (TimerHandle_t)timer;
-    timer_ctx_t *ctx = (timer_ctx_t *)pvTimerGetTimerID(t);
-    xTimerDelete(t, 0);
-    if (ctx) {
-        vPortFree(ctx);
+    if (!timer) {
+        return;
     }
+    struct freertos_timer *ft = container_of(timer,
+                                             struct freertos_timer, base);
+    xTimerDelete(ft->handle, 0);
+    vPortFree(ft);
 }
 
 /* ---------- Memory ---------- */
@@ -254,8 +365,9 @@ void *claw_calloc(size_t nmemb, size_t size)
     return calloc(nmemb, size);
 #else
     void *p = pvPortMalloc(nmemb * size);
-    if (p)
+    if (p) {
         memset(p, 0, nmemb * size);
+    }
     return p;
 #endif
 }
@@ -335,10 +447,18 @@ void claw_log(int level, const char *tag, const char *fmt, ...)
     }
 
     switch (level) {
-    case CLAW_LOG_ERROR: esp_level = ESP_LOG_ERROR; break;
-    case CLAW_LOG_WARN:  esp_level = ESP_LOG_WARN;  break;
-    case CLAW_LOG_INFO:  esp_level = ESP_LOG_INFO;  break;
-    default:             esp_level = ESP_LOG_DEBUG;  break;
+    case CLAW_LOG_ERROR:
+        esp_level = ESP_LOG_ERROR;
+        break;
+    case CLAW_LOG_WARN:
+        esp_level = ESP_LOG_WARN;
+        break;
+    case CLAW_LOG_INFO:
+        esp_level = ESP_LOG_INFO;
+        break;
+    default:
+        esp_level = ESP_LOG_DEBUG;
+        break;
     }
 
 #ifdef CONFIG_LOG_COLORS

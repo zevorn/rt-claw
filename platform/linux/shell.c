@@ -350,7 +350,7 @@ static void do_chat(const char *msg)
     s_anim_phase = 0;
     ai_set_status_cb(chat_status_cb);
 
-    claw_thread_t anim = claw_thread_create("anim",
+    struct claw_thread *anim = claw_thread_create("anim",
         anim_thread_fn, NULL, 2048, 20);
 
     /* Temporarily restore cooked mode for AI output */
