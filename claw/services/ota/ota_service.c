@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: MIT
  *
  * OTA service — periodic version check and update management.
+ * OOP: private context struct embedding struct claw_service.
  */
 
 #include "osal/claw_os.h"
 #include "osal/claw_net.h"
+#include "claw/core/claw_service.h"
 #include "claw_config.h"
 #include "claw_ota.h"
 #include "claw/services/ota/ota_service.h"
+#include "utils/list.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -23,10 +26,21 @@
 
 #define TAG "ota"
 
-static struct claw_thread *s_check_thread;
+/* ------------------------------------------------------------------ */
+/* OTA service context — all state lives here, no file-scope globals  */
+/* ------------------------------------------------------------------ */
 
-/* Accessed from OTA worker thread and main thread */
-static volatile Claw_OtaState s_state = CLAW_OTA_IDLE;
+struct ota_service_ctx {
+    struct claw_service    base;           /* MUST be first member */
+
+    struct claw_thread    *check_thread;
+    volatile Claw_OtaState state;          /* worker thread + main */
+    char                   update_url[256];
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct ota_service_ctx, base);
+
+static struct ota_service_ctx s_ota;
 
 /* ---- Progress callback ---- */
 
@@ -196,23 +210,21 @@ int ota_check_update(claw_ota_info_t *info)
 
 /* ---- Update worker ---- */
 
-static char s_update_url[256];
-
 static void ota_worker_thread(void *arg)
 {
-    (void)arg;
+    struct ota_service_ctx *ctx = (struct ota_service_ctx *)arg;
 
-    CLAW_LOGI(TAG, "starting OTA update: %s", s_update_url);
-    s_state = CLAW_OTA_DOWNLOADING;
+    CLAW_LOGI(TAG, "starting OTA update: %s", ctx->update_url);
+    ctx->state = CLAW_OTA_DOWNLOADING;
 
-    int ret = claw_ota_do_update(s_update_url, ota_progress);
+    int ret = claw_ota_do_update(ctx->update_url, ota_progress);
     if (ret != CLAW_OK) {
         CLAW_LOGE(TAG, "OTA update failed");
-        s_state = CLAW_OTA_ERROR;
+        ctx->state = CLAW_OTA_ERROR;
         return;
     }
 
-    s_state = CLAW_OTA_DONE;
+    ctx->state = CLAW_OTA_DONE;
     CLAW_LOGI(TAG, "OTA update complete, rebooting in 3s ...");
     claw_thread_delay_ms(3000);
 #ifdef CLAW_PLATFORM_ESP_IDF
@@ -222,12 +234,14 @@ static void ota_worker_thread(void *arg)
 
 int ota_trigger_update(const char *url)
 {
+    struct ota_service_ctx *ctx = &s_ota;
+
     if (!claw_ota_supported()) {
         CLAW_LOGW(TAG, "OTA not supported on this platform");
         return CLAW_ERROR;
     }
 
-    if (s_state == CLAW_OTA_DOWNLOADING) {
+    if (ctx->state == CLAW_OTA_DOWNLOADING) {
         CLAW_LOGW(TAG, "OTA already in progress");
         return CLAW_ERROR;
     }
@@ -237,13 +251,13 @@ int ota_trigger_update(const char *url)
     }
 
     size_t len = strlen(url);
-    if (len >= sizeof(s_update_url)) {
+    if (len >= sizeof(ctx->update_url)) {
         return CLAW_ERROR;
     }
-    memcpy(s_update_url, url, len + 1);
+    memcpy(ctx->update_url, url, len + 1);
 
     if (!claw_thread_create("ota_worker", ota_worker_thread,
-                            NULL, 8192, 10)) {
+                            ctx, 8192, 10)) {
         CLAW_LOGE(TAG, "failed to create OTA worker thread");
         return CLAW_ERROR;
     }
@@ -255,13 +269,13 @@ int ota_trigger_update(const char *url)
 #if CONFIG_RTCLAW_OTA_CHECK_INTERVAL_MS > 0
 static void ota_check_thread(void *arg)
 {
-    (void)arg;
+    struct ota_service_ctx *ctx = (struct ota_service_ctx *)arg;
 
     /* Wait for network to stabilize after boot */
     claw_thread_delay_ms(30000);
 
     while (!claw_thread_should_exit()) {
-        if (s_state == CLAW_OTA_IDLE) {
+        if (ctx->state == CLAW_OTA_IDLE) {
             claw_ota_info_t info;
             int ret = ota_check_update(&info);
             if (ret == 1) {
@@ -273,14 +287,21 @@ static void ota_check_thread(void *arg)
 }
 #endif
 
-/* ---- Service lifecycle ---- */
+/* ---- OOP lifecycle ops ---- */
 
-int ota_service_init(void)
+static claw_err_t ota_svc_init(struct claw_service *svc)
 {
+    struct ota_service_ctx *ctx =
+        container_of(svc, struct ota_service_ctx, base);
+
+    ctx->check_thread = NULL;
+    ctx->state = CLAW_OTA_IDLE;
+    ctx->update_url[0] = '\0';
+
     int ret = claw_ota_platform_init();
     if (ret != CLAW_OK) {
         CLAW_LOGE(TAG, "platform OTA init failed");
-        return ret;
+        return CLAW_ERR_GENERIC;
     }
 
     /* Mark running firmware as valid on successful boot */
@@ -291,31 +312,68 @@ int ota_service_init(void)
     return CLAW_OK;
 }
 
-int ota_service_start(void)
+static claw_err_t ota_svc_start(struct claw_service *svc)
 {
+    struct ota_service_ctx *ctx =
+        container_of(svc, struct ota_service_ctx, base);
+
 #if CONFIG_RTCLAW_OTA_CHECK_INTERVAL_MS > 0
-    s_check_thread = claw_thread_create("ota_check",
-        ota_check_thread, NULL, 4096, 18);
-    if (!s_check_thread) {
+    ctx->check_thread = claw_thread_create("ota_check",
+        ota_check_thread, ctx, 4096, 18);
+    if (!ctx->check_thread) {
         CLAW_LOGW(TAG, "auto-check thread create failed");
     }
+#else
+    (void)ctx;
 #endif
     return CLAW_OK;
 }
 
-void ota_service_stop(void)
+static void ota_svc_stop(struct claw_service *svc)
 {
-    if (s_check_thread) {
-        claw_thread_delete(s_check_thread);
-        s_check_thread = NULL;
+    struct ota_service_ctx *ctx =
+        container_of(svc, struct ota_service_ctx, base);
+
+    if (ctx->check_thread) {
+        claw_thread_delete(ctx->check_thread);
+        ctx->check_thread = NULL;
     }
 }
 
-#endif /* CONFIG_RTCLAW_OTA_ENABLE */
+/* ---- Public API (delegates to singleton) ---- */
 
-/* OOP service registration */
-#ifdef CONFIG_RTCLAW_OTA_ENABLE
-#include "claw/core/claw_service.h"
-CLAW_DEFINE_SIMPLE_SERVICE(ota, "ota",
-    ota_service_init, ota_service_start, ota_service_stop, NULL);
-#endif
+int ota_service_init(void)
+{
+    return ota_svc_init(&s_ota.base) == CLAW_OK ? CLAW_OK : CLAW_ERROR;
+}
+
+int ota_service_start(void)
+{
+    return ota_svc_start(&s_ota.base) == CLAW_OK ? CLAW_OK : CLAW_ERROR;
+}
+
+void ota_service_stop(void)
+{
+    ota_svc_stop(&s_ota.base);
+}
+
+/* ---- OOP service registration ---- */
+
+static const struct claw_service_ops ota_svc_ops = {
+    .init  = ota_svc_init,
+    .start = ota_svc_start,
+    .stop  = ota_svc_stop,
+};
+
+static struct ota_service_ctx s_ota = {
+    .base = {
+        .name  = "ota",
+        .ops   = &ota_svc_ops,
+        .deps  = NULL,
+        .state = CLAW_SVC_CREATED,
+    },
+};
+
+CLAW_SERVICE_REGISTER(ota, &s_ota.base);
+
+#endif /* CONFIG_RTCLAW_OTA_ENABLE */

@@ -3,14 +3,45 @@
  * SPDX-License-Identifier: MIT
  *
  * Network service — Ethernet init and HTTP connectivity test.
+ * OOP: private context struct embedding struct claw_service.
  */
 
 #include "osal/claw_os.h"
 #include "claw/services/net/net_service.h"
+#include "claw/core/claw_service.h"
+#include "utils/list.h"
 
 #include <string.h>
 
 #define TAG "net"
+
+/* ------------------------------------------------------------------ */
+/* Platform headers needed before context struct definition           */
+/* ------------------------------------------------------------------ */
+
+#if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_ETH_ENABLED)
+#include "esp_netif.h"
+#endif
+
+/* ------------------------------------------------------------------ */
+/* Service context — all state lives here, no file-scope globals      */
+/* ------------------------------------------------------------------ */
+
+struct net_service_ctx {
+    struct claw_service  base;       /* MUST be first member */
+#if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_ETH_ENABLED)
+    struct claw_sem     *got_ip_sem;
+    esp_netif_t         *eth_netif;
+#endif
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct net_service_ctx, base);
+
+static struct net_service_ctx s_net;
+
+/* ================================================================== */
+/* Platform-specific init and ipinfo                                  */
+/* ================================================================== */
 
 #if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_ETH_ENABLED)
 /*
@@ -19,7 +50,6 @@
  * so this block is compiled only when Ethernet is enabled.
  */
 
-#include "esp_netif.h"
 #include "esp_eth.h"
 #include "esp_eth_mac_openeth.h"
 #include "esp_event.h"
@@ -27,9 +57,6 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "lwip/dns.h"
-
-static struct claw_sem *s_got_ip_sem;
-static esp_netif_t *s_eth_netif;
 
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
                               int32_t event_id, void *event_data)
@@ -62,18 +89,18 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
         CLAW_LOGI(TAG, "netmask: " IPSTR,
                   IP2STR(&event->ip_info.netmask));
         CLAW_LOGI(TAG, "gateway: " IPSTR, IP2STR(&event->ip_info.gw));
-        claw_sem_give(s_got_ip_sem);
+        claw_sem_give(s_net.got_ip_sem);
     }
 }
 
-static int eth_init(void)
+static int eth_init(struct net_service_ctx *ctx)
 {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
-    s_eth_netif = esp_netif_new(&netif_cfg);
-    esp_netif_t *netif = s_eth_netif;
+    ctx->eth_netif = esp_netif_new(&netif_cfg);
+    esp_netif_t *netif = ctx->eth_netif;
 
     eth_mac_config_t mac_cfg = ETH_MAC_DEFAULT_CONFIG();
     esp_eth_mac_t *mac = esp_eth_mac_new_openeth(&mac_cfg);
@@ -100,17 +127,17 @@ static int eth_init(void)
     return CLAW_OK;
 }
 
-int net_service_init(void)
+static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
-    s_got_ip_sem = claw_sem_create("net_ip", 0);
-    if (!s_got_ip_sem) {
+    ctx->got_ip_sem = claw_sem_create("net_ip", 0);
+    if (!ctx->got_ip_sem) {
         CLAW_LOGE(TAG, "failed to create semaphore");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
-    if (eth_init() != CLAW_OK) {
+    if (eth_init(ctx) != CLAW_OK) {
         CLAW_LOGE(TAG, "Ethernet init failed");
-        return CLAW_ERROR;
+        return CLAW_ERR_GENERIC;
     }
 
     /*
@@ -120,7 +147,7 @@ int net_service_init(void)
      * static IP fallback.
      */
     CLAW_LOGI(TAG, "waiting for IP address (DHCP) ...");
-    int ret = claw_sem_take(s_got_ip_sem, 2000);
+    int ret = claw_sem_take(ctx->got_ip_sem, 2000);
     if (ret != CLAW_OK) {
         CLAW_LOGW(TAG, "DHCP timeout, falling back to static IP");
 
@@ -148,8 +175,8 @@ int net_service_init(void)
         IP4_ADDR(&ip_info.gw,      0, 0, 0, 0);
 #endif
 
-        esp_netif_dhcpc_stop(s_eth_netif);
-        esp_netif_set_ip_info(s_eth_netif, &ip_info);
+        esp_netif_dhcpc_stop(ctx->eth_netif);
+        esp_netif_set_ip_info(ctx->eth_netif, &ip_info);
         CLAW_LOGI(TAG, "static ip: " IPSTR, IP2STR(&ip_info.ip));
     }
 
@@ -169,8 +196,8 @@ void net_print_ipinfo(void)
 {
     esp_netif_ip_info_t info;
 
-    if (s_eth_netif &&
-        esp_netif_get_ip_info(s_eth_netif, &info) == ESP_OK &&
+    if (s_net.eth_netif &&
+        esp_netif_get_ip_info(s_net.eth_netif, &info) == ESP_OK &&
         info.ip.addr != 0) {
         printf("  ip:      " IPSTR "\n", IP2STR(&info.ip));
         printf("  netmask: " IPSTR "\n", IP2STR(&info.netmask));
@@ -188,8 +215,9 @@ void net_print_ipinfo(void)
 
 #include "esp_netif.h"
 
-int net_service_init(void)
+static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
+    (void)ctx;
     CLAW_LOGI(TAG, "network service ready (WiFi managed by platform)");
     return CLAW_OK;
 }
@@ -244,8 +272,9 @@ static void net_link_thread(void *arg)
     claw_platform_net_prepare();
 }
 
-int net_service_init(void)
+static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
+    (void)ctx;
     const char *dev_name = claw_platform_net_device_name();
 
     if (!dev_name || dev_name[0] == '\0') {
@@ -338,8 +367,9 @@ void net_print_ipinfo(void)
 #include <arpa/inet.h>
 #include <net/if.h>
 
-int net_service_init(void)
+static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
+    (void)ctx;
     CLAW_LOGI(TAG, "network service ready (Linux native)");
     return CLAW_OK;
 }
@@ -391,8 +421,9 @@ void net_print_ipinfo(void)
 
 #include <stdio.h>
 
-int net_service_init(void)
+static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
+    (void)ctx;
     CLAW_LOGI(TAG, "service initialized (network backend pending)");
     return CLAW_OK;
 }
@@ -404,7 +435,50 @@ void net_print_ipinfo(void)
 
 #endif
 
-/* OOP service registration */
-#include "claw/core/claw_service.h"
-CLAW_DEFINE_SIMPLE_SERVICE(net, "net",
-    net_service_init, NULL, NULL, NULL);
+/* ================================================================== */
+/* OOP lifecycle ops                                                  */
+/* ================================================================== */
+
+static claw_err_t net_svc_init(struct claw_service *svc)
+{
+    struct net_service_ctx *ctx =
+        container_of(svc, struct net_service_ctx, base);
+    return net_platform_init(ctx);
+}
+
+static void net_svc_stop(struct claw_service *svc)
+{
+    struct net_service_ctx *ctx =
+        container_of(svc, struct net_service_ctx, base);
+    (void)ctx;
+}
+
+/* ================================================================== */
+/* Public API (delegates to context singleton)                        */
+/* ================================================================== */
+
+int net_service_init(void)
+{
+    return net_svc_init(&s_net.base) == CLAW_OK ? CLAW_OK : CLAW_ERROR;
+}
+
+/* ================================================================== */
+/* OOP service registration                                           */
+/* ================================================================== */
+
+static const struct claw_service_ops net_svc_ops = {
+    .init  = net_svc_init,
+    .start = NULL,
+    .stop  = net_svc_stop,
+};
+
+static struct net_service_ctx s_net = {
+    .base = {
+        .name  = "net",
+        .ops   = &net_svc_ops,
+        .deps  = NULL,
+        .state = CLAW_SVC_CREATED,
+    },
+};
+
+CLAW_SERVICE_REGISTER(net, &s_net.base);

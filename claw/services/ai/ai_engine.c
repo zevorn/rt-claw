@@ -11,6 +11,8 @@
 #include "claw/services/ai/ai_engine.h"
 #include "claw/services/ai/ai_memory.h"
 #include "claw/tools/claw_tools.h"
+#include "claw/core/claw_service.h"
+#include "utils/list.h"
 #include "cJSON.h"
 
 #ifdef CONFIG_RTCLAW_SCHED_ENABLE
@@ -36,14 +38,6 @@
 #define AI_URL_MAX      256
 #define AI_MODEL_MAX    64
 
-/*
- * Mutable config buffers — initialized from compile-time defaults,
- * overridden at runtime via ai_set_*() (e.g. from NVS).
- */
-static char s_api_key[AI_KEY_MAX];
-static char s_api_url[AI_URL_MAX];
-static char s_model[AI_MODEL_MAX];
-
 #ifdef CONFIG_RTCLAW_AI_CONTEXT_SIZE
 #define RESP_BUF_SIZE      CONFIG_RTCLAW_AI_CONTEXT_SIZE
 #else
@@ -53,19 +47,48 @@ static char s_model[AI_MODEL_MAX];
 #define API_MAX_RETRIES    2
 #define API_RETRY_BASE_MS  2000
 
-/*
- * Per-caller state: callers set these before ai_chat(), which
- * snapshots them into the request struct for the worker thread.
- */
-static ai_status_cb_t s_status_cb;
-static char s_channel_hint[512];
-static int s_channel = AI_CHANNEL_SHELL;
+/* ---- OOP service context ---- */
 
-/*
- * API format: 0 = Claude (Anthropic), 1 = OpenAI-compatible.
- * Auto-detected from model name in ai_engine_init().
- */
-static int s_openai_compat;
+struct ai_engine_ctx {
+    struct claw_service     base;       /* MUST be first member */
+    char                    api_key[AI_KEY_MAX];
+    char                    api_url[AI_URL_MAX];
+    char                    model[AI_MODEL_MAX];
+    ai_status_cb_t          status_cb;
+    char                    channel_hint[512];
+    int                     channel;
+    int                     openai_compat;
+    struct claw_mq         *queue;
+    struct claw_thread     *worker;
+    ai_status_cb_t          active_cb;
+};
+
+CLAW_ASSERT_EMBEDDED_FIRST(struct ai_engine_ctx, base);
+
+/* Forward-declare ops functions (defined at end of file) */
+static claw_err_t ai_svc_init(struct claw_service *svc);
+static void ai_svc_stop(struct claw_service *svc);
+
+static const char *ai_deps[] = { "gateway", "net", NULL };
+
+static const struct claw_service_ops ai_svc_ops = {
+    .init  = ai_svc_init,
+    .start = NULL,
+    .stop  = ai_svc_stop,
+};
+
+static struct ai_engine_ctx ai_ctx = {
+    .base = {
+        .name  = "ai_engine",
+        .ops   = &ai_svc_ops,
+        .deps  = ai_deps,
+        .state = CLAW_SVC_CREATED,
+    },
+    .channel = AI_CHANNEL_SHELL,
+};
+
+/* Singleton pointer — valid from program start (static init) */
+static struct ai_engine_ctx *s_ctx = &ai_ctx;
 
 /* ---- Request queue ---- */
 
@@ -81,43 +104,38 @@ struct ai_request {
     int             result;
 };
 
-static struct claw_mq *s_ai_queue;
-static struct claw_thread *s_worker_thread;
-
-/* Worker-local active callback (set per request) */
-static ai_status_cb_t s_active_cb;
-
 static inline void notify_status(int st, const char *detail)
 {
-    if (s_active_cb) {
-        s_active_cb(st, detail);
+    if (s_ctx->active_cb) {
+        s_ctx->active_cb(st, detail);
     }
 }
 
 void ai_set_status_cb(ai_status_cb_t cb)
 {
-    s_status_cb = cb;
+    s_ctx->status_cb = cb;
 }
 
 void ai_set_channel_hint(const char *hint)
 {
     if (hint) {
-        snprintf(s_channel_hint, sizeof(s_channel_hint), "%s", hint);
+        snprintf(s_ctx->channel_hint, sizeof(s_ctx->channel_hint),
+                 "%s", hint);
     } else {
-        s_channel_hint[0] = '\0';
+        s_ctx->channel_hint[0] = '\0';
     }
 }
 
 void ai_set_channel(int channel_id)
 {
     if (channel_id >= 0 && channel_id < AI_CHANNEL_MAX) {
-        s_channel = channel_id;
+        s_ctx->channel = channel_id;
     }
 }
 
 int ai_get_channel(void)
 {
-    return s_channel;
+    return s_ctx->channel;
 }
 
 static const char *SYSTEM_PROMPT =
@@ -151,15 +169,15 @@ static cJSON *do_api_call(cJSON *req_body)
     int hdr_count;
     claw_net_header_t headers_claude[] = {
         { "Content-Type",      "application/json" },
-        { "x-api-key",         s_api_key },
+        { "x-api-key",         s_ctx->api_key },
         { "anthropic-version", "2023-06-01" },
     };
     claw_net_header_t headers_openai[2];
 
     claw_net_header_t *headers;
-    if (s_openai_compat) {
+    if (s_ctx->openai_compat) {
         snprintf(s_auth_bearer, sizeof(s_auth_bearer),
-                 "Bearer %s", s_api_key);
+                 "Bearer %s", s_ctx->api_key);
         headers_openai[0] = (claw_net_header_t)
             { "Content-Type",  "application/json" };
         headers_openai[1] = (claw_net_header_t)
@@ -181,7 +199,7 @@ static cJSON *do_api_call(cJSON *req_body)
         }
 
         size_t resp_len = 0;
-        int status = claw_net_post(s_api_url, headers, hdr_count,
+        int status = claw_net_post(s_ctx->api_url, headers, hdr_count,
                                     body_str, strlen(body_str),
                                     resp_buf, RESP_BUF_SIZE, &resp_len);
 
@@ -219,7 +237,7 @@ static cJSON *do_api_call(cJSON *req_body)
 /*
  * Wrap Claude tool schema into OpenAI format:
  *   { name, description, input_schema }
- *   → { type: "function", function: { name, description, parameters } }
+ *   -> { type: "function", function: { name, description, parameters } }
  */
 static cJSON *wrap_tools_openai(cJSON *claude_tools)
 {
@@ -255,10 +273,10 @@ static cJSON *build_request(const char *system_prompt,
                             cJSON *messages, cJSON *tools)
 {
     cJSON *req = cJSON_CreateObject();
-    cJSON_AddStringToObject(req, "model", s_model);
+    cJSON_AddStringToObject(req, "model", s_ctx->model);
     cJSON_AddNumberToObject(req, "max_tokens", AI_MAX_TOKENS);
 
-    if (s_openai_compat) {
+    if (s_ctx->openai_compat) {
         /*
          * OpenAI format: system prompt as first message,
          * tools wrapped in { type: "function", function: {...} }.
@@ -349,7 +367,7 @@ static char *build_system_prompt(void)
     int dev_len = build_device_context(dev_ctx, sizeof(dev_ctx));
 
     size_t base_len = strlen(SYSTEM_PROMPT);
-    size_t hint_len = strlen(s_channel_hint);
+    size_t hint_len = strlen(s_ctx->channel_hint);
     char *ltm_ctx = ai_ltm_build_context();
     size_t ltm_len = ltm_ctx ? strlen(ltm_ctx) : 0;
 
@@ -368,7 +386,7 @@ static char *build_system_prompt(void)
         memcpy(p + off, SYSTEM_PROMPT, base_len);
         off += base_len;
         if (hint_len > 0) {
-            memcpy(p + off, s_channel_hint, hint_len);
+            memcpy(p + off, s_ctx->channel_hint, hint_len);
             off += hint_len;
         }
         memcpy(p + off, dev_ctx, dev_len);
@@ -548,7 +566,7 @@ static int ai_chat_with_messages(const char *system_prompt,
 
         int has_tool_calls = 0;
 
-        if (s_openai_compat) {
+        if (s_ctx->openai_compat) {
             /* OpenAI: choices[0].message */
             cJSON *choices = cJSON_GetObjectItem(resp, "choices");
             cJSON *choice0 = choices ? cJSON_GetArrayItem(choices, 0)
@@ -757,10 +775,10 @@ static void try_compress_memory(int channel)
     claw_free(prompt);
 
     cJSON *req_body = cJSON_CreateObject();
-    cJSON_AddStringToObject(req_body, "model", s_model);
+    cJSON_AddStringToObject(req_body, "model", s_ctx->model);
     cJSON_AddNumberToObject(req_body, "max_tokens", 256);
     cJSON_AddItemToObject(req_body, "messages", req_msgs);
-    if (!s_openai_compat) {
+    if (!s_ctx->openai_compat) {
         cJSON_AddStringToObject(req_body, "system",
                                 "You are a conversation summarizer.");
     }
@@ -777,7 +795,7 @@ static void try_compress_memory(int channel)
     /* Extract summary text */
     char summary[COMPRESS_SUMMARY_MAX];
     summary[0] = '\0';
-    if (s_openai_compat) {
+    if (s_ctx->openai_compat) {
         cJSON *choices = cJSON_GetObjectItem(resp, "choices");
         cJSON *c0 = choices ? cJSON_GetArrayItem(choices, 0) : NULL;
         cJSON *msg = c0 ? cJSON_GetObjectItem(c0, "message") : NULL;
@@ -907,21 +925,21 @@ static void do_chat_raw(struct ai_request *req)
 
 static void ai_worker_thread(void *arg)
 {
-    (void)arg;
+    struct ai_engine_ctx *ctx = (struct ai_engine_ctx *)arg;
     struct ai_request *req;
 
     CLAW_LOGI(TAG, "worker started");
 
     while (!claw_thread_should_exit()) {
-        if (claw_mq_recv(s_ai_queue, &req, sizeof(req),
+        if (claw_mq_recv(ctx->queue, &req, sizeof(req),
                           1000) != CLAW_OK) {
             continue;
         }
 
         /* Apply per-request context */
-        snprintf(s_channel_hint, sizeof(s_channel_hint),
+        snprintf(ctx->channel_hint, sizeof(ctx->channel_hint),
                  "%s", req->channel_hint);
-        s_active_cb = req->status_cb;
+        ctx->active_cb = req->status_cb;
 
         CLAW_LOGD(TAG, "processing request (ch=%d, raw=%d)",
                   req->channel, req->raw);
@@ -932,7 +950,7 @@ static void ai_worker_thread(void *arg)
             do_chat(req);
         }
 
-        s_active_cb = NULL;
+        ctx->active_cb = NULL;
         claw_sem_give(req->done);
     }
 }
@@ -949,7 +967,7 @@ static int submit_and_wait(struct ai_request *req)
     }
 
     struct ai_request *ptr = req;
-    if (claw_mq_send(s_ai_queue, &ptr, sizeof(ptr),
+    if (claw_mq_send(s_ctx->queue, &ptr, sizeof(ptr),
                       CLAW_NO_WAIT) != CLAW_OK) {
         claw_sem_delete(req->done);
         snprintf(req->reply, req->reply_size,
@@ -976,7 +994,7 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
         return CLAW_ERROR;
     }
 
-    if (strlen(s_api_key) == 0) {
+    if (strlen(s_ctx->api_key) == 0) {
         snprintf(reply, reply_size, "[no API key configured]");
         return CLAW_ERROR;
     }
@@ -985,13 +1003,13 @@ int ai_chat(const char *user_msg, char *reply, size_t reply_size)
         .input = user_msg,
         .reply = reply,
         .reply_size = reply_size,
-        .channel = s_channel,
-        .status_cb = s_status_cb,
+        .channel = s_ctx->channel,
+        .status_cb = s_ctx->status_cb,
         .raw = 0,
         .result = CLAW_ERROR,
     };
     snprintf(req.channel_hint, sizeof(req.channel_hint),
-             "%s", s_channel_hint);
+             "%s", s_ctx->channel_hint);
 
     return submit_and_wait(&req);
 }
@@ -1002,7 +1020,7 @@ int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
         return CLAW_ERROR;
     }
 
-    if (strlen(s_api_key) == 0) {
+    if (strlen(s_ctx->api_key) == 0) {
         snprintf(reply, reply_size, "[no API key configured]");
         return CLAW_ERROR;
     }
@@ -1011,13 +1029,13 @@ int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
         .input = prompt,
         .reply = reply,
         .reply_size = reply_size,
-        .channel = s_channel,
-        .status_cb = s_status_cb,
+        .channel = s_ctx->channel,
+        .status_cb = s_ctx->status_cb,
         .raw = 1,
         .result = CLAW_ERROR,
     };
     snprintf(req.channel_hint, sizeof(req.channel_hint),
-             "%s", s_channel_hint);
+             "%s", s_ctx->channel_hint);
 
     return submit_and_wait(&req);
 }
@@ -1027,27 +1045,27 @@ int ai_chat_raw(const char *prompt, char *reply, size_t reply_size)
 void ai_set_api_key(const char *key)
 {
     if (key) {
-        snprintf(s_api_key, sizeof(s_api_key), "%s", key);
+        snprintf(s_ctx->api_key, sizeof(s_ctx->api_key), "%s", key);
     }
 }
 
 void ai_set_api_url(const char *url)
 {
     if (url) {
-        snprintf(s_api_url, sizeof(s_api_url), "%s", url);
+        snprintf(s_ctx->api_url, sizeof(s_ctx->api_url), "%s", url);
     }
 }
 
 void ai_set_model(const char *model)
 {
     if (model) {
-        snprintf(s_model, sizeof(s_model), "%s", model);
+        snprintf(s_ctx->model, sizeof(s_ctx->model), "%s", model);
     }
 }
 
-const char *ai_get_api_key(void)  { return s_api_key; }
-const char *ai_get_api_url(void)  { return s_api_url; }
-const char *ai_get_model(void)    { return s_model; }
+const char *ai_get_api_key(void)  { return s_ctx->api_key; }
+const char *ai_get_api_url(void)  { return s_ctx->api_url; }
+const char *ai_get_model(void)    { return s_ctx->model; }
 
 int ai_engine_init(void)
 {
@@ -1055,23 +1073,23 @@ int ai_engine_init(void)
      * Initialize from compile-time defaults (may be overridden
      * by platform-specific NVS load before this call).
      */
-    if (s_api_key[0] == '\0') {
-        snprintf(s_api_key, sizeof(s_api_key),
+    if (s_ctx->api_key[0] == '\0') {
+        snprintf(s_ctx->api_key, sizeof(s_ctx->api_key),
                  "%s", CONFIG_RTCLAW_AI_API_KEY);
     }
-    if (s_api_url[0] == '\0') {
-        snprintf(s_api_url, sizeof(s_api_url),
+    if (s_ctx->api_url[0] == '\0') {
+        snprintf(s_ctx->api_url, sizeof(s_ctx->api_url),
                  "%s", CONFIG_RTCLAW_AI_API_URL);
     }
-    if (s_model[0] == '\0') {
-        snprintf(s_model, sizeof(s_model),
+    if (s_ctx->model[0] == '\0') {
+        snprintf(s_ctx->model, sizeof(s_ctx->model),
                  "%s", CONFIG_RTCLAW_AI_MODEL);
     }
 
-    s_ai_queue = claw_mq_create("ai_q",
-                                sizeof(struct ai_request *),
-                                CLAW_AI_QUEUE_DEPTH);
-    if (!s_ai_queue) {
+    s_ctx->queue = claw_mq_create("ai_q",
+                                   sizeof(struct ai_request *),
+                                   CLAW_AI_QUEUE_DEPTH);
+    if (!s_ctx->queue) {
         CLAW_LOGE(TAG, "request queue create failed");
         return CLAW_ERROR;
     }
@@ -1084,24 +1102,24 @@ int ai_engine_init(void)
     }
 
     /* Auto-detect API format from model name */
-    s_openai_compat = (strncmp(s_model, "claude", 6) != 0);
+    s_ctx->openai_compat = (strncmp(s_ctx->model, "claude", 6) != 0);
     CLAW_LOGI(TAG, "api format: %s",
-              s_openai_compat ? "openai" : "claude");
+              s_ctx->openai_compat ? "openai" : "claude");
 
-    s_worker_thread = claw_thread_create("ai_worker", ai_worker_thread,
-                                          NULL, CLAW_AI_WORKER_STACK,
-                                          CLAW_AI_WORKER_PRIO);
-    if (!s_worker_thread) {
+    s_ctx->worker = claw_thread_create("ai_worker", ai_worker_thread,
+                                        s_ctx, CLAW_AI_WORKER_STACK,
+                                        CLAW_AI_WORKER_PRIO);
+    if (!s_ctx->worker) {
         CLAW_LOGE(TAG, "worker thread create failed");
         return CLAW_ERROR;
     }
 
-    if (strlen(s_api_key) == 0) {
+    if (strlen(s_ctx->api_key) == 0) {
         CLAW_LOGW(TAG, "no API key configured");
         claw_lcd_status("No API key configured");
     } else {
         CLAW_LOGI(TAG, "engine ready (model: %s, tools: %d)",
-                  s_model, claw_tools_count());
+                  s_ctx->model, claw_tools_count());
         claw_lcd_status("AI ready - waiting for input");
     }
     return CLAW_OK;
@@ -1109,12 +1127,12 @@ int ai_engine_init(void)
 
 void ai_engine_stop(void)
 {
-    claw_thread_delete(s_worker_thread);
-    s_worker_thread = NULL;
+    claw_thread_delete(s_ctx->worker);
+    s_ctx->worker = NULL;
 
-    if (s_ai_queue) {
-        claw_mq_delete(s_ai_queue);
-        s_ai_queue = NULL;
+    if (s_ctx->queue) {
+        claw_mq_delete(s_ctx->queue);
+        s_ctx->queue = NULL;
     }
 
     CLAW_LOGI(TAG, "stopped");
@@ -1122,7 +1140,7 @@ void ai_engine_stop(void)
 
 int ai_ping(void)
 {
-    if (s_api_key[0] == '\0' || s_api_url[0] == '\0') {
+    if (s_ctx->api_key[0] == '\0' || s_ctx->api_url[0] == '\0') {
         return CLAW_ERROR;
     }
 
@@ -1131,16 +1149,16 @@ int ai_ping(void)
      * Does NOT acquire s_api_lock so it never blocks ai_chat().
      */
     char req[256];
-    if (s_openai_compat) {
+    if (s_ctx->openai_compat) {
         snprintf(req, sizeof(req),
             "{\"model\":\"%s\","
             "\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],"
-            "\"max_tokens\":1}", s_model);
+            "\"max_tokens\":1}", s_ctx->model);
     } else {
         snprintf(req, sizeof(req),
             "{\"model\":\"%s\","
             "\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],"
-            "\"max_tokens\":1}", s_model);
+            "\"max_tokens\":1}", s_ctx->model);
     }
 
     /* Reuse the same header setup as do_api_call */
@@ -1148,8 +1166,9 @@ int ai_ping(void)
     claw_net_header_t headers[3];
     int hdr_count;
 
-    if (s_openai_compat) {
-        snprintf(auth_buf, sizeof(auth_buf), "Bearer %s", s_api_key);
+    if (s_ctx->openai_compat) {
+        snprintf(auth_buf, sizeof(auth_buf),
+                 "Bearer %s", s_ctx->api_key);
         headers[0] = (claw_net_header_t)
             { "Content-Type",  "application/json" };
         headers[1] = (claw_net_header_t)
@@ -1159,7 +1178,7 @@ int ai_ping(void)
         headers[0] = (claw_net_header_t)
             { "Content-Type",      "application/json" };
         headers[1] = (claw_net_header_t)
-            { "x-api-key",         s_api_key };
+            { "x-api-key",         s_ctx->api_key };
         headers[2] = (claw_net_header_t)
             { "anthropic-version", "2023-06-01" };
         hdr_count = 3;
@@ -1167,7 +1186,7 @@ int ai_ping(void)
 
     char resp[256];
     size_t resp_len = 0;
-    int status = claw_net_post(s_api_url, headers, hdr_count,
+    int status = claw_net_post(s_ctx->api_url, headers, hdr_count,
                                 req, strlen(req),
                                 resp, sizeof(resp), &resp_len);
 
@@ -1175,8 +1194,22 @@ int ai_ping(void)
     return (status > 0) ? CLAW_OK : CLAW_ERROR;
 }
 
-/* OOP service registration */
-#include "claw/core/claw_service.h"
-static const char *ai_deps[] = { "gateway", "net", NULL };
-CLAW_DEFINE_SIMPLE_SERVICE(ai_engine, "ai_engine",
-    ai_engine_init, NULL, ai_engine_stop, ai_deps);
+/* ---- OOP service ops ---- */
+
+static claw_err_t ai_svc_init(struct claw_service *svc)
+{
+    struct ai_engine_ctx *ctx =
+        container_of(svc, struct ai_engine_ctx, base);
+    s_ctx = ctx;
+    return ai_engine_init() == CLAW_OK ? CLAW_OK : CLAW_ERR_GENERIC;
+}
+
+static void ai_svc_stop(struct claw_service *svc)
+{
+    struct ai_engine_ctx *ctx =
+        container_of(svc, struct ai_engine_ctx, base);
+    (void)ctx;
+    ai_engine_stop();
+}
+
+CLAW_SERVICE_REGISTER(ai_engine, &ai_ctx.base);
