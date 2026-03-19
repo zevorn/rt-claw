@@ -24,9 +24,11 @@ src_files = files(
 )
 
 # Drivers (outside claw/ directory)
+# es8311_audio.c excluded: depends on esp_codec_dev managed component
+# which has transitive headers not available in Meson cross-compile.
+# It compiles via ESP-IDF CMake (platform/esp32c3/main/CMakeLists.txt).
 src_files += files(
     '../drivers/display/espressif/ssd1306_oled.c',
-    '../drivers/audio/espressif/es8311_audio.c',
 )
 
 # Feature flags
