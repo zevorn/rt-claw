@@ -299,7 +299,7 @@ static claw_err_t wifi_drv_probe(struct claw_driver *drv)
 static void wifi_drv_remove(struct claw_driver *drv)
 {
     (void)drv;
-    wifi_manager_stop();
+    /* WiFi teardown handled by ESP-IDF on reboot */
 }
 
 static const struct claw_driver_ops wifi_drv_ops = {
