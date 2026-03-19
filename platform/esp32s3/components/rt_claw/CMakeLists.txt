@@ -42,6 +42,7 @@ idf_component_register(
     INCLUDE_DIRS    ${CLAW_INC_DIRS}
     REQUIRES        ${CLAW_REQUIRES}
     LDFRAGMENTS     "rtclaw.lf"
+    WHOLE_ARCHIVE
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC CLAW_PLATFORM_ESP_IDF)

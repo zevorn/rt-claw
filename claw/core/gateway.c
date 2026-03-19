@@ -32,6 +32,7 @@ struct gateway_ctx {
     struct claw_thread       *thread;
 };
 
+/* Forward declaration — defined at file end with designated initializer */
 static struct gateway_ctx s_gw;
 
 /* --- Pipeline handlers --- */
