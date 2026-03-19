@@ -170,7 +170,7 @@ void sched_stop(void)
 int sched_add(const char *name, uint32_t interval_ms, int32_t count,
               sched_callback_t cb, void *arg)
 {
-    if (!name || !cb || interval_ms == 0) {
+    if (!name || name[0] == '\0' || !cb || interval_ms == 0) {
         return CLAW_ERROR;
     }
 

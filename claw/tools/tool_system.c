@@ -109,6 +109,7 @@ static const char schema_empty[] =
 #include "esp_system.h"
 #include "esp_chip_info.h"
 #include "esp_heap_caps.h"
+#include "esp_mac.h"
 #include "esp_timer.h"
 
 static claw_err_t tool_system_info(struct claw_tool *tool,
@@ -151,9 +152,23 @@ static claw_err_t tool_system_info(struct claw_tool *tool,
     cJSON_AddNumberToObject(result, "cores", ci.cores);
     cJSON_AddNumberToObject(result, "revision", ci.revision);
 
+    uint8_t mac[6];
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
+        char mac_str[18];
+        snprintf(mac_str, sizeof(mac_str),
+                 "%02x:%02x:%02x:%02x:%02x:%02x",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        cJSON_AddStringToObject(result, "mac", mac_str);
+    }
+
     int64_t uptime_us = esp_timer_get_time();
     cJSON_AddNumberToObject(result, "uptime_seconds",
                             (double)uptime_us / 1000000.0);
+
+    size_t free_heap = esp_get_free_heap_size();
+    size_t min_heap = esp_get_minimum_free_heap_size();
+    cJSON_AddNumberToObject(result, "free_heap", (double)free_heap);
+    cJSON_AddNumberToObject(result, "min_free_heap", (double)min_heap);
 
     return CLAW_OK;
 }

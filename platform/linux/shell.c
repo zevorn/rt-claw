@@ -395,7 +395,7 @@ void linux_shell_loop(void)
     printf("\n");
 
     while (!g_exit_flag) {
-        printf("\n" CLR_CYAN "<You> " CLR_RESET);
+        printf("\n" CLR_CYAN "rt-claw chat> " CLR_RESET);
         fflush(stdout);
 
         int len = shell_read_line(input, sizeof(input));

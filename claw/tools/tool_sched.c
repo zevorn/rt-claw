@@ -407,6 +407,11 @@ static claw_err_t tool_schedule_task(struct claw_tool *tool,
     }
 
     const char *name = name_j->valuestring;
+    if (name[0] == '\0') {
+        cJSON_AddStringToObject(result, "error",
+                                "task name must not be empty");
+        return CLAW_ERROR;
+    }
     int interval_s = interval_j->valueint;
     int count = -1;
 
