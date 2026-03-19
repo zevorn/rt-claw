@@ -44,6 +44,10 @@ claw_err_t claw_driver_collect_from_section(void)
 {
     const struct claw_driver **p;
 
+    if (!__start_claw_drivers || !__stop_claw_drivers) {
+        return CLAW_OK;
+    }
+
     claw_for_each_registered(p, __start_claw_drivers,
                              __stop_claw_drivers) {
         claw_err_t err = claw_driver_register(

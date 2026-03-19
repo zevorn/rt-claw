@@ -48,6 +48,10 @@ claw_err_t claw_service_collect_from_section(void)
 {
     const struct claw_service **p;
 
+    if (!__start_claw_services || !__stop_claw_services) {
+        return CLAW_OK;
+    }
+
     claw_for_each_registered(p, __start_claw_services,
                              __stop_claw_services) {
         claw_err_t err = claw_service_register(

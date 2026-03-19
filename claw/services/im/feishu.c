@@ -1382,3 +1382,9 @@ const char *feishu_get_app_id(void)        { return ""; }
 const char *feishu_get_app_secret(void)    { return ""; }
 
 #endif /* CONFIG_RTCLAW_FEISHU_ENABLE */
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *feishu_deps[] = { "ai_engine", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(feishu, "feishu",
+    feishu_init, feishu_start, feishu_stop, feishu_deps);

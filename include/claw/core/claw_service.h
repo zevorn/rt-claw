@@ -81,4 +81,65 @@ enum claw_service_state claw_service_get_state(const struct claw_service *svc);
  */
 claw_err_t claw_service_collect_from_section(void);
 
+/*
+ * Convenience macro to define a service that wraps legacy
+ * init/start/stop functions (no context struct yet).
+ * Usage:
+ *   CLAW_DEFINE_SIMPLE_SERVICE(gateway, "gateway",
+ *       gateway_init, NULL, gateway_stop, NULL);
+ */
+/*
+ * Helper: wrap a legacy int (*fn)(void) into claw_err_t.
+ * Returns CLAW_OK on success, CLAW_ERR_GENERIC on failure.
+ */
+static inline claw_err_t claw_svc_wrap_init(int (*fn)(void),
+                                            struct claw_service *svc)
+{
+    (void)svc;
+    if (!fn) {
+        return CLAW_OK;
+    }
+    return fn() == CLAW_OK ? CLAW_OK : CLAW_ERR_GENERIC;
+}
+
+static inline claw_err_t claw_svc_wrap_start(int (*fn)(void),
+                                             struct claw_service *svc)
+{
+    (void)svc;
+    if (!fn) {
+        return CLAW_OK;
+    }
+    return fn() == CLAW_OK ? CLAW_OK : CLAW_ERR_GENERIC;
+}
+
+static inline void claw_svc_wrap_stop(void (*fn)(void),
+                                      struct claw_service *svc)
+{
+    (void)svc;
+    if (fn) {
+        fn();
+    }
+}
+
+#define CLAW_DEFINE_SIMPLE_SERVICE(id, svc_name,                        \
+                                   init_fn, start_fn, stop_fn, dep_arr) \
+    static claw_err_t id##_svc_init(struct claw_service *svc)           \
+    { return claw_svc_wrap_init(init_fn, svc); }                        \
+    static claw_err_t id##_svc_start(struct claw_service *svc)          \
+    { return claw_svc_wrap_start(start_fn, svc); }                      \
+    static void id##_svc_stop(struct claw_service *svc)                 \
+    { claw_svc_wrap_stop(stop_fn, svc); }                               \
+    static const struct claw_service_ops id##_svc_ops = {               \
+        .init  = id##_svc_init,                                         \
+        .start = id##_svc_start,                                        \
+        .stop  = id##_svc_stop,                                         \
+    };                                                                  \
+    static struct claw_service id##_svc = {                             \
+        .name  = (svc_name),                                            \
+        .ops   = &id##_svc_ops,                                         \
+        .deps  = (dep_arr),                                             \
+        .state = CLAW_SVC_CREATED,                                      \
+    };                                                                  \
+    CLAW_SERVICE_REGISTER(id, &id##_svc)
+
 #endif /* CLAW_CORE_CLAW_SERVICE_H */

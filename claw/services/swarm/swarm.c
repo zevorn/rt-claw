@@ -702,3 +702,9 @@ void swarm_list_nodes(void)
 
     claw_mutex_unlock(swarm_lock);
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *swarm_deps[] = { "gateway", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(swarm, "swarm",
+    swarm_init, swarm_start, swarm_stop, swarm_deps);

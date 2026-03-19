@@ -312,3 +312,10 @@ void ota_service_stop(void)
 }
 
 #endif /* CONFIG_RTCLAW_OTA_ENABLE */
+
+/* OOP service registration */
+#ifdef CONFIG_RTCLAW_OTA_ENABLE
+#include "claw/core/claw_service.h"
+CLAW_DEFINE_SIMPLE_SERVICE(ota, "ota",
+    ota_service_init, ota_service_start, ota_service_stop, NULL);
+#endif

@@ -1174,3 +1174,9 @@ int ai_ping(void)
     /* Any HTTP response means the API is reachable */
     return (status > 0) ? CLAW_OK : CLAW_ERROR;
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *ai_deps[] = { "gateway", "net", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(ai_engine, "ai_engine",
+    ai_engine_init, NULL, ai_engine_stop, ai_deps);

@@ -92,6 +92,8 @@ struct claw_thread *claw_thread_create(const char *name,
         return NULL;
     }
     ft->base.name = name;
+    ft->base.priority = priority;
+    ft->base.stack_size = stack_size;
     ft->entry = entry;
     ft->arg = arg;
 
@@ -150,6 +152,9 @@ struct claw_mutex *claw_mutex_create(const char *name)
 
 int claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms)
 {
+    if (!mutex) {
+        return CLAW_ERR_INVALID;
+    }
     struct freertos_mutex *fm = container_of(mutex,
                                              struct freertos_mutex, base);
     if (xSemaphoreTake(fm->handle, ms_to_ticks(timeout_ms)) == pdTRUE) {
@@ -195,6 +200,9 @@ struct claw_sem *claw_sem_create(const char *name, uint32_t init_value)
 
 int claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms)
 {
+    if (!sem) {
+        return CLAW_ERR_INVALID;
+    }
     struct freertos_sem *fs = container_of(sem,
                                            struct freertos_sem, base);
     if (xSemaphoreTake(fs->handle, ms_to_ticks(timeout_ms)) == pdTRUE) {

@@ -78,6 +78,8 @@ struct claw_thread *claw_thread_create(const char *name,
     }
 
     t->base.name = name;
+    t->base.priority = priority;
+    t->base.stack_size = stack_size;
     t->entry = entry;
     t->arg = arg;
     atomic_init(&t->exit_flag, false);
@@ -157,6 +159,9 @@ int claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms)
     if (!mutex) {
         return CLAW_ERROR;
     }
+    if (!mutex) {
+        return CLAW_ERR_INVALID;
+    }
     struct linux_mutex *m = container_of(mutex,
                                          struct linux_mutex, base);
 
@@ -223,6 +228,9 @@ int claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms)
 {
     if (!sem) {
         return CLAW_ERROR;
+    }
+    if (!sem) {
+        return CLAW_ERR_INVALID;
     }
     struct linux_sem *s = container_of(sem, struct linux_sem, base);
 

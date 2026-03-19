@@ -362,3 +362,11 @@ int heartbeat_llm_online(void)
 {
     return s_llm_state;
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+#ifdef CONFIG_RTCLAW_HEARTBEAT_ENABLE
+static const char *heartbeat_deps[] = { "sched", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(heartbeat, "heartbeat",
+    heartbeat_init, NULL, heartbeat_stop, heartbeat_deps);
+#endif

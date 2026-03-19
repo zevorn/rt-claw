@@ -70,6 +70,8 @@ struct claw_thread *claw_thread_create(const char *name,
         return NULL;
     }
     rt->base.name = name;
+    rt->base.priority = priority;
+    rt->base.stack_size = stack_size;
     rt->handle = rt_thread_create(name, entry, arg,
                                   stack_size, priority, 20);
     if (rt->handle == RT_NULL) {
@@ -127,6 +129,9 @@ struct claw_mutex *claw_mutex_create(const char *name)
 
 int claw_mutex_lock(struct claw_mutex *mutex, uint32_t timeout_ms)
 {
+    if (!mutex) {
+        return CLAW_ERR_INVALID;
+    }
     struct rtthread_mutex *rt = container_of(mutex,
                                              struct rtthread_mutex,
                                              base);
@@ -181,6 +186,9 @@ struct claw_sem *claw_sem_create(const char *name, uint32_t init_value)
 
 int claw_sem_take(struct claw_sem *sem, uint32_t timeout_ms)
 {
+    if (!sem) {
+        return CLAW_ERR_INVALID;
+    }
     struct rtthread_sem *rt = container_of(sem,
                                            struct rtthread_sem,
                                            base);

@@ -188,3 +188,8 @@ void gateway_stop(void)
         gw_mq = NULL;
     }
 }
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+CLAW_DEFINE_SIMPLE_SERVICE(gateway, "gateway",
+    gateway_init, NULL, gateway_stop, NULL);

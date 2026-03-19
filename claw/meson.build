@@ -3,6 +3,7 @@ src_files = files(
     'core/claw_errno.c',
     'core/service_core.c',
     'core/driver_core.c',
+    'core/tool_core.c',
     'core/gateway.c',
     'core/scheduler.c',
     'services/ai/ai_engine.c',
@@ -82,6 +83,6 @@ rtclaw_lib = static_library('rtclaw', src_files,
 )
 
 rtclaw_dep = declare_dependency(
-    link_with: rtclaw_lib,
+    link_whole: rtclaw_lib,
     include_directories: [claw_root_inc, claw_inc],
 )

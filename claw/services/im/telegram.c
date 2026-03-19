@@ -577,3 +577,9 @@ void telegram_set_bot_token(const char *t) { (void)t; }
 const char *telegram_get_bot_token(void)   { return ""; }
 
 #endif /* CONFIG_RTCLAW_TELEGRAM_ENABLE */
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+static const char *telegram_deps[] = { "ai_engine", NULL };
+CLAW_DEFINE_SIMPLE_SERVICE(telegram, "telegram",
+    telegram_init, telegram_start, telegram_stop, telegram_deps);

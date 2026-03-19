@@ -51,14 +51,24 @@ struct claw_tool;
 /* On platforms with custom linker scripts, define them explicitly.    */
 /* ------------------------------------------------------------------ */
 
-extern const struct claw_service *__start_claw_services[];
-extern const struct claw_service *__stop_claw_services[];
+/*
+ * Weak references: sections may be empty if no components registered.
+ * When empty, __start == __stop == NULL (or both point to same address).
+ */
+extern const struct claw_service *__start_claw_services[]
+    __attribute__((weak));
+extern const struct claw_service *__stop_claw_services[]
+    __attribute__((weak));
 
-extern const struct claw_driver *__start_claw_drivers[];
-extern const struct claw_driver *__stop_claw_drivers[];
+extern const struct claw_driver *__start_claw_drivers[]
+    __attribute__((weak));
+extern const struct claw_driver *__stop_claw_drivers[]
+    __attribute__((weak));
 
-extern const struct claw_tool *__start_claw_tools[];
-extern const struct claw_tool *__stop_claw_tools[];
+extern const struct claw_tool *__start_claw_tools[]
+    __attribute__((weak));
+extern const struct claw_tool *__stop_claw_tools[]
+    __attribute__((weak));
 
 /* Iterate over all registered entries in a linker section */
 #define claw_for_each_registered(ptr, start, stop)                      \

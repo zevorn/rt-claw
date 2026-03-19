@@ -28,6 +28,8 @@ extern "C" {
 
 struct claw_thread {
     const char *name;
+    uint32_t    priority;
+    uint32_t    stack_size;
 };
 
 struct claw_mutex {

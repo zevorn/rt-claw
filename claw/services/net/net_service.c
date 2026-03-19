@@ -403,3 +403,8 @@ void net_print_ipinfo(void)
 }
 
 #endif
+
+/* OOP service registration */
+#include "claw/core/claw_service.h"
+CLAW_DEFINE_SIMPLE_SERVICE(net, "net",
+    net_service_init, NULL, NULL, NULL);
