@@ -249,9 +249,7 @@ static void test_skill_try_command_no_slash(void)
     ai_skill_init();
     ai_skill_register("bare", "bare skill", "bare: %s");
 
-    char reply[256];
     /* Without slash — should still resolve */
-    char *argv[] = { "bare" };
     /*
      * We can only test that find succeeds (bare exists).
      * Actual execution calls ai_chat_raw which needs AI engine.

@@ -9,9 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 
-static int _test_total;
-static int _test_fail;
-static int _test_current_failed;
+static int __attribute__((unused)) _test_total;
+static int __attribute__((unused)) _test_fail;
+static int __attribute__((unused)) _test_current_failed;
 
 #define TEST_BEGIN() do { _test_total = 0; _test_fail = 0; } while (0)
 

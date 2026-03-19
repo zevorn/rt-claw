@@ -105,7 +105,7 @@ void board_early_init(void)
     i2c_master_bus_handle_t bus0 = create_i2c_bus(V1_SDA, V1_SCL,
                                                    I2C_NUM_0);
     int oled_on_v1 = 0;
-    int pa_pin = V1_PA;
+    int pa_pin __attribute__((unused)) = V1_PA;
 
     if (bus0) {
         i2c_scan(bus0, "V1 SDA=3 SCL=4");

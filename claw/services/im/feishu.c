@@ -1415,42 +1415,18 @@ static void feishu_svc_stop(struct claw_service *svc)
 
 #else /* !CONFIG_RTCLAW_FEISHU_ENABLE */
 
-/* Minimal context when Feishu is disabled */
-struct feishu_ctx {
-    struct claw_service base;
-};
-
-CLAW_ASSERT_EMBEDDED_FIRST(struct feishu_ctx, base);
-
-static struct feishu_ctx s_feishu;
-
 void feishu_set_app_id(const char *id)     { (void)id; }
 void feishu_set_app_secret(const char *s)  { (void)s; }
 const char *feishu_get_app_id(void)        { return ""; }
 const char *feishu_get_app_secret(void)    { return ""; }
-
-static claw_err_t feishu_svc_init(struct claw_service *svc)
-{
-    (void)svc;
-    return CLAW_OK;
-}
-
-static claw_err_t feishu_svc_start(struct claw_service *svc)
-{
-    (void)svc;
-    return CLAW_OK;
-}
-
-static void feishu_svc_stop(struct claw_service *svc)
-{
-    (void)svc;
-}
 
 #endif /* CONFIG_RTCLAW_FEISHU_ENABLE */
 
 /* ------------------------------------------------------------------ */
 /*  OOP service registration                                           */
 /* ------------------------------------------------------------------ */
+
+#ifdef CONFIG_RTCLAW_FEISHU_ENABLE
 
 static const char *feishu_deps[] = { "ai_engine", "tools", NULL };
 
@@ -1469,6 +1445,6 @@ static struct feishu_ctx s_feishu = {
     },
 };
 
-#ifdef CONFIG_RTCLAW_FEISHU_ENABLE
 CLAW_SERVICE_REGISTER(feishu, &s_feishu.base);
-#endif
+
+#endif /* CONFIG_RTCLAW_FEISHU_ENABLE */

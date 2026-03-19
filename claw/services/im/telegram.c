@@ -618,30 +618,6 @@ void telegram_stop(void)
 
 #else /* !CONFIG_RTCLAW_TELEGRAM_ENABLE */
 
-/* Minimal context for disabled builds */
-struct telegram_ctx {
-    struct claw_service base;
-};
-
-static struct telegram_ctx s_tg;
-
-static claw_err_t telegram_svc_init(struct claw_service *svc)
-{
-    (void)svc;
-    return CLAW_OK;
-}
-
-static claw_err_t telegram_svc_start(struct claw_service *svc)
-{
-    (void)svc;
-    return CLAW_OK;
-}
-
-static void telegram_svc_stop(struct claw_service *svc)
-{
-    (void)svc;
-}
-
 int  telegram_init(void)  { return 0; }
 int  telegram_start(void) { return 0; }
 void telegram_stop(void)  {}
@@ -653,6 +629,8 @@ const char *telegram_get_bot_token(void)   { return ""; }
 /* ------------------------------------------------------------------ */
 /*  OOP service registration                                           */
 /* ------------------------------------------------------------------ */
+
+#ifdef CONFIG_RTCLAW_TELEGRAM_ENABLE
 
 static const char *telegram_deps[] = { "ai_engine", "tools", NULL };
 
@@ -671,6 +649,6 @@ static struct telegram_ctx s_tg = {
     },
 };
 
-#ifdef CONFIG_RTCLAW_TELEGRAM_ENABLE
 CLAW_SERVICE_REGISTER(telegram, &s_tg.base);
-#endif
+
+#endif /* CONFIG_RTCLAW_TELEGRAM_ENABLE */
