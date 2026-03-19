@@ -202,7 +202,17 @@ void es8311_audio_set_volume(int vol)
 void es8311_audio_enable_output(int enable)
 {
     if (s_pa_pin >= 0) {
-        gpio_set_level(s_pa_pin, enable ? 1 : 0);
+        if (enable) {
+            gpio_set_level(s_pa_pin, 1);
+            /* Let PA stabilize before sending audio */
+            vTaskDelay(pdMS_TO_TICKS(50));
+        } else {
+            /* Flush silence to drain I2S DMA before PA off */
+            int16_t silence[240] = {0};
+            es8311_audio_write(silence, 240);
+            vTaskDelay(pdMS_TO_TICKS(30));
+            gpio_set_level(s_pa_pin, 0);
+        }
     }
 }
 
@@ -215,6 +225,43 @@ void es8311_audio_write(const int16_t *data, size_t samples)
                         samples * sizeof(int16_t));
 }
 
+/*
+ * Generate a sine-wave tone.  Caller must manage PA enable/disable
+ * to avoid repeated PA toggling (pop noise) during melodies.
+ */
+static void generate_tone(int freq_hz, int duration_ms)
+{
+    int total_samples = SAMPLE_RATE * duration_ms / 1000;
+    int fade_samples = SAMPLE_RATE / 100; /* 10ms fade */
+    int16_t frame[240];
+    int pos = 0;
+
+    if (fade_samples > total_samples / 2) {
+        fade_samples = total_samples / 2;
+    }
+
+    while (pos < total_samples) {
+        int chunk = total_samples - pos;
+        if (chunk > 240) {
+            chunk = 240;
+        }
+        for (int i = 0; i < chunk; i++) {
+            int s = pos + i;
+            float t = (float)s / SAMPLE_RATE;
+            float val = sinf(2.0f * 3.14159f * freq_hz * t);
+            float env = 1.0f;
+            if (s < fade_samples) {
+                env = (float)s / fade_samples;
+            } else if (s >= total_samples - fade_samples) {
+                env = (float)(total_samples - 1 - s) / fade_samples;
+            }
+            frame[i] = (int16_t)(val * env * 16000);
+        }
+        es8311_audio_write(frame, chunk);
+        pos += chunk;
+    }
+}
+
 void es8311_audio_beep(int freq_hz, int duration_ms, int volume)
 {
     if (!s_initialized) {
@@ -223,29 +270,7 @@ void es8311_audio_beep(int freq_hz, int duration_ms, int volume)
 
     es8311_audio_set_volume(volume);
     es8311_audio_enable_output(1);
-
-    /*
-     * Generate sine wave: 24kHz sample rate, 16-bit mono.
-     * Use 10ms frames (240 samples) to keep stack usage low.
-     */
-    int total_samples = SAMPLE_RATE * duration_ms / 1000;
-    int16_t frame[240];
-    int pos = 0;
-
-    while (pos < total_samples) {
-        int chunk = total_samples - pos;
-        if (chunk > 240) {
-            chunk = 240;
-        }
-        for (int i = 0; i < chunk; i++) {
-            float t = (float)(pos + i) / SAMPLE_RATE;
-            float val = sinf(2.0f * 3.14159f * freq_hz * t);
-            frame[i] = (int16_t)(val * 16000);
-        }
-        es8311_audio_write(frame, chunk);
-        pos += chunk;
-    }
-
+    generate_tone(freq_hz, duration_ms);
     es8311_audio_enable_output(0);
 }
 
@@ -263,10 +288,9 @@ static void play_melody(const note_t *notes, int count, int vol)
 
     for (int i = 0; i < count; i++) {
         if (notes[i].freq == 0) {
-            /* Silence (rest) */
             vTaskDelay(pdMS_TO_TICKS(notes[i].ms));
         } else {
-            es8311_audio_beep(notes[i].freq, notes[i].ms, vol);
+            generate_tone(notes[i].freq, notes[i].ms);
         }
     }
 
