@@ -9,6 +9,6 @@ entries:
     claw_registry -> flash_rodata
 
 [mapping:claw_registry]
-archive: librt_claw.a
+archive: *
 entries:
     * (claw_registry_default)
