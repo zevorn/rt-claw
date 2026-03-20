@@ -303,6 +303,22 @@ static int shell_read_line(char *buf, int size)
     }
 
     buf[len] = '\0';
+
+    /*
+     * If we exited because the buffer is full (not because of Enter),
+     * drain remaining bytes until newline so they don't leak into the
+     * next command.
+     */
+    if (len >= size - 1) {
+        uint8_t discard;
+        while (claw_console_read(&discard, 1, UINT32_MAX) > 0) {
+            if (discard == '\r' || discard == '\n') {
+                break;
+            }
+        }
+        claw_console_write("\r\n", 2);
+    }
+
     return len;
 }
 

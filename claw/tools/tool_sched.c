@@ -375,6 +375,8 @@ static void sched_nvs_restore(void)
 
         uint32_t interval_s =
             rec.interval_s > 0 ? rec.interval_s : 60;
+        ctx->interval_s = interval_s;
+        ctx->count = rec.count;
 
         if (sched_add(rec.name, interval_s * 1000,
                       rec.count,

@@ -218,6 +218,18 @@ static int shell_read_line(char *buf, int size)
     }
 
     buf[len] = '\0';
+
+    /* Drain remaining input until newline when buffer is full */
+    if (len >= size - 1) {
+        unsigned char discard;
+        while (read(STDIN_FILENO, &discard, 1) > 0) {
+            if (discard == '\r' || discard == '\n') {
+                break;
+            }
+        }
+        write(STDOUT_FILENO, "\r\n", 2);
+    }
+
     return len;
 }
 
