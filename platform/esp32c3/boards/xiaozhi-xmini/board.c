@@ -153,7 +153,7 @@ void board_early_init(void)
     if (bus0) {
         if (ssd1306_init_on_bus(bus0) == 0) {
             s_oled_ready = 1;
-            ssd1306_write_line(0, "  rt-claw v0.1.0");
+            ssd1306_write_line(0, "  rt-claw v" RT_CLAW_VERSION);
             ssd1306_write_line(1, "  xmini-c3");
             ssd1306_write_line(2, s_audio_ready
                                ? "  Audio: OK" : "  Audio: N/A");

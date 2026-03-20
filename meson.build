@@ -1,5 +1,5 @@
 project('rt-claw', 'c',
-    version: '0.1.0',
+    version: '0.2.0',
     default_options: [
         'c_std=gnu99',
         'warning_level=2',
@@ -97,6 +97,21 @@ _int_overrides = {
 
 conf_data = configuration_data()
 _has_any = false
+
+# Version from git describe (e.g. "v0.2.0" or "v0.2.0-3-gabcdef")
+_git_ver = run_command('git', 'describe', '--tags', '--always',
+                       '--dirty=-dirty', check: false)
+if _git_ver.returncode() == 0
+    _ver_str = _git_ver.stdout().strip()
+    # Strip leading 'v' prefix
+    if _ver_str.startswith('v')
+        _ver_str = _ver_str.substring(1)
+    endif
+else
+    _ver_str = meson.project_version()
+endif
+conf_data.set_quoted('RT_CLAW_VERSION', _ver_str)
+_has_any = true
 
 foreach opt_name, pair : _str_overrides
     _val = get_option(opt_name)

@@ -34,7 +34,9 @@
 #include "claw_gen_config.h"
 #endif
 
-#define RT_CLAW_VERSION         "0.1.0"
+#ifndef RT_CLAW_VERSION
+#define RT_CLAW_VERSION         "0.2.0"
+#endif
 
 /* ---- Gateway ---- */
 #define CLAW_GW_MSG_POOL_SIZE   16

@@ -10,6 +10,9 @@
 #ifndef CLAW_GEN_CONFIG_H
 #define CLAW_GEN_CONFIG_H
 
+/* Version (from git describe) */
+#mesondefine RT_CLAW_VERSION
+
 /* AI Engine */
 #mesondefine CONFIG_RTCLAW_AI_API_KEY
 #mesondefine CONFIG_RTCLAW_AI_API_URL
