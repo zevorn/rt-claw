@@ -17,15 +17,6 @@
 int claw_tools_init(void)
 {
     /*
-     * On non-ESP-IDF platforms, collect tools from linker
-     * sections if not already done by claw_init().
-     * On ESP-IDF, constructors handle registration.
-     */
-#ifndef CLAW_PLATFORM_ESP_IDF
-    claw_tool_core_collect_from_section();
-#endif
-
-    /*
      * Remove LCD tools if LCD hardware is not available.
      * claw_lcd_init() runs before services start, so
      * claw_lcd_available() is authoritative by now.
