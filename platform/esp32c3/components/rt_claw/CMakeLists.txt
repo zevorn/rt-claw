@@ -55,7 +55,7 @@ target_compile_options(${COMPONENT_LIB} PRIVATE -Werror)
 
 # Version from git describe
 execute_process(
-    COMMAND git describe --tags --always --dirty=-dirty
+    COMMAND git describe --tags --dirty=-dirty
     WORKING_DIRECTORY ${RT_CLAW_ROOT}
     OUTPUT_VARIABLE _GIT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET RESULT_VARIABLE _GIT_RC

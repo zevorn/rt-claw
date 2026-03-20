@@ -45,10 +45,13 @@ static void ai_boot_test_thread(void *arg)
 int claw_init(void)
 {
     claw_log_raw("\n");
-    claw_log_raw("  +-----------------------------------------+\n");
-    claw_log_raw("  |          rt-claw v%s                 |\n", RT_CLAW_VERSION);
-    claw_log_raw("  |  Real-Time Claw / Swarm Intelligence    |\n");
-    claw_log_raw("  +-----------------------------------------+\n");
+    claw_log_raw("         __          __\n");
+    claw_log_raw("   _____/ /_  ______/ /___ __      __\n");
+    claw_log_raw("  / ___/ __/ / ___/ / __ `/ | /| / /\n");
+    claw_log_raw(" / /  / /_  / /__/ / /_/ /| |/ |/ /\n");
+    claw_log_raw("/_/   \\__/  \\___/_/\\__,_/ |__/|__/\n");
+    claw_log_raw("\n");
+    claw_log_raw("  v%s\n", RT_CLAW_VERSION);
     claw_log_raw("\n");
 
     /*

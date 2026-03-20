@@ -98,12 +98,13 @@ _int_overrides = {
 conf_data = configuration_data()
 _has_any = false
 
-# Version from git describe (e.g. "v0.2.0" or "v0.2.0-3-gabcdef")
-_git_ver = run_command('git', 'describe', '--tags', '--always',
+# Version from git describe (e.g. "v0.2.0" or "v0.2.0-3-gabcdef").
+# Without --always so it fails cleanly when no tag is reachable
+# (e.g. shallow CI clone), falling back to meson.project_version().
+_git_ver = run_command('git', 'describe', '--tags',
                        '--dirty=-dirty', check: false)
 if _git_ver.returncode() == 0
     _ver_str = _git_ver.stdout().strip()
-    # Strip leading 'v' prefix
     if _ver_str.startswith('v')
         _ver_str = _ver_str.substring(1)
     endif
