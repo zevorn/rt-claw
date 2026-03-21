@@ -197,13 +197,37 @@ esp_err_t wifi_manager_set_credentials(const char *ssid,
                                        const char *password)
 {
     nvs_handle_t nvs;
-    ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs));
-    ESP_ERROR_CHECK(nvs_set_str(nvs, NVS_KEY_SSID, ssid));
-    ESP_ERROR_CHECK(nvs_set_str(nvs, NVS_KEY_PASS,
-                                password ? password : ""));
-    ESP_ERROR_CHECK(nvs_commit(nvs));
-    nvs_close(nvs);
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS open failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
+    err = nvs_set_str(nvs, NVS_KEY_SSID, ssid);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS set SSID failed: %s",
+                 esp_err_to_name(err));
+        nvs_close(nvs);
+        return err;
+    }
+
+    err = nvs_set_str(nvs, NVS_KEY_PASS, password ? password : "");
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS set password failed: %s",
+                 esp_err_to_name(err));
+        nvs_close(nvs);
+        return err;
+    }
+
+    err = nvs_commit(nvs);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS commit failed: %s",
+                 esp_err_to_name(err));
+        nvs_close(nvs);
+        return err;
+    }
+
+    nvs_close(nvs);
     ESP_LOGI(TAG, "credentials saved for SSID: %s", ssid);
     return ESP_OK;
 }

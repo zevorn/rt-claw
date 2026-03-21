@@ -36,8 +36,12 @@ int claw_kv_set_str(const char *ns, const char *key, const char *value)
     if (nvs_open(ns, NVS_READWRITE, &h) != ESP_OK) {
         return CLAW_ERROR;
     }
-    nvs_set_str(h, key, value);
-    esp_err_t err = nvs_commit(h);
+    esp_err_t err = nvs_set_str(h, key, value);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return CLAW_ERROR;
+    }
+    err = nvs_commit(h);
     nvs_close(h);
     return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
 }
@@ -62,8 +66,12 @@ int claw_kv_set_blob(const char *ns, const char *key,
     if (nvs_open(ns, NVS_READWRITE, &h) != ESP_OK) {
         return CLAW_ERROR;
     }
-    nvs_set_blob(h, key, data, len);
-    esp_err_t err = nvs_commit(h);
+    esp_err_t err = nvs_set_blob(h, key, data, len);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return CLAW_ERROR;
+    }
+    err = nvs_commit(h);
     nvs_close(h);
     return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
 }
@@ -86,8 +94,12 @@ int claw_kv_set_u8(const char *ns, const char *key, uint8_t val)
     if (nvs_open(ns, NVS_READWRITE, &h) != ESP_OK) {
         return CLAW_ERROR;
     }
-    nvs_set_u8(h, key, val);
-    esp_err_t err = nvs_commit(h);
+    esp_err_t err = nvs_set_u8(h, key, val);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return CLAW_ERROR;
+    }
+    err = nvs_commit(h);
     nvs_close(h);
     return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
 }
@@ -109,8 +121,12 @@ int claw_kv_delete(const char *ns, const char *key)
     if (nvs_open(ns, NVS_READWRITE, &h) != ESP_OK) {
         return CLAW_ERROR;
     }
-    nvs_erase_key(h, key);
-    esp_err_t err = nvs_commit(h);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return CLAW_ERROR;
+    }
+    err = nvs_commit(h);
     nvs_close(h);
     return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
 }
@@ -121,8 +137,12 @@ int claw_kv_erase_ns(const char *ns)
     if (nvs_open(ns, NVS_READWRITE, &h) != ESP_OK) {
         return CLAW_ERROR;
     }
-    nvs_erase_all(h);
-    esp_err_t err = nvs_commit(h);
+    esp_err_t err = nvs_erase_all(h);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return CLAW_ERROR;
+    }
+    err = nvs_commit(h);
     nvs_close(h);
     return (err == ESP_OK) ? CLAW_OK : CLAW_ERROR;
 }
