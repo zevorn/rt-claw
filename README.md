@@ -116,11 +116,11 @@ Inspired by [OpenClaw](https://github.com/openclaw/openclaw), [Nanobot](https://
 
 ## Star History
 
-<a href="https://star-history.com/#zevorn/rt-claw&Date">
+<a href="https://www.star-history.com/?repos=zevorn%2Frt-claw&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=zevorn/rt-claw&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=zevorn/rt-claw&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=zevorn/rt-claw&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=zevorn/rt-claw&type=date&legend=top-left" />
  </picture>
 </a>
 
