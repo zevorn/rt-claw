@@ -10,6 +10,7 @@
  * Auto-detects by probing ES8311 on each I2C bus.
  */
 
+#include "claw/claw_config.h"
 #include "claw_board.h"
 #include "drivers/display/espressif/ssd1306_oled.h"
 #ifdef CONFIG_RTCLAW_AUDIO_ENABLE
