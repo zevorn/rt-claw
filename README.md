@@ -17,7 +17,7 @@
 <p align="center"><a href="README_zh.md">中文</a> | <strong>English</strong></p>
 
 **RT-Claw** is an [OpenClaw](https://github.com/openclaw/openclaw)-inspired intelligent assistant for embedded devices.
-Multi-RTOS support via OSAL. Build swarm intelligence with networked nodes.
+Multi-OS support via OSAL (FreeRTOS, RT-Thread, Linux). Build swarm intelligence with networked nodes.
 ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimiclaw).
 
 > Deploy your own AI assistant on hardware that costs just one dollar — seamlessly integrated into your daily workflow, efficiently bridging the digital and physical worlds.
@@ -39,7 +39,7 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 | Swarm Intelligence | Node discovery, heartbeat, capability bitmap, remote tool invocation across nodes | Done |
 | Scheduled Tasks | Timer-driven task execution and periodic automation; AI can create/list/remove tasks | Done |
 | Chat-first Shell | UART REPL with insert-mode editing, tab completion, UTF-8; direct input goes to AI, /commands for system | Done |
-| OSAL | Write once, run on FreeRTOS and RT-Thread with zero code changes | Done |
+| OSAL | Write once, run on FreeRTOS, RT-Thread and Linux with zero code changes | Done |
 | Gateway | Thread-safe message routing between services | Done |
 | Networking | Ethernet (QEMU) and WiFi (real hardware); HTTP client for API calls | Done |
 | IM Integrations | Feishu (Lark) via WebSocket long connection; planned: DingTalk, QQ, Telegram | In Progress |
@@ -51,35 +51,36 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 ## Architecture
 
 ```
-+--------------------------------------------------------------+
-|                     rt-claw Application                      |
-|    gateway | net | swarm | ai_engine | shell | sched | im    |
-+--------------------------------------------------------------+
-|                      skills (AI Skills)                      |
-|             (one skill composes multiple tools)              |
-+--------------------------------------------------------------+
-|                       tools (Tool Use)                       |
-| gpio | system | lcd | audio | http | scheduler | memory      |
-+--------------------------------------------------------------+
-|                    drivers (Hardware BSP)                    |
-| WiFi | ES8311 | SSD1306 | serial | LCD framebuffer           |
-+--------------------------------------------------------------+
-|                  osal/claw_os.h (OSAL API)                   |
-+-------------------+-----------------------+------------------+
-| FreeRTOS (IDF)    | FreeRTOS (standalone) |    RT-Thread     |
-+-------------------+-----------------------+------------------+
-| ESP32-C3 / S3     | QEMU Zynq-A9 (GEM)    | QEMU vexpress-a9 |
-+-------------------+-----------------------+------------------+
++----------------------------------------------------------------+
+|                      rt-claw Application                       |
+|     gateway | net | swarm | ai_engine | shell | sched | im     |
++----------------------------------------------------------------+
+|                       skills (AI Skills)                       |
+|              (one skill composes multiple tools)               |
++----------------------------------------------------------------+
+|                        tools (Tool Use)                        |
+|    gpio | system | lcd | audio | http | scheduler | memory     |
++----------------------------------------------------------------+
+|                     drivers (Hardware BSP)                     |
+|       WiFi | ES8311 | SSD1306 | serial | LCD framebuffer       |
++----------------------------------------------------------------+
+|                   osal/claw_os.h (OSAL API)                    |
++----------------+----------------------+--------------+---------+
+| FreeRTOS (IDF) | FreeRTOS(standalone) |  RT-Thread   |  Linux  |
++----------------+----------------------+--------------+---------+
+| ESP32-C3 / S3  |  QEMU Zynq-A9 (GEM)  | vexpress-a9  |  Native |
++----------------+----------------------+--------------+---------+
 ```
 
 ## Supported Platforms
 
-| Platform | Target | RTOS | Build | Status |
-|----------|--------|------|-------|--------|
-| ESP32-C3 | QEMU, xiaozhi-xmini, generic devkit | ESP-IDF + FreeRTOS | Meson + CMake | Verified |
-| ESP32-S3 | QEMU, real hardware | ESP-IDF + FreeRTOS | Meson + CMake | Verified |
-| Zynq-A9 | QEMU | FreeRTOS + FreeRTOS+TCP | Meson (full firmware) | Verified |
+| Platform | Target | OS | Build | Status |
+|----------|--------|----|-------|--------|
+| ESP32-C3 | QEMU, xiaozhi-xmini, generic devkit | FreeRTOS (ESP-IDF) | Meson + CMake | Verified |
+| ESP32-S3 | QEMU, real hardware | FreeRTOS (ESP-IDF) | Meson + CMake | Verified |
+| Zynq-A9 | QEMU | FreeRTOS (standalone) | Meson (full firmware) | Verified |
 | vexpress-a9 | QEMU | RT-Thread | Meson + SCons | Verified |
+| Linux | Native (x86_64, aarch64) | Linux (pthreads) | Meson | Verified |
 
 ## Quick Start
 

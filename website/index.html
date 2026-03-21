@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RT-Claw — Making AI Assistants Cheap Again</title>
-    <meta name="description" content="RT-Claw: OpenClaw-inspired AI assistant on embedded RTOS. Deploy your own AI on $1 hardware. Flash firmware directly from your browser.">
+    <meta name="description" content="RT-Claw: OpenClaw-inspired AI assistant on embedded systems (FreeRTOS, RT-Thread, Linux). Deploy your own AI on $1 hardware. Flash firmware directly from your browser.">
     <link rel="icon" type="image/png" href="img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,6 +314,7 @@
         .platform-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent2), var(--accent3)); }
         .platform-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
         .platform-card:nth-child(4)::before { background: linear-gradient(90deg, #8b5cf6, var(--accent2)); }
+        .platform-card:nth-child(5)::before { background: linear-gradient(90deg, var(--accent2), #8b5cf6); }
         .platform-card h3 { font-size: 1.15rem; margin-bottom: 0.75rem; font-weight: 600; }
         .platform-tag {
             display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
@@ -635,8 +636,8 @@
             <div class="stat-label" data-en="Hardware Cost" data-zh="硬件成本">Hardware Cost</div>
         </div>
         <div class="stat reveal">
-            <div class="stat-value">2</div>
-            <div class="stat-label" data-en="RTOS Supported" data-zh="支持的 RTOS">RTOS Supported</div>
+            <div class="stat-value">3</div>
+            <div class="stat-label" data-en="OS Supported" data-zh="支持的 OS">OS Supported</div>
         </div>
     </div>
 </div>
@@ -646,13 +647,13 @@
     <div class="container">
         <div class="section-label reveal" data-en="Why RT-Claw" data-zh="为什么选择 RT-Claw">Why RT-Claw</div>
         <h2 class="section-title reveal" data-en="Intelligence at the Edge" data-zh="边缘智能">Intelligence at the Edge</h2>
-        <p class="section-subtitle reveal" data-en="No cloud dependency. No Linux. Just pure C on bare-metal RTOS, with LLM superpowers." data-zh="无需云端依赖。无需 Linux。纯 C 语言运行在裸机 RTOS 上，拥有 LLM 超能力。">No cloud dependency. No Linux. Just pure C on bare-metal RTOS, with LLM superpowers.</p>
+        <p class="section-subtitle reveal" data-en="No cloud dependency. Pure C on FreeRTOS, RT-Thread, and Linux, with LLM superpowers." data-zh="无需云端依赖。纯 C 语言运行在 FreeRTOS、RT-Thread 和 Linux 上，拥有 LLM 超能力。">No cloud dependency. Pure C on FreeRTOS, RT-Thread, and Linux, with LLM superpowers.</p>
         <div class="highlights-grid">
             <div class="highlight-card reveal">
                 <div class="highlight-num">01</div>
                 <div class="highlight-icon">&#9889;</div>
                 <h3 data-en="Pure C, Zero Bloat" data-zh="纯 C 语言，零臃肿">Pure C, Zero Bloat</h3>
-                <p data-en="No Linux. No Node.js. C99 on FreeRTOS and RT-Thread. Runs on MCUs with 400 KB RAM. Hardware costs one dollar." data-zh="无需 Linux。无需 Node.js。C99 运行在 FreeRTOS 和 RT-Thread 上。仅需 400 KB RAM 的 MCU。硬件成本仅一美元。">No Linux. No Node.js. C99 on FreeRTOS and RT-Thread. Runs on MCUs with 400 KB RAM. Hardware costs one dollar.</p>
+                <p data-en="No Node.js. C99 on FreeRTOS, RT-Thread, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar." data-zh="无需 Node.js。C99 运行在 FreeRTOS、RT-Thread 和 Linux 上。仅需 400 KB RAM 的 MCU 或任何 Linux 主机。硬件成本仅一美元。">No Node.js. C99 on FreeRTOS, RT-Thread, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar.</p>
             </div>
             <div class="highlight-card reveal">
                 <div class="highlight-num">02</div>
@@ -695,7 +696,7 @@
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128736;</div>
                 <h3 data-en="OSAL Abstraction" data-zh="OSAL 抽象层">OSAL Abstraction</h3>
-                <p data-en="Write once, run on FreeRTOS and RT-Thread. Clean claw_os.h hides all RTOS specifics." data-zh="一次编写，在 FreeRTOS 和 RT-Thread 上运行。简洁的 claw_os.h 屏蔽所有 RTOS 差异。">Write once, run on FreeRTOS and RT-Thread. Clean claw_os.h hides all RTOS specifics.</p>
+                <p data-en="Write once, run on FreeRTOS, RT-Thread, and Linux. Clean claw_os.h hides all OS specifics." data-zh="一次编写，在 FreeRTOS、RT-Thread 和 Linux 上运行。简洁的 claw_os.h 屏蔽所有 OS 差异。">Write once, run on FreeRTOS, RT-Thread, and Linux. Clean claw_os.h hides all OS specifics.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#129703;</div>
@@ -731,26 +732,26 @@
     <div class="container">
         <div class="section-label reveal" data-en="Design" data-zh="设计">Design</div>
         <h2 class="section-title reveal" data-en="Architecture" data-zh="架构">Architecture</h2>
-        <p class="section-subtitle reveal" data-en="Clean layered design with OSAL bridging multiple RTOS platforms." data-zh="简洁的分层设计，通过 OSAL 桥接多个 RTOS 平台。">Clean layered design with OSAL bridging multiple RTOS platforms.</p>
-        <div class="arch-diagram reveal">+--------------------------------------------------------------+
-|                     rt-claw Application                      |
-|    gateway | net | swarm | ai_engine | shell | sched | im    |
-+--------------------------------------------------------------+
-|                      skills (AI Skills)                      |
-|             (one skill composes multiple tools)              |
-+--------------------------------------------------------------+
-|                       tools (Tool Use)                       |
-|   gpio | system | lcd | audio | http | scheduler | memory    |
-+--------------------------------------------------------------+
-|                    drivers (Hardware BSP)                    |
-|      WiFi | ES8311 | SSD1306 | serial | LCD framebuffer      |
-+--------------------------------------------------------------+
-|                  osal/claw_os.h  (OSAL API)                  |
-+-------------------+-----------------------+------------------+
-| FreeRTOS (IDF)    | FreeRTOS (standalone) |    RT-Thread     |
-+-------------------+-----------------------+------------------+
-| ESP32-C3 / S3     | QEMU Zynq-A9 (GEM)    | QEMU vexpress-a9 |
-+-------------------+-----------------------+------------------+</div>
+        <p class="section-subtitle reveal" data-en="Clean layered design with OSAL bridging multiple OS platforms." data-zh="简洁的分层设计，通过 OSAL 桥接多个 OS 平台。">Clean layered design with OSAL bridging multiple OS platforms.</p>
+        <div class="arch-diagram reveal">+----------------------------------------------------------------+
+|                      rt-claw Application                       |
+|     gateway | net | swarm | ai_engine | shell | sched | im     |
++----------------------------------------------------------------+
+|                       skills (AI Skills)                       |
+|              (one skill composes multiple tools)               |
++----------------------------------------------------------------+
+|                        tools (Tool Use)                        |
+|    gpio | system | lcd | audio | http | scheduler | memory     |
++----------------------------------------------------------------+
+|                     drivers (Hardware BSP)                     |
+|       WiFi | ES8311 | SSD1306 | serial | LCD framebuffer       |
++----------------------------------------------------------------+
+|                   osal/claw_os.h (OSAL API)                    |
++----------------+----------------------+--------------+---------+
+| FreeRTOS (IDF) | FreeRTOS(standalone) |  RT-Thread   |  Linux  |
++----------------+----------------------+--------------+---------+
+| ESP32-C3 / S3  |  QEMU Zynq-A9 (GEM)  | vexpress-a9  |  Native |
++----------------+----------------------+--------------+---------+</div>
     </div>
 </section>
 
@@ -769,7 +770,7 @@
     <div class="container">
         <div class="section-label reveal" data-en="Hardware" data-zh="硬件">Hardware</div>
         <h2 class="section-title reveal" data-en="Supported Platforms" data-zh="支持的平台">Supported Platforms</h2>
-        <p class="section-subtitle reveal" data-en="Run on real hardware or emulate with QEMU. Current QEMU support covers Espressif fork targets and vexpress-a9; upstream STM32 boards are excluded for now because QEMU still lacks working Ethernet there." data-zh="在真实硬件上运行或使用 QEMU 仿真。当前 QEMU 支持 Espressif 分支目标和 vexpress-a9；上游 STM32 板卡由于 QEMU 尚缺少可用的以太网支持而暂时排除。">Run on real hardware or emulate with QEMU. Current QEMU support covers Espressif fork targets and vexpress-a9; upstream STM32 boards are excluded for now because QEMU still lacks working Ethernet there.</p>
+        <p class="section-subtitle reveal" data-en="Run on real hardware, emulate with QEMU, or build natively on Linux. Multiple OS backends via a single OSAL API." data-zh="在真实硬件上运行、使用 QEMU 仿真，或在 Linux 上原生构建。通过统一 OSAL API 支持多种 OS 后端。">Run on real hardware, emulate with QEMU, or build natively on Linux. Multiple OS backends via a single OSAL API.</p>
         <div class="platforms-grid">
             <div class="platform-card reveal">
                 <h3>ESP32-S3</h3>
@@ -833,6 +834,21 @@
                     <li data-en="AI conversation via api-proxy" data-zh="通过 api-proxy 进行 AI 对话">AI conversation via api-proxy</li>
                 </ul>
             </div>
+            <div class="platform-card reveal">
+                <h3>Linux Native</h3>
+                <div>
+                    <span class="platform-tag">x86_64 / aarch64</span>
+                    <span class="platform-tag">Linux</span>
+                    <span class="platform-tag">pthreads</span>
+                    <span class="platform-tag">libcurl</span>
+                </div>
+                <ul>
+                    <li data-en="No cross-compile, no QEMU needed" data-zh="无需交叉编译，无需 QEMU">No cross-compile, no QEMU needed</li>
+                    <li data-en="OSAL via pthreads + libcurl + file KV" data-zh="通过 pthreads + libcurl + 文件 KV 实现 OSAL">OSAL via pthreads + libcurl + file KV</li>
+                    <li data-en="Full AI conversation on any Linux host" data-zh="在任意 Linux 主机上完整 AI 对话">Full AI conversation on any Linux host</li>
+                    <li data-en="Fastest development iteration cycle" data-zh="最快的开发迭代周期">Fastest development iteration cycle</li>
+                </ul>
+            </div>
         </div>
 
         <!-- Status Table -->
@@ -847,7 +863,7 @@
                     <tr><td>Tool Use</td><td>LLM-driven hardware control via function calling</td><td><span class="badge badge-done">Done</span></td></tr>
                     <tr><td>Skill System</td><td>Composable skills from tools; built-in draw skill for LCD</td><td><span class="badge badge-done">Done</span></td></tr>
                     <tr><td>Chat-first Shell</td><td>UART REPL with AI integration and UTF-8 support</td><td><span class="badge badge-done">Done</span></td></tr>
-                    <tr><td>OSAL</td><td>Write once, run on FreeRTOS and RT-Thread</td><td><span class="badge badge-done">Done</span></td></tr>
+                    <tr><td>OSAL</td><td>Write once, run on FreeRTOS, RT-Thread and Linux</td><td><span class="badge badge-done">Done</span></td></tr>
                     <tr><td>Gateway</td><td>Thread-safe message routing between services</td><td><span class="badge badge-done">Done</span></td></tr>
                     <tr><td>Networking</td><td>Ethernet + HTTP on QEMU; WiFi on real hardware</td><td><span class="badge badge-done">Done</span></td></tr>
                     <tr><td>Conversation Memory</td><td>RAM ring buffer + NVS Flash persistent storage</td><td><span class="badge badge-done">Done</span></td></tr>
@@ -999,7 +1015,7 @@
 <!-- Footer -->
 <footer>
     <div class="container">
-        <p><strong style="color: var(--text);">RT-Claw</strong> — <span data-en="OpenClaw-inspired AI Assistant on Embedded RTOS" data-zh="受 OpenClaw 启发的嵌入式 RTOS AI 助手">OpenClaw-inspired AI Assistant on Embedded RTOS</span></p>
+        <p><strong style="color: var(--text);">RT-Claw</strong> — <span data-en="OpenClaw-inspired AI Assistant on Embedded Systems" data-zh="受 OpenClaw 启发的嵌入式 AI 助手">OpenClaw-inspired AI Assistant on Embedded Systems</span></p>
         <p><span data-en="Released under the" data-zh="基于">Released under the</span> <a href="https://github.com/zevorn/rt-claw/blob/main/LICENSE" data-en="MIT License" data-zh="MIT 许可证">MIT License</a></p>
     </div>
 </footer>
