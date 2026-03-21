@@ -563,11 +563,9 @@ void linux_shell_loop(void)
 
     enable_raw_mode();
 
-    printf("\n");
     printf(CLR_CYAN "  rt-claw" CLR_RESET
            "  (type /help for commands, Tab to complete)\n");
     printf("  Direct input sends to AI, /command for system.\n");
-    printf("\n");
 
     struct timeval last_ctrlc = { 0, 0 };
 

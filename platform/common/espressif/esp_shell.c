@@ -616,11 +616,9 @@ void esp_shell_loop(void)
         return;
     }
 
-    printf("\n");
     printf(CLR_CYAN "  rt-claw" CLR_RESET
            "  (type /help for commands)\n");
     printf("  Direct input sends to AI, /command for system.\n");
-    printf("\n");
 
     while (1) {
         shell_history_reset_nav();
