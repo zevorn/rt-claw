@@ -444,6 +444,8 @@ static void tg_poll_thread(void *arg)
         return;
     }
 
+    int backoff_ms = POLL_RETRY_MS;
+
     while (!claw_thread_should_exit()) {
         char body[128];
         snprintf(body, sizeof(body),
@@ -454,11 +456,15 @@ static void tg_poll_thread(void *arg)
         int ret = tg_api_post(ctx, "getUpdates", body, resp,
                                RESP_BUF_SIZE, HTTP_POLL_TIMEOUT_MS);
         if (ret != CLAW_OK) {
-            CLAW_LOGW(TAG, "getUpdates failed, retry in %dms",
-                      POLL_RETRY_MS);
-            claw_thread_delay_ms(POLL_RETRY_MS);
+            CLAW_LOGW(TAG, "getUpdates failed, retry in %ds",
+                      backoff_ms / 1000);
+            claw_thread_delay_ms(backoff_ms);
+            if (backoff_ms < 60000) {
+                backoff_ms *= 2;
+            }
             continue;
         }
+        backoff_ms = POLL_RETRY_MS;
 
         cJSON *root = cJSON_Parse(resp);
         if (!root) {

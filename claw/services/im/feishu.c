@@ -1171,6 +1171,7 @@ static void feishu_thread(void *arg)
 
     /* Fetch tenant token first (needed for sending replies) */
     int retries = 0;
+    int delay_ms = 10000;
 
     while (refresh_token(ctx) != CLAW_OK) {
         if (claw_thread_should_exit()) {
@@ -1182,8 +1183,12 @@ static void feishu_thread(void *arg)
                       retries);
             return;
         }
-        CLAW_LOGW(TAG, "token failed, retry in 10s");
-        claw_thread_delay_ms(10000);
+        CLAW_LOGW(TAG, "token failed, retry %d/%d in %ds",
+                  retries, TOKEN_MAX_RETRIES, delay_ms / 1000);
+        claw_thread_delay_ms(delay_ms);
+        if (delay_ms < 60000) {
+            delay_ms *= 2;
+        }
     }
     if (claw_thread_should_exit()) {
         return;
