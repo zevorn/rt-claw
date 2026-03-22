@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-/* Service lifecycle (registered in claw_init.c) */
+/* Service lifecycle (registered via CLAW_SERVICE_REGISTER) */
 int  ota_service_init(void);
 int  ota_service_start(void);
 void ota_service_stop(void);
