@@ -113,17 +113,30 @@ static claw_err_t tool_http_request(struct claw_tool *tool,
     }
 
     CLAW_LOGI(TAG, "%s %s", method, url);
-    esp_err_t err = esp_http_client_perform(client);
-    int status = 0;
 
-    if (err == ESP_OK) {
-        status = esp_http_client_get_status_code(client);
+    /* Retry up to 2 times on connection failures (TLS contention) */
+    esp_err_t err = ESP_FAIL;
+    int status = 0;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        ctx.len = 0;
+        resp_buf[0] = '\0';
+        err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            status = esp_http_client_get_status_code(client);
+            break;
+        }
+        CLAW_LOGW(TAG, "attempt %d failed: %s", attempt + 1,
+                  esp_err_to_name(err));
+        if (attempt < 2) {
+            claw_thread_delay_ms(1000);
+        }
     }
     esp_http_client_cleanup(client);
 
     if (err != ESP_OK) {
         claw_free(resp_buf);
-        cJSON_AddStringToObject(result, "error", "HTTP request failed");
+        cJSON_AddStringToObject(result, "error",
+                                "HTTP request failed after retries");
         return CLAW_OK;
     }
 

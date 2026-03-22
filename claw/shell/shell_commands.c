@@ -14,6 +14,7 @@
 #include "claw/services/ai/ai_engine.h"
 #include "claw/services/ai/ai_memory.h"
 #include "claw/tools/claw_tools.h"
+#include "utils/list.h"
 #include "claw/services/im/feishu.h"
 #include "claw/services/im/telegram.h"
 #include "claw/services/net/net_service.h"
@@ -421,6 +422,26 @@ static void cmd_ip(int argc, char **argv)
     net_print_ipinfo();
 }
 
+/* ---- /tools: list registered AI tools ---- */
+
+static void cmd_tools(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+
+    claw_list_node_t *head = claw_tool_core_list();
+    claw_list_node_t *pos;
+    int i = 0;
+
+    printf("Registered tools (%d):\n", claw_tool_core_count());
+    claw_list_for_each(pos, head) {
+        struct claw_tool *t = claw_list_entry(pos, struct claw_tool,
+                                               node);
+        printf("  %d. %-20s %s\n", ++i, t->name,
+               t->description ? t->description : "");
+    }
+}
+
 /* ---- Common command table ---- */
 
 const shell_cmd_t shell_common_commands[] = {
@@ -433,6 +454,7 @@ const shell_cmd_t shell_common_commands[] = {
     SHELL_CMD("/feishu_status", cmd_feishu_status, "Show Feishu config"),
     SHELL_CMD("/telegram_set",  cmd_telegram_set,  "Set Telegram token"),
     SHELL_CMD("/telegram_status", cmd_telegram_status, "Show Telegram config"),
+    SHELL_CMD("/tools",         cmd_tools,         "List registered AI tools"),
     SHELL_CMD("/ip",            cmd_ip,            "Show IP address"),
     SHELL_CMD("/remember",      cmd_remember,      "Save to long-term memory"),
     SHELL_CMD("/forget",        cmd_forget,        "Delete a long-term memory"),
