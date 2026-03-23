@@ -19,6 +19,7 @@ packages=(
     libssl-dev
     dfu-util
     libusb-1.0-0
+    libcurl4-openssl-dev
     meson
     scons
     gcc-arm-none-eabi
