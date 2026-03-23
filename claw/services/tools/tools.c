@@ -100,6 +100,24 @@ cJSON *claw_tools_to_json_exclude(const char *prefix)
     return arr;
 }
 
+/*
+ * Weak stubs for scheduler tool functions.
+ * Overridden by services/tools/sched.c when tool_sched is enabled.
+ */
+__attribute__((weak))
+void sched_set_reply_context(sched_reply_fn_t fn, const char *target)
+{
+    (void)fn;
+    (void)target;
+}
+
+__attribute__((weak))
+int sched_tool_remove_by_name(const char *name)
+{
+    (void)name;
+    return -1;
+}
+
 /* OOP service registration */
 #include "claw/core/service.h"
 #ifdef CONFIG_RTCLAW_SCHED_ENABLE

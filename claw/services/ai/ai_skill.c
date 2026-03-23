@@ -312,7 +312,7 @@ char *ai_skill_build_summary(void)
 
 /* --- LLM Tool Use: create_skill / delete_skill --- */
 
-#ifdef CLAW_PLATFORM_ESP_IDF
+#if defined(CLAW_PLATFORM_ESP_IDF) && defined(CONFIG_RTCLAW_SKILL_ENABLE)
 
 static claw_err_t tool_create_skill(struct claw_tool *tool,
                                     const cJSON *params, cJSON *result)
@@ -393,8 +393,6 @@ static const char schema_delete_skill[] =
     "\"description\":\"Name of skill to delete\"}},"
     "\"required\":[\"name\"]}";
 
-/* OOP tool registration */
-#ifdef CONFIG_RTCLAW_SKILL_ENABLE
 #include "claw/core/tool.h"
 
 static const struct claw_tool_ops create_skill_ops = {
@@ -424,10 +422,8 @@ static struct claw_tool delete_skill_tool = {
     .flags = CLAW_TOOL_LOCAL_ONLY,
 };
 CLAW_TOOL_REGISTER(delete_skill, &delete_skill_tool);
-#endif /* CONFIG_RTCLAW_SKILL_ENABLE */
 
-#else /* non-ESP-IDF — no skill tools */
-#endif
+#endif /* CLAW_PLATFORM_ESP_IDF && CONFIG_RTCLAW_SKILL_ENABLE */
 
 /* OOP service registration */
 #include "claw/core/service.h"

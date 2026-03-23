@@ -18,12 +18,12 @@ rtclaw_exe = executable('rtclaw',
     install: false,
 )
 
-# Unit test executable
+# Unit test executable — links ota_stub.c for OTA symbol resolution
 test_main_src = files('../../tests/unit/test_main_linux.c')
 test_incs = include_directories('../../tests/unit')
 
 rtclaw_test_exe = executable('rtclaw_test',
-    test_main_src,
+    test_main_src + files('ota_stub.c'),
     include_directories: [claw_inc, claw_root_inc, test_incs],
     c_args: platform_defs,
     link_with: [unittest_lib],

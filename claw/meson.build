@@ -18,13 +18,8 @@ src_files = files(
     'shell/shell_commands.c',
     'shell/shell_history.c',
     'services/tools/tools.c',
-    'services/tools/gpio.c',
     'services/tools/lcd.c',
-    'services/tools/sched.c',
-    'services/tools/system.c',
-    'services/tools/net.c',
     'services/tools/audio.c',
-    'services/tools/mouse.c',
 )
 
 # Drivers (outside claw/ directory)
@@ -48,18 +43,28 @@ if get_option('skill')
 endif
 if get_option('tool_gpio')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_GPIO'
+    src_files += files('services/tools/gpio.c')
 endif
 if get_option('tool_system')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_SYSTEM'
+    src_files += files('services/tools/system.c')
 endif
 if get_option('tool_sched')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_SCHED'
 endif
+# sched.c provides both LLM tools (guarded by CONFIG_RTCLAW_TOOL_SCHED)
+# and helpers used by the scheduler service and shell (e.g.
+# sched_tool_remove_by_name, sched_set_reply_context).
+if get_option('tool_sched') or get_option('sched')
+    src_files += files('services/tools/sched.c')
+endif
 if get_option('tool_net')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_NET'
+    src_files += files('services/tools/net.c')
 endif
 if get_option('tool_mouse')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_MOUSE'
+    src_files += files('services/tools/mouse.c')
 endif
 if get_option('heartbeat')
     if not get_option('sched')
@@ -84,10 +89,10 @@ src_files += files(
     'services/ota/ota_service.c',
     'services/tools/ota.c',
 )
-# Non-ESP, non-Linux platforms need an OTA platform stub when ota is
-# enabled.  Linux provides its own in platform/linux/meson.build;
+# Non-ESP, non-Linux Meson platforms need an OTA platform stub.
+# Linux provides its own in platform/linux/meson.build;
 # ESP-IDF provides platform/common/espressif/esp_ota.c via CMake.
-if get_option('ota') and osal_backend == 'rtthread'
+if osal_backend != 'linux'
     src_files += files('../platform/linux/ota_stub.c')
 endif
 

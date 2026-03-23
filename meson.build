@@ -67,6 +67,13 @@ elif osal_backend == 'linux'
     platform_defs += ['-DCLAW_PLATFORM_LINUX']
 endif
 
+# Bare-metal platforms lack HTTPS/WebSocket; reject feishu/telegram.
+_bare_metal = (osal_backend == 'rtthread') or \
+              (osal_backend == 'freertos' and get_option('platform') == 'zynq-a9')
+if _bare_metal and (get_option('feishu') or get_option('telegram'))
+    error('feishu/telegram are not supported on bare-metal platforms (no HTTPS/WebSocket)')
+endif
+
 # ---- Unified configuration via claw_config_generated.h ----
 #
 # All rt-claw credentials and tunable parameters are configured here,

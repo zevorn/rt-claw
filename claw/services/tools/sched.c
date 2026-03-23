@@ -58,8 +58,10 @@ static sched_ai_ctx_t s_ctx[SCHED_AI_MAX];
 static struct claw_thread *s_ai_worker;
 static struct claw_sem *s_worker_sem;
 static struct claw_mutex *s_worker_lock;
+#ifdef CONFIG_RTCLAW_TOOL_SCHED
 static sched_ai_ctx_t *s_pending_ctx;
 static int s_worker_busy; /* protected by s_worker_lock */
+#endif
 
 /*
  * Reply context — set by the caller (feishu / shell) before ai_chat()
@@ -87,6 +89,7 @@ void sched_set_reply_context(sched_reply_fn_t fn, const char *target)
     claw_mutex_unlock(s_rctx_lock);
 }
 
+#ifdef CONFIG_RTCLAW_TOOL_SCHED
 static sched_ai_ctx_t *ctx_alloc(void)
 {
     for (int i = 0; i < SCHED_AI_MAX; i++) {
@@ -98,8 +101,10 @@ static sched_ai_ctx_t *ctx_alloc(void)
     return NULL;
 }
 
-/* Forward declaration — defined after ctx_free_by_name */
 static int sched_nvs_save(void);
+#else
+static int sched_nvs_save(void) { return 0; }
+#endif
 
 static void ctx_free_by_name(const char *name)
 {
@@ -128,9 +133,13 @@ int sched_tool_remove_by_name(const char *name)
 }
 
 /*
- * Find the next pending task using round-robin scan.
- * Must be called with s_worker_lock held.
+ * Everything below until the matching #endif is the LLM tool
+ * subsystem: worker thread, AI callback, NVS persistence, tool
+ * execute functions, schemas, init/cleanup, and registration.
+ * Only compiled when tool_sched is enabled.
  */
+#ifdef CONFIG_RTCLAW_TOOL_SCHED
+
 static int s_rr_idx;
 
 static sched_ai_ctx_t *drain_pending(void)
@@ -608,8 +617,6 @@ static void sched_tool_cleanup(struct claw_tool *tool)
 }
 
 /* OOP tool registration */
-#ifdef CONFIG_RTCLAW_TOOL_SCHED
-
 static const struct claw_tool_ops list_tasks_ops = {
     .execute = tool_list_tasks,
     .init = sched_tool_init_subsys,
