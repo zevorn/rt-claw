@@ -13,3 +13,4 @@
 	path = third_party/rtthread-micropython
 	url = https://github.com/RT-Thread-packages/micropython.git
 	branch = master
+	ignore = untracked
