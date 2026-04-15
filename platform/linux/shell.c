@@ -22,6 +22,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/select.h>
 #include <sys/time.h>
 
@@ -175,14 +176,41 @@ static int shell_read_line(char *buf, int size)
     unsigned char ch;
 
     if (!isatty(STDIN_FILENO)) {
-        if (!fgets(buf, size, stdin)) {
-            return -1;
+        while (len < size - 1) {
+            fd_set readfds;
+            struct timeval timeout = { 0, 100000 };
+            int ret;
+
+            if (g_exit_flag) {
+                return -1;
+            }
+
+            FD_ZERO(&readfds);
+            FD_SET(STDIN_FILENO, &readfds);
+            ret = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout);
+            if (ret < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                return -1;
+            }
+            if (ret == 0) {
+                continue;
+            }
+
+            ret = (int)read(STDIN_FILENO, &ch, 1);
+            if (ret <= 0) {
+                if (len == 0) {
+                    return -1;
+                }
+                break;
+            }
+            if (ch == '\n' || ch == '\r') {
+                break;
+            }
+            buf[len++] = (char)ch;
         }
-        len = (int)strlen(buf);
-        while (len > 0 && (buf[len - 1] == '\n' ||
-                           buf[len - 1] == '\r')) {
-            buf[--len] = '\0';
-        }
+        buf[len] = '\0';
         return len;
     }
 

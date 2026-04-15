@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Console buffer and interaction functions for QEMU subprocess I/O.
 
+import os
 import re
 import threading
 import time
@@ -23,7 +24,7 @@ class ConsoleBuffer:
 
     def __init__(self, proc):
         self.proc = proc
-        self._lines = []
+        self._output = ""
         self._lock = threading.Lock()
         self._closed = False
         self._reader = threading.Thread(
@@ -33,10 +34,14 @@ class ConsoleBuffer:
 
     def _read_loop(self):
         try:
-            for raw in self.proc.stdout:
-                line = _strip_ansi(raw.decode("utf-8", errors="replace"))
+            fd = self.proc.stdout.fileno()
+            while True:
+                raw = os.read(fd, 256)
+                if not raw:
+                    break
+                text = _strip_ansi(raw.decode("utf-8", errors="replace"))
                 with self._lock:
-                    self._lines.append(line)
+                    self._output += text
         except (ValueError, OSError):
             pass
         finally:
@@ -45,10 +50,11 @@ class ConsoleBuffer:
 
     def get_lines(self):
         with self._lock:
-            return list(self._lines)
+            return self._output.splitlines(keepends=True)
 
     def get_output(self):
-        return "".join(self.get_lines())
+        with self._lock:
+            return self._output
 
     @property
     def is_alive(self):
@@ -62,7 +68,8 @@ class ConsoleBuffer:
 
 def wait_for_console_pattern(console: ConsoleBuffer,
                              pattern: str,
-                             timeout: float = 60.0) -> str:
+                             timeout: float = 60.0,
+                             start_offset: int = 0) -> str:
     """
     Wait until `pattern` appears in console output.
 
@@ -71,21 +78,29 @@ def wait_for_console_pattern(console: ConsoleBuffer,
     Raises RuntimeError if QEMU exits before pattern is found.
     """
     deadline = time.monotonic() + timeout
-    seen = 0
+    settle_deadline = 0.0
+    matched_len = -1
 
     while True:
-        lines = console.get_lines()
+        output = console.get_output()
+        pos = output.find(pattern, start_offset)
+        if pos >= 0:
+            end = pos + len(pattern)
+            newline = output.find("\n", end)
 
-        for i in range(seen, len(lines)):
-            if pattern in lines[i]:
-                return "".join(lines[:i + 1])
-        seen = len(lines)
+            if newline >= 0:
+                return output[:newline + 1]
+
+            if len(output) != matched_len:
+                matched_len = len(output)
+                settle_deadline = time.monotonic() + 0.2
+            elif time.monotonic() >= settle_deadline:
+                return output
 
         if time.monotonic() >= deadline:
-            output = console.get_output()
             raise TimeoutError(
                 f"Pattern {pattern!r} not found within {timeout}s.\n"
-                f"--- Console output ({len(lines)} lines) ---\n"
+                f"--- Console output ({len(output.splitlines())} lines) ---\n"
                 f"{output[-2000:]}"
             )
 
@@ -111,5 +126,6 @@ def exec_command_and_wait_for_pattern(console: ConsoleBuffer,
                                       pattern: str,
                                       timeout: float = 30.0) -> str:
     """Send a command and wait for a pattern in the output."""
+    start_offset = len(console.get_output())
     exec_command(console, command)
-    return wait_for_console_pattern(console, pattern, timeout)
+    return wait_for_console_pattern(console, pattern, timeout, start_offset)

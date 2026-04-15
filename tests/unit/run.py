@@ -20,16 +20,18 @@ def build():
     env = os.environ.copy()
     env["RTCLAW_UNIT_TEST"] = "1"
 
-    # Ensure Meson is set up with OTA enabled (stubs in test_ota.c)
+    # Ensure Meson is set up with OTA and script tool enabled.
     if not os.path.isfile(os.path.join(BUILD_DIR, "build.ninja")):
         subprocess.check_call(
             ["meson", "setup", BUILD_DIR,
-             "--cross-file", cross_file, "-Dota=true"],
+             "--cross-file", cross_file,
+             "-Dota=true", "-Dtool_script=true"],
             cwd=PROJECT_ROOT, env=env,
         )
     else:
         subprocess.check_call(
-            ["meson", "configure", BUILD_DIR, "-Dota=true"],
+            ["meson", "configure", BUILD_DIR,
+             "-Dota=true", "-Dtool_script=true"],
             cwd=PROJECT_ROOT, env=env,
         )
 

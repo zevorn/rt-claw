@@ -90,7 +90,10 @@ A9_PLATFORM       := platform/vexpress-a9
 .PHONY: vexpress-a9-qemu
 vexpress-a9-qemu:
 	@if [ ! -f $(MESON_BUILDDIR_A9)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_A9) --cross-file $(CROSS_FILE_A9); \
+		meson setup $(MESON_BUILDDIR_A9) --cross-file $(CROSS_FILE_A9) \
+			-Dtool_script=true; \
+	else \
+		meson configure $(MESON_BUILDDIR_A9) -Dtool_script=true; \
 	fi
 	meson compile -C $(MESON_BUILDDIR_A9)
 	cd $(A9_PLATFORM) && scons -j$$(nproc)
@@ -374,7 +377,10 @@ MESON_BUILDDIR_LINUX := $(BUILD_DIR)/linux
 .PHONY: build-linux
 build-linux:
 	@if [ ! -f $(MESON_BUILDDIR_LINUX)/build.ninja ]; then \
-		meson setup $(MESON_BUILDDIR_LINUX) -Dosal=linux; \
+		meson setup $(MESON_BUILDDIR_LINUX) -Dosal=linux \
+			-Dtool_script=true; \
+	else \
+		meson configure $(MESON_BUILDDIR_LINUX) -Dtool_script=true; \
 	fi
 	meson compile -C $(MESON_BUILDDIR_LINUX)
 	@echo "Output: $(MESON_BUILDDIR_LINUX)/platform/linux/rtclaw"
@@ -526,6 +532,7 @@ test-smoke-esp32s3:
 .PHONY: test-smoke-vexpress
 test-smoke-vexpress: vexpress-a9-qemu
 	$(call _functest,vexpress-a9-qemu,test_boot.py)
+	$(call _functest,vexpress-a9-qemu,test_vexpress_micropython.py)
 
 .PHONY: test-online-esp32c3
 test-online-esp32c3: run-esp32c3-qemu-flash
