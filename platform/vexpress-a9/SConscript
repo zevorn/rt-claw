@@ -3,9 +3,18 @@ from building import *
 
 cwd = GetCurrentDir()
 project_root = os.path.normpath(os.path.join(cwd, '..', '..'))
+micropython_root = os.path.join(
+    project_root, 'third_party', 'rtthread-micropython'
+)
 objs = []
 
 unit_test = os.environ.get('RTCLAW_UNIT_TEST', '0') == '1'
+
+AddDepend('PKG_USING_MICROPYTHON')
+Env.AppendUnique(CPPDEFINES=[
+    'PKG_USING_MICROPYTHON',
+    'PKG_MICROPYTHON_HEAP_SIZE=32768',
+])
 
 # --- Local subdirectories (drivers, applications) ---
 for d in os.listdir(cwd):
@@ -17,6 +26,64 @@ for d in os.listdir(cwd):
 board_src = [os.path.join(cwd, 'boards', 'qemu', 'board.c')]
 group = DefineGroup('Board', board_src, depend = [''],
     CPPPATH = [os.path.join(project_root, 'include')])
+objs = objs + group
+
+micropython_src = []
+micropython_src += Glob(os.path.join(micropython_root, 'py', '*.c'))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'lib', 'mp-readline', '*.c'
+))
+micropython_src += Glob(os.path.join(micropython_root, 'lib', 'utils', '*.c'))
+micropython_src += Glob(os.path.join(micropython_root, 'extmod', '*.c'))
+micropython_src += [
+    src for src in Glob(os.path.join(micropython_root, 'port', '*.c'))
+    if os.path.basename(str(src)) not in ['mpy_main.c', 'mpputsnport.c']
+]
+micropython_src += Glob(os.path.join(
+    micropython_root, 'port', 'modules', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'port', 'modules', 'machine', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'port', 'modules', 'user', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'lib', 'netutils', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'lib', 'timeutils', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'drivers', 'bus', '*.c'
+))
+micropython_src += Glob(os.path.join(
+    micropython_root, 'port', 'native', '*.c'
+))
+
+micropython_inc = [
+    micropython_root,
+    os.path.join(micropython_root, 'port'),
+    os.path.join(micropython_root, 'port', 'modules'),
+    os.path.join(micropython_root, 'port', 'modules', 'machine'),
+]
+group = DefineGroup('MicroPython', micropython_src,
+    depend = ['PKG_USING_MICROPYTHON'],
+    CPPPATH = micropython_inc,
+    LOCAL_CCFLAGS = ' -std=gnu99')
+objs = objs + group
+
+script_src = [
+    os.path.join(cwd, 'scripting.c'),
+    os.path.join(cwd, 'micropython_main.c'),
+    os.path.join(cwd, 'mpputsnport.c'),
+]
+script_inc = [
+    os.path.join(project_root, 'include'),
+    micropython_root,
+]
+group = DefineGroup('ClawScript', script_src, depend = [''],
+    CPPPATH = [os.path.abspath(p) for p in script_inc])
 objs = objs + group
 
 # rt-claw headers (unified include/ directory)

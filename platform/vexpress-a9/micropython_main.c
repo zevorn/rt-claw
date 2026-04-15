@@ -1,0 +1,334 @@
+/*
+ * Copyright (c) 2026, Chao Liu <chao.liu.zevorn@gmail.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Local MicroPython shell entry adapted for RT-Thread DFS v2.
+ */
+
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
+
+#include <rtthread.h>
+
+#ifdef RT_USING_DFS
+#include <unistd.h>
+#include <fcntl.h>
+#include <dfs.h>
+#endif
+
+#include "py/compile.h"
+#include "py/frozenmod.h"
+#include "py/gc.h"
+#include "py/mperrno.h"
+#include "py/mpthread.h"
+#include "py/repl.h"
+#include "py/runtime.h"
+#include "py/stackctrl.h"
+#include "lib/mp-readline/readline.h"
+#include "lib/utils/pyexec.h"
+#include "mpgetcharport.h"
+#include "mpputsnport.h"
+
+#define THREAD_STACK_NO_SYNC   4096
+#define THREAD_STACK_WITH_SYNC 8192
+
+#if MICROPY_ENABLE_COMPILER
+void do_str(const char *src, mp_parse_input_kind_t input_kind)
+{
+    nlr_buf_t nlr;
+
+    if (nlr_push(&nlr) == 0) {
+        mp_lexer_t *lex = mp_lexer_new_from_str_len(
+            MP_QSTR__lt_stdin_gt_,
+            src,
+            strlen(src),
+            0
+        );
+        qstr source_name = lex->source_name;
+        mp_parse_tree_t parse_tree = mp_parse(lex, input_kind);
+        mp_obj_t module_fun = mp_compile(&parse_tree, source_name, true);
+
+        mp_call_function_0(module_fun);
+        nlr_pop();
+    } else {
+        mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+    }
+}
+#endif
+
+#ifdef RT_USING_DFS
+static int mp_sys_resource_bak(struct dfs_fdtable **table_bak)
+{
+    struct dfs_fdtable *fd_table;
+    struct dfs_fdtable *fd_table_bak;
+    struct dfs_file **fds;
+
+    fd_table = dfs_fdtable_get();
+    if (!fd_table) {
+        return RT_FALSE;
+    }
+
+    fd_table_bak = (struct dfs_fdtable *)rt_malloc(
+        sizeof(struct dfs_fdtable)
+    );
+    if (!fd_table_bak) {
+        return RT_FALSE;
+    }
+
+    fds = (struct dfs_file **)rt_malloc(
+        (int)fd_table->maxfd * sizeof(struct dfs_file *)
+    );
+    if (!fds) {
+        rt_free(fd_table_bak);
+        return RT_FALSE;
+    }
+
+    rt_memcpy(fds, fd_table->fds,
+              (int)fd_table->maxfd * sizeof(struct dfs_file *));
+    fd_table_bak->maxfd = (int)fd_table->maxfd;
+    fd_table_bak->fds = fds;
+    *table_bak = fd_table_bak;
+
+    return RT_TRUE;
+}
+
+static void mp_sys_resource_gc(struct dfs_fdtable *fd_table_bak)
+{
+    struct dfs_fdtable *fd_table;
+    int i;
+
+    if (!fd_table_bak) {
+        return;
+    }
+
+    fd_table = dfs_fdtable_get();
+    if (!fd_table) {
+        rt_free(fd_table_bak->fds);
+        rt_free(fd_table_bak);
+        return;
+    }
+
+    for (i = 0; i < (int)fd_table->maxfd; i++) {
+        if (fd_table->fds[i] != RT_NULL) {
+            if ((i < (int)fd_table_bak->maxfd &&
+                 fd_table_bak->fds[i] == RT_NULL) ||
+                i >= (int)fd_table_bak->maxfd) {
+                close(i + DFS_STDIO_OFFSET);
+            }
+        }
+    }
+
+    rt_free(fd_table_bak->fds);
+    rt_free(fd_table_bak);
+}
+#endif
+
+static void *stack_top = RT_NULL;
+static char *heap = RT_NULL;
+
+void mpy_main(const char *filename)
+{
+    int stack_dummy;
+    int stack_size_check;
+
+#ifdef RT_USING_DFS
+    struct dfs_fdtable *fd_table_bak = RT_NULL;
+#endif
+
+    stack_top = (void *)&stack_dummy;
+
+#ifdef RT_USING_DFS
+    mp_sys_resource_bak(&fd_table_bak);
+#endif
+
+    mp_getchar_init();
+    mp_putsn_init();
+
+#if defined(MICROPYTHON_USING_FILE_SYNC_VIA_IDE)
+    stack_size_check = THREAD_STACK_WITH_SYNC;
+#else
+    stack_size_check = THREAD_STACK_NO_SYNC;
+#endif
+
+    if (rt_thread_self()->stack_size < stack_size_check) {
+#if (RTTHREAD_VERSION < RT_VERSION_CHECK(5, 0, 1))
+        mp_printf(&mp_plat_print,
+                  "The stack (%.*s) size for executing "
+                  "MicroPython must be >= %d\n",
+                  RT_NAME_MAX, rt_thread_self()->name,
+                  stack_size_check);
+#else
+        mp_printf(&mp_plat_print,
+                  "The stack (%.*s) size for executing "
+                  "MicroPython must be >= %d\n",
+                  RT_NAME_MAX, rt_thread_self()->parent.name,
+                  stack_size_check);
+#endif
+    }
+
+#if MICROPY_PY_THREAD
+    mp_thread_init(
+        rt_thread_self()->stack_addr,
+        ((rt_uint32_t)stack_top
+         - (rt_uint32_t)rt_thread_self()->stack_addr) / 4
+    );
+#endif
+
+    mp_stack_set_top(stack_top);
+    mp_stack_set_limit(rt_thread_self()->stack_size - 1024);
+
+#if MICROPY_ENABLE_GC
+    heap = rt_malloc(MICROPY_HEAP_SIZE);
+    if (!heap) {
+        mp_printf(&mp_plat_print, "No memory for MicroPython Heap!\n");
+        goto cleanup;
+    }
+    gc_init(heap, heap + MICROPY_HEAP_SIZE);
+#endif
+
+    mp_init();
+
+    mp_obj_list_init(mp_sys_path, 0);
+    mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR_));
+    mp_obj_list_append(
+        mp_sys_path,
+        mp_obj_new_str(MICROPY_PY_PATH_FIRST,
+                       strlen(MICROPY_PY_PATH_FIRST))
+    );
+    mp_obj_list_append(
+        mp_sys_path,
+        mp_obj_new_str(MICROPY_PY_PATH_SECOND,
+                       strlen(MICROPY_PY_PATH_SECOND))
+    );
+    mp_obj_list_init(mp_sys_argv, 0);
+    readline_init0();
+
+    if (filename) {
+#ifndef MICROPYTHON_USING_UOS
+        mp_printf(&mp_plat_print,
+                  "Please enable uos module in sys module option first.\n");
+#else
+        pyexec_file(filename);
+#endif
+    } else {
+#ifdef MICROPYTHON_USING_UOS
+        void *frozen_data;
+        const char *_boot_file = "_boot.py";
+        const char *boot_file = "boot.py";
+        const char *main_file = MICROPY_MAIN_PY_PATH;
+
+        if (mp_find_frozen_module(_boot_file, strlen(_boot_file),
+                                  &frozen_data) != MP_FROZEN_NONE) {
+            pyexec_frozen_module(_boot_file);
+        }
+        if (!access(boot_file, 0)) {
+            pyexec_file(boot_file);
+        }
+        if (!access(main_file, 0) &&
+            pyexec_mode_kind == PYEXEC_MODE_FRIENDLY_REPL) {
+            pyexec_file(main_file);
+        }
+#endif
+
+        mp_printf(&mp_plat_print, "\n");
+        for (;;) {
+            if (pyexec_mode_kind == PYEXEC_MODE_RAW_REPL) {
+                if (pyexec_raw_repl() != 0) {
+                    break;
+                }
+            } else {
+                if (pyexec_friendly_repl() != 0) {
+                    break;
+                }
+            }
+        }
+    }
+
+    gc_sweep_all();
+    mp_deinit();
+
+cleanup:
+#if MICROPY_PY_THREAD
+    mp_thread_deinit();
+#endif
+
+#if MICROPY_ENABLE_GC
+    if (heap) {
+        rt_free(heap);
+        heap = RT_NULL;
+    }
+#endif
+
+    mp_putsn_deinit();
+    mp_getchar_deinit();
+
+#ifdef RT_USING_DFS
+    mp_sys_resource_gc(fd_table_bak);
+#endif
+}
+
+#if !MICROPY_PY_MODUOS_FILE
+mp_import_stat_t mp_import_stat(const char *path)
+{
+    (void)path;
+    return MP_IMPORT_STAT_NO_EXIST;
+}
+#endif
+
+NORETURN void nlr_jump_fail(void *val)
+{
+    (void)val;
+    mp_printf(MICROPY_ERROR_PRINTER, "nlr_jump_fail\n");
+    while (1) {
+    }
+}
+
+#ifndef NDEBUG
+NORETURN void MP_WEAK __assert_func(const char *file, int line,
+                                    const char *func,
+                                    const char *expr)
+{
+    (void)func;
+    mp_printf(MICROPY_ERROR_PRINTER,
+              "Assertion '%s' failed, at file %s:%d\n",
+              expr, file, line);
+    while (1) {
+    }
+}
+#endif
+
+int DEBUG_printf(const char *format, ...)
+{
+    static char log_buf[512];
+    va_list args;
+
+    va_start(args, format);
+    rt_vsprintf(log_buf, format, args);
+    mp_printf(&mp_plat_print, "%s", log_buf);
+    va_end(args);
+
+    return 0;
+}
+
+#ifndef MICROPYTHON_USING_UOS
+mp_lexer_t *mp_lexer_new_from_file(const char *filename)
+{
+    (void)filename;
+    mp_raise_OSError(MP_ENOENT);
+}
+#endif
+
+#if defined(RT_USING_FINSH) && defined(FINSH_USING_MSH)
+#include <finsh.h>
+static void python(uint8_t argc, char **argv)
+{
+    if (argc > 1) {
+        mpy_main(argv[1]);
+    } else {
+        mpy_main(RT_NULL);
+    }
+}
+MSH_CMD_EXPORT(python, MicroPython: `python [file.py]` execute python script);
+#endif

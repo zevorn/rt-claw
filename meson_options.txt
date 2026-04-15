@@ -24,6 +24,8 @@ option('tool_sched', type: 'boolean', value: true,
     description: 'Enable scheduler tool')
 option('tool_net', type: 'boolean', value: true,
     description: 'Enable network (HTTP) tool')
+option('tool_script', type: 'boolean', value: false,
+    description: 'Enable embedded script execution tool')
 option('tool_mouse', type: 'boolean', value: false,
     description: 'Enable USB HID mouse tools (ESP32-S3 only)')
 option('heartbeat', type: 'boolean', value: false,

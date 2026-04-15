@@ -19,7 +19,7 @@ class TestLinuxShell(RTClawLinuxTest):
         output = exec_command_and_wait_for_pattern(
             self.console, "/help",
             "Anything else is sent directly to AI.",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("/help", output)
         self.assertIn("/log", output)
@@ -30,7 +30,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/log off' must disable log output."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/log off", "Log output: OFF",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("OFF", output)
 
@@ -38,7 +38,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/log on' must enable log output."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/log on", "Log output: ON",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("ON", output)
 
@@ -46,7 +46,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/log level debug' must set log level."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/log level debug", "Log level: debug",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("debug", output)
 
@@ -54,7 +54,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/log level error' must set log level."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/log level error", "Log level: error",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("error", output)
 
@@ -62,7 +62,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/history' must show 0 messages initially."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/history", "messages",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("0 messages", output)
 
@@ -70,7 +70,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/clear' must clear conversation memory."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/clear", "cleared",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("cleared", output)
 
@@ -79,11 +79,11 @@ class TestLinuxShell(RTClawLinuxTest):
         exec_command_and_wait_for_pattern(
             self.console, "/remember mykey myvalue",
             "Remembered:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         output = exec_command_and_wait_for_pattern(
             self.console, "/memories", "mykey",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("mykey", output)
 
@@ -92,11 +92,11 @@ class TestLinuxShell(RTClawLinuxTest):
         exec_command_and_wait_for_pattern(
             self.console, "/remember forgetme tempval",
             "Remembered:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         output = exec_command_and_wait_for_pattern(
             self.console, "/forget forgetme", "Forgot:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("forgetme", output)
 
@@ -104,7 +104,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/ai_status' must show Model field."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/ai_status", "Model:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("Model:", output)
         self.assertIn("API URL:", output)
@@ -114,12 +114,12 @@ class TestLinuxShell(RTClawLinuxTest):
         output = exec_command_and_wait_for_pattern(
             self.console, "/ai_set model test-model-123",
             "Model saved:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("test-model-123", output)
         output = exec_command_and_wait_for_pattern(
             self.console, "/ai_status", "Model:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("test-model-123", output)
 
@@ -128,7 +128,7 @@ class TestLinuxShell(RTClawLinuxTest):
         output = exec_command_and_wait_for_pattern(
             self.console, "/ai_set url https://test.example.com/v1",
             "API URL saved:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("https://test.example.com/v1", output)
 
@@ -136,7 +136,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """'/ip' must show network info."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/ip", "Network:",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("Network:", output)
 
@@ -144,7 +144,7 @@ class TestLinuxShell(RTClawLinuxTest):
         """Unknown /command must show error message."""
         output = exec_command_and_wait_for_pattern(
             self.console, "/nonexistent_cmd_xyz", "Unknown command",
-            timeout=self.SHELL_TIMEOUT,
+            timeout=self.platform.shell_timeout,
         )
         self.assertIn("Unknown command", output)
 

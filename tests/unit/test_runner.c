@@ -11,6 +11,7 @@
 extern int test_ai_memory_suite(void);
 extern int test_gateway_suite(void);
 extern int test_tools_suite(void);
+extern int test_script_tool_suite(void);
 extern int test_im_util_suite(void);
 extern int test_ota_suite(void);
 extern int test_ai_skill_suite(void);
@@ -24,6 +25,7 @@ int run_all_unit_tests(void)
     failed += test_ai_memory_suite();
     failed += test_gateway_suite();
     failed += test_tools_suite();
+    failed += test_script_tool_suite();
     failed += test_im_util_suite();
     failed += test_ota_suite();
     failed += test_ai_skill_suite();

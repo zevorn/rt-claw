@@ -62,6 +62,10 @@ if get_option('tool_net')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_NET'
     src_files += files('services/tools/net.c')
 endif
+if get_option('tool_script')
+    feature_defs += '-DCONFIG_RTCLAW_TOOL_SCRIPT'
+    src_files += files('services/tools/script.c')
+endif
 if get_option('tool_mouse')
     feature_defs += '-DCONFIG_RTCLAW_TOOL_MOUSE'
     src_files += files('services/tools/mouse.c')
