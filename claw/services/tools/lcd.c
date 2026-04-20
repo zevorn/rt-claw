@@ -582,25 +582,34 @@ int claw_lcd_available(void)
 #define BAR_X       4
 #define BAR_W       (LCD_WIDTH - 8)
 
-void claw_lcd_status(const char *msg)
-{
-    if (!msg) {
+#ifdef CONFIG_RTCLAW_USE_LVGL
+    #include "platform/atk-esp32s3-lvgl/main/ui_control.h"
+    void claw_lcd_status(const char *msg)
+    {
+        ui_set_status_text(msg);
         return;
     }
+#else
+    void claw_lcd_status(const char *msg)
+    {
+        if (!msg) {
+            return;
+        }
 
-    /* Skip slow MMIO framebuffer writes until user explicitly uses LCD */
-    if (!s_fb || !s_lcd_active) {
-        return;
+        /* Skip slow MMIO framebuffer writes until user explicitly uses LCD */
+        if (!s_fb || !s_lcd_active) {
+            return;
+        }
+
+        /* Clear status strip */
+        lcd_draw_rect(0, STATUS_Y, LCD_WIDTH, STATUS_H,
+                    rgb888_to_565(0, 0, 40), 1);
+
+        lcd_draw_text(BAR_X, STATUS_Y + 2, msg,
+                    rgb888_to_565(0, 220, 255),
+                    rgb888_to_565(0, 0, 40), 1);
     }
-
-    /* Clear status strip */
-    lcd_draw_rect(0, STATUS_Y, LCD_WIDTH, STATUS_H,
-                  rgb888_to_565(0, 0, 40), 1);
-
-    lcd_draw_text(BAR_X, STATUS_Y + 2, msg,
-                  rgb888_to_565(0, 220, 255),
-                  rgb888_to_565(0, 0, 40), 1);
-}
+#endif
 
 void claw_lcd_progress(int percent)
 {
@@ -642,10 +651,19 @@ int __attribute__((weak)) claw_lcd_available(void)
     return 0;
 }
 
+#ifdef CONFIG_RTCLAW_USE_LVGL
+    #include "platform/atk-esp32s3-lvgl/main/ui_control.h"
+    void claw_lcd_status(const char *msg)
+    {
+        ui_set_status_text(msg);
+        return;
+    }
+#else
 void __attribute__((weak)) claw_lcd_status(const char *msg)
 {
     (void)msg;
 }
+#endif
 
 void __attribute__((weak)) claw_lcd_progress(int percent)
 {

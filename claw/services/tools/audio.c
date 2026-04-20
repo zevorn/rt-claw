@@ -12,7 +12,27 @@
 
 #ifdef CONFIG_RTCLAW_AUDIO_ENABLE
 
+#ifdef CONFIG_RTCLAW_ES8388
+#include "drivers/audio/espressif/es8388_audio.h"
+#else
 #include "drivers/audio/espressif/es8311_audio.h"
+#endif
+
+
+typedef void (*audio_beep_t)(int freq, int duration, int volume);
+typedef void (*audio_set_volume_t)(int vol);
+typedef int  (*audio_play_sound_t)(const char *name);
+
+
+#ifdef CONFIG_RTCLAW_ES8388
+static audio_beep_t       board_audio_beep       = es8388_audio_beep;
+static audio_set_volume_t board_audio_set_volume = es8388_audio_set_volume;
+static audio_play_sound_t board_audio_play_sound = es8388_audio_play_sound;
+#else
+static audio_beep_t       board_audio_beep       = es8311_audio_beep;
+static audio_set_volume_t board_audio_set_volume = es8311_audio_set_volume;
+static audio_play_sound_t board_audio_play_sound = es8311_audio_play_sound;
+#endif
 
 static claw_err_t tool_audio_beep(struct claw_tool *tool,
                                   const cJSON *params, cJSON *result)
@@ -47,7 +67,8 @@ static claw_err_t tool_audio_beep(struct claw_tool *tool,
         return CLAW_ERROR;
     }
 
-    es8311_audio_beep(freq, duration, volume);
+    /* es8311_audio_beep(freq, duration, volume); */
+    board_audio_beep(freq, duration, volume);
 
     cJSON_AddStringToObject(result, "status", "ok");
     char msg[64];
@@ -74,7 +95,8 @@ static claw_err_t tool_audio_volume(struct claw_tool *tool,
         return CLAW_ERROR;
     }
 
-    es8311_audio_set_volume(vol);
+    /*  es8311_audio_set_volume(vol); */
+    board_audio_set_volume(vol);
     cJSON_AddStringToObject(result, "status", "ok");
     char msg[32];
     snprintf(msg, sizeof(msg), "volume set to %d", vol);
@@ -92,7 +114,8 @@ static claw_err_t tool_audio_play_sound(struct claw_tool *tool,
         return CLAW_ERROR;
     }
 
-    if (es8311_audio_play_sound(name_j->valuestring) != 0) {
+    /* if (es8311_audio_play_sound(name_j->valuestring) != 0) { */
+     if (board_audio_play_sound(name_j->valuestring) != 0) {
         cJSON_AddStringToObject(result, "error",
                                 "unknown sound name");
         return CLAW_ERROR;

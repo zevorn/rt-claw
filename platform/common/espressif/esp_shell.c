@@ -25,6 +25,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef CONFIG_RTCLAW_USE_LVGL
+    #include "ui_control.h"
+#endif
+
 #ifdef CONFIG_RTCLAW_SHELL_ENABLE
 
 #define TAG         "shell"
@@ -583,6 +587,10 @@ static void do_chat(const char *msg)
         anim_thread_fn, NULL, 2048, 20);
 
     int ret = ai_chat(msg, s_reply, REPLY_SIZE);
+
+    #ifdef CONFIG_RTCLAW_USE_LVGL
+        ui_set_reply_text(s_reply);
+    #endif
 
     s_anim_active = 0;
     ai_set_status_cb(NULL);

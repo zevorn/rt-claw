@@ -1,0 +1,196 @@
+menu "rt-claw Configuration"
+
+    # AI Engine credentials and tuning are configured at the top level
+    # via Meson options or environment variables.  See claw_config.h.
+    menu "Board Config"
+        menu "Audio Config"
+
+            config RTCLAW_ES8311
+                bool "Default Audio Set"
+                default n
+                help
+                    Configure Audio Driver. 
+            config RTCLAW_ES8388
+                bool "Enable ES8388 Audio Codec"
+                default n
+                help
+                    Configure Audio Driver. 
+        endmenu
+
+        menu "Display Config"
+            config RTCLAW_SSD1306
+                bool "Default Display Set"
+                default n
+                help
+                    Configure Display Module. 
+
+            config RTCLAW_USE_LVGL
+                bool "Uses the LVGL interface"
+                default n
+                help
+                    Uses the LVGL interface. 
+
+        endmenu
+    endmenu
+
+    menu "WiFi"
+
+        config RTCLAW_WIFI_SSID
+            string "Default WiFi SSID"
+            default ""
+            help
+                Build-time WiFi SSID. Can be overridden at runtime
+                via /wifi_set shell command (saved to NVS).
+
+        config RTCLAW_WIFI_PASS
+            string "Default WiFi password"
+            default ""
+            help
+                Build-time WiFi password. Can be overridden at runtime
+                via /wifi_set shell command (saved to NVS).
+
+        config RTCLAW_WIFI_PROVISION_ENABLE
+            bool "Enable WiFi provisioning (AP + Web portal)"
+            default y
+            help
+                Start a SoftAP hotspot with captive portal when no WiFi
+                credentials are configured or STA connection fails.
+                Users can configure WiFi and API keys via a web page.
+
+    endmenu
+
+    menu "Module Selection"
+
+        config RTCLAW_AI_BOOT_TEST
+            bool "Run AI connection test at boot"
+            default y
+            help
+                Send a test message to the LLM API during startup
+                to verify connectivity.  Disable on real hardware
+                to save time and bandwidth.
+
+        config RTCLAW_SHELL_ENABLE
+            bool "Enable interactive UART shell"
+            default y
+            help
+                Chat-first UART shell. Direct input goes to AI,
+                /commands for system. Disable to save RAM when
+                using only IM channels (e.g. Feishu).
+        
+        config RTCLAW_AUDIO_ENABLE
+            bool "Enable audio (ES8388 codec + PA)"
+            default n
+            help
+                ES8388 audio codec and power amplifier.
+                Disable to skip audio init and save resources.
+
+        config RTCLAW_LCD_ENABLE
+            bool "Enable LCD display"
+            default n
+            help
+                SPI LCD panel support.
+                Disable if no display hardware is present.
+
+        config RTCLAW_SWARM_ENABLE
+            bool "Enable swarm intelligence"
+            default y
+            help
+                Node discovery, heartbeat, and distributed task
+                scheduling over UDP broadcast.
+
+        config RTCLAW_SCHED_ENABLE
+            bool "Enable task scheduler"
+            default y
+            help
+                Timer-driven task execution engine.
+
+        config RTCLAW_SKILL_ENABLE
+            bool "Enable skill system"
+            default y
+            help
+                Predefined prompt templates (draw, monitor, greet).
+
+        config RTCLAW_FEISHU_ENABLE
+            bool "Enable Feishu (Lark) IM integration"
+            default n
+            help
+                WebSocket long connection to Feishu. Receives messages
+                and replies via AI engine. No public IP needed.
+
+        config RTCLAW_TELEGRAM_ENABLE
+            bool "Enable Telegram Bot integration"
+            default n
+            help
+                HTTP long-polling Telegram Bot. Receives messages and
+                replies via AI engine. No public IP needed.
+
+        config RTCLAW_HEARTBEAT_ENABLE
+            bool "Enable periodic AI heartbeat"
+            default n
+            depends on RTCLAW_SCHED_ENABLE
+            help
+                Periodic LLM health check with device status reporting.
+
+        config RTCLAW_OTA_ENABLE
+            bool "Enable OTA firmware update"
+            default n
+            help
+                Over-the-air firmware update via HTTP(S).
+                Requires OTA partition table (ota_0 + ota_1).
+
+        config RTCLAW_USB_HID_MOUSE
+            bool "Enable USB HID mouse"
+            default n
+            depends on IDF_TARGET_ESP32S3
+            help
+                Emulate a USB mouse via ESP32-S3 USB OTG (GPIO 19/20).
+                Uses TinyUSB HID device class.
+                Note: enabling this makes the USB OTG port a HID
+                device — USB Serial/JTAG console must use UART instead.
+
+        menu "Tool Use"
+
+            config RTCLAW_TOOL_GPIO
+                bool "GPIO tools"
+                default y
+                help
+                    gpio_set, gpio_get, gpio_config tools.
+
+            config RTCLAW_TOOL_SYSTEM
+                bool "System info tools"
+                default y
+                help
+                    system_info, memory_info, system_restart tools.
+
+            config RTCLAW_TOOL_LCD
+                bool "LCD drawing tools"
+                default n
+                depends on RTCLAW_LCD_ENABLE
+                help
+                    lcd_fill, lcd_text, lcd_rect, lcd_line, lcd_circle tools.
+
+            config RTCLAW_TOOL_SCHED
+                bool "Scheduler tools"
+                default y
+                depends on RTCLAW_SCHED_ENABLE
+                help
+                    schedule_task, remove_task tools.
+
+            config RTCLAW_TOOL_NET
+                bool "Network (HTTP) tools"
+                default y
+                help
+                    http_request tool for GET/POST requests.
+
+            config RTCLAW_TOOL_MOUSE
+                bool "USB HID mouse tools"
+                default y
+                depends on RTCLAW_USB_HID_MOUSE
+                help
+                    mouse_move, mouse_click, mouse_scroll tools.
+
+        endmenu
+
+    endmenu
+
+endmenu

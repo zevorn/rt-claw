@@ -1,0 +1,14 @@
+[sections:claw_registry]
+entries:
+    claw_services+
+    claw_drivers+
+    claw_tools+
+
+[scheme:claw_registry_default]
+entries:
+    claw_registry -> flash_rodata
+
+[mapping:claw_registry]
+archive: *
+entries:
+    * (claw_registry_default)
