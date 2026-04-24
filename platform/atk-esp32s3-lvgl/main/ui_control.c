@@ -82,7 +82,10 @@ static void ui_text_scroll_timer(lv_timer_t *timer)
 
         int line_len = end - s_text_offset;
         char line[512] = {0};
-        if (line_len > 0) strncpy(line, s_full_text + s_text_offset, line_len);
+        if (line_len > 0) {
+            line_len = LV_CLAMP(line_len, 0, sizeof(line) - 1);
+            strncpy(line, s_full_text + s_text_offset, line_len);
+        }
 
         lv_textarea_set_text(ui_TextArea3, line);
         lv_obj_scroll_to_y(ui_TextArea3, 0, LV_ANIM_OFF);

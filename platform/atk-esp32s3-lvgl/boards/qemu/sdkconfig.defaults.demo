@@ -48,3 +48,7 @@ CONFIG_RTCLAW_TOOL_NET=y
 
 # ---- Telegram off ----
 # CONFIG_RTCLAW_TELEGRAM_ENABLE is not set
+
+# ---- User Board Config ----
+CONFIG_RTCLAW_ES8388=y
+CONFIG_RTCLAW_USE_LVGL=y
