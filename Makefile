@@ -437,8 +437,6 @@ _atk_s3-build:
 	python3 scripts/gen_atk_esp32s3_cross.py $(ATK_S3_BOARD)
 
 	@mkdir -p $(BUILD_DIR)
-	@rm -rf $(BUILD_DIR)/esp32s3-$(ATK_S3_BOARD)
-	@ln -sfn atk-esp32s3-$(ATK_S3_BOARD) $(BUILD_DIR)/esp32s3-$(ATK_S3_BOARD)
 
 	@NINJA=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/meson/build.ninja; \
 	CROSS=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/cross.ini; \

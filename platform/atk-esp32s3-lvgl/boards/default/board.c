@@ -244,13 +244,6 @@ static void st7789_display_init(spi_host_device_t host)
 }
 
 
-
-
-static int s_oled_ready;
-static int s_audio_ready;
-
-
-
 #ifdef CLAW_PLATFORM_ESP_IDF
 
 static i2c_master_bus_handle_t create_i2c_bus(int sda, int scl,
@@ -274,21 +267,6 @@ static i2c_master_bus_handle_t create_i2c_bus(int sda, int scl,
     return bus;
 }
 
-static void i2c_scan(i2c_master_bus_handle_t bus, const char *label)
-{
-    printf("I2C scan [%s]:", label);
-    int found = 0;
-    for (int addr = 0x08; addr < 0x78; addr++) {
-        if (i2c_master_probe(bus, addr, 100) == ESP_OK) {
-            printf(" 0x%02X", addr);
-            found++;
-        }
-    }
-    if (found == 0) {
-        printf(" (none)");
-    }
-    printf("\n");
-}
 
 #endif /* CLAW_PLATFORM_ESP_IDF */
 
