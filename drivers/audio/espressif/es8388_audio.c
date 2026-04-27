@@ -404,7 +404,12 @@ int es8388_audio_play_sound(const char *name)
 
 #else /* stubs — no esp_codec_dev or non-ESP-IDF */
 
-
+int  es8388_audio_init(void *bus, int pa) { (void)bus; (void)pa; return -1; }
+void es8388_audio_set_volume(int v) { (void)v; }
+void es8388_audio_enable_output(int e) { (void)e; }
+void es8388_audio_write(const int16_t *d, size_t s) { (void)d; (void)s; }
+void es8388_audio_beep(int f, int d, int v) { (void)f; (void)d; (void)v; }
+int  es8388_audio_play_sound(const char *n) { (void)n; return -1; }
 
 #endif
 
