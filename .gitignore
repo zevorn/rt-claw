@@ -52,6 +52,14 @@ packages/
 sd.bin
 platform/*/cross.ini
 
+# Node.js (Codex CLI)
+node_modules/
+package.json
+package-lock.json
+
+# Codex
+.codex
+
 # Claude Code
 .claude/*
 !.claude/skills/
