@@ -371,6 +371,99 @@ _s3-build:
 		-DRTCLAW_BOARD=$(S3_BOARD) build
 	@echo "Output: $(BUILD_DIR)/esp32s3-$(S3_BOARD)/"
 
+# --- ATK-ESP32-S3 unified targets ---
+# Prerequisite: source $$HOME/esp/esp-idf/export.sh
+#
+# All boards share platform/atk-esp32s3/ as the single ESP-IDF project.
+# Board-specific config lives in platform/atk-esp32s3/boards/<board>/.
+#
+# Boards:
+#   qemu       QEMU virtual devkit (4MB, OpenCores Ethernet)
+#   default    Real hardware (16MB, WiFi + PSRAM)
+#
+ATK_ESP_S3_DIR := platform/atk-esp32s3-lvgl
+
+# Default aliases
+.PHONY: build-atk-esp32s3
+build-atk-esp32s3: build-atk-esp32s3-default
+
+# ---- All boards: build ----
+.PHONY: build-atk-esp32s3-default
+build-atk-esp32s3-default: ATK_S3_BOARD = default
+build-atk-esp32s3-default: _atk_s3-build
+
+# Backwards-compatible alias
+.PHONY: atk-esp32s3
+atk-esp32s3: build-atk-esp32s3-default
+
+# ---- Hardware: flash + monitor ----
+# .PHONY: flash-atk-esp32s3
+# flash-atk-esp32s3: build-atk-esp32s3-default
+# 	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf flash
+
+# .PHONY: monitor-atk-esp32s3
+# monitor-atk-esp32s3:
+# 	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf monitor
+
+.PHONY: flash-atk-esp32s3
+flash-atk-esp32s3: ATK_S3_BOARD = default
+flash-atk-esp32s3: build-atk-esp32s3-default
+	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf flash
+
+.PHONY: monitor-atk-esp32s3
+monitor-atk-esp32s3: ATK_S3_BOARD = default
+monitor-atk-esp32s3:
+	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf monitor
+# ---- Internal: shared build logic for all ATK-ESP32-S3 boards ----
+.PHONY: _atk_s3-build
+_atk_s3-build:
+	@if [ ! -f $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf/build.ninja ]; then \
+		cd $(ATK_ESP_S3_DIR) && idf.py \
+			-B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(ATK_S3_BOARD) set-target esp32s3; \
+	fi
+	@CCJSON=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf/compile_commands.json; \
+	DEFAULTS=$(ATK_ESP_S3_DIR)/boards/$(ATK_S3_BOARD)/sdkconfig.defaults; \
+	KCONFIG=$(ATK_ESP_S3_DIR)/components/rt_claw/Kconfig; \
+	SDKCONFIG=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf/sdkconfig; \
+	if [ ! -f "$$CCJSON" ] || [ "$$DEFAULTS" -nt "$$CCJSON" ] \
+	   || [ "$$KCONFIG" -nt "$$CCJSON" ] \
+	   || { [ -f "$$SDKCONFIG" ] && [ "$$SDKCONFIG" -nt "$$CCJSON" ]; }; then \
+		cd $(ATK_ESP_S3_DIR) && idf.py \
+			-B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf \
+			-DRTCLAW_BOARD=$(ATK_S3_BOARD) reconfigure; \
+	fi
+
+	python3 scripts/gen_atk_esp32s3_cross.py $(ATK_S3_BOARD)
+
+	@mkdir -p $(BUILD_DIR)
+
+	@NINJA=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/meson/build.ninja; \
+	CROSS=$(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/cross.ini; \
+	if [ ! -f "$$NINJA" ]; then \
+		meson setup $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/meson \
+			--cross-file "$$CROSS"; \
+	elif [ "$$CROSS" -nt "$$NINJA" ]; then \
+		meson setup $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/meson \
+			--reconfigure --cross-file "$$CROSS"; \
+	fi
+
+	meson compile -C $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/meson
+
+	cd $(ATK_ESP_S3_DIR) && idf.py \
+		-B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(ATK_S3_BOARD) reconfigure && \
+	idf.py \
+		-B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf \
+		-DRTCLAW_BOARD=$(ATK_S3_BOARD) build
+	@echo "Output: $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/"
+# use
+# make build-atk-esp32s3
+# make flash-atk-esp32s3
+# make monitor-atk-esp32s3
+
+
+
 # --- Linux native ---
 MESON_BUILDDIR_LINUX := $(BUILD_DIR)/linux
 
