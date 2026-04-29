@@ -40,15 +40,26 @@ pio run -e esp32s3_qemu            # QEMU 虚拟板
 ## 烧录
 
 ```bash
+# ESP32-C3
 cd platform/esp32c3
 pio run -e esp32c3_devkit -t upload
 pio run -e esp32c3_xiaozhi_xmini -t upload
+
+# ESP32-S3
+cd platform/esp32s3
+pio run -e esp32s3_default -t upload
 ```
 
 ## 串口监控
 
 ```bash
+# ESP32-C3
+cd platform/esp32c3
 pio run -e esp32c3_devkit -t monitor
+
+# ESP32-S3
+cd platform/esp32s3
+pio run -e esp32s3_default -t monitor
 ```
 
 ## 环境变量

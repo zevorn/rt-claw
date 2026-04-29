@@ -68,3 +68,7 @@ package-lock.json
 !.claude/skills/
 .humanize*
 slides
+
+# PlatformIO generated (per-env sdkconfig, stub sources)
+sdkconfig.*
+rt_claw_stub.c
