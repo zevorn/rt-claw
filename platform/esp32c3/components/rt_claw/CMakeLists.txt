@@ -59,72 +59,9 @@ if(_GIT_RC EQUAL 0)
         RT_CLAW_VERSION=\"${_GIT_VERSION}\")
 endif()
 
-if(RTCLAW_PLATFORMIO)
-    # PlatformIO path: run gen-cross.py + meson compile as a custom target,
-    # then link the Meson static archives into the component interface.
-    # This keeps Meson objects in the firmware link only (not the bootloader).
-
-    set(_gen_cross "${RT_CLAW_ROOT}/scripts/gen-esp32c3-cross.py")
-    set(_board_build_dir "${MESON_BUILD_DIR}/..")
-
-    set(_meson_stamp "${MESON_BUILD_DIR}/.pio_meson_done")
-    set(_meson_script "${CMAKE_CURRENT_BINARY_DIR}/run_meson.cmake")
-    file(WRITE "${_meson_script}" "
-        execute_process(
-            COMMAND ${Python3_EXECUTABLE} \"${_gen_cross}\"
-                --idf-build-dir \"${CMAKE_BINARY_DIR}\"
-                --board-build-dir \"${_board_build_dir}\"
-                \"${RTCLAW_BOARD}\"
-            WORKING_DIRECTORY \"${RT_CLAW_ROOT}\"
-            RESULT_VARIABLE _rc
-        )
-        if(NOT _rc EQUAL 0)
-            message(FATAL_ERROR \"gen-esp32c3-cross.py failed\")
-        endif()
-        set(_cross_ini \"${_board_build_dir}/cross.ini\")
-        set(_build_ninja \"${MESON_BUILD_DIR}/build.ninja\")
-        if(NOT EXISTS \${_build_ninja})
-            execute_process(
-                COMMAND meson setup \"${MESON_BUILD_DIR}\"
-                    --cross-file=\${_cross_ini}
-                WORKING_DIRECTORY \"${RT_CLAW_ROOT}\"
-                RESULT_VARIABLE _rc
-            )
-            if(NOT _rc EQUAL 0)
-                message(FATAL_ERROR \"meson setup failed\")
-            endif()
-        endif()
-        execute_process(
-            COMMAND meson compile -C \"${MESON_BUILD_DIR}\"
-            WORKING_DIRECTORY \"${RT_CLAW_ROOT}\"
-            RESULT_VARIABLE _rc
-        )
-        if(NOT _rc EQUAL 0)
-            message(FATAL_ERROR \"meson compile failed\")
-        endif()
-        file(WRITE \"${_meson_stamp}\" \"done\")
-    ")
-
-    add_custom_command(
-        OUTPUT "${_meson_stamp}"
-        COMMAND ${CMAKE_COMMAND} -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
-            -P "${_meson_script}"
-        COMMENT "Building rt-claw Meson libraries for PlatformIO"
-        VERBATIM
-    )
-    add_custom_target(rtclaw_meson_build DEPENDS "${_meson_stamp}")
-    add_dependencies(${COMPONENT_LIB} rtclaw_meson_build)
-
-    set(_rtclaw_a "${MESON_BUILD_DIR}/claw/librtclaw.a")
-    set(_osal_a   "${MESON_BUILD_DIR}/osal/libosal.a")
-    set(_cjson_a  "${MESON_BUILD_DIR}/vendor/lib/cjson/libcjson.a")
-
-    target_link_libraries(${COMPONENT_LIB} INTERFACE
-        -Wl,--whole-archive
-        "${_rtclaw_a}" "${_osal_a}" "${_cjson_a}"
-        -Wl,--no-whole-archive
-    )
-else()
+if(NOT RTCLAW_PLATFORMIO)
+    # Makefile/idf.py path: merge Meson pre-built objects via POST_BUILD.
+    # PlatformIO path handles Meson via pio_post_configure.py + LINKFLAGS.
     # Makefile/idf.py path: merge Meson pre-built objects via POST_BUILD.
     set(_merge_script "${CMAKE_CURRENT_BINARY_DIR}/merge_meson_objs.cmake")
     file(WRITE "${_merge_script}" "

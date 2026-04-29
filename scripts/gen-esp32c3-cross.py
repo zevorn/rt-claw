@@ -96,6 +96,8 @@ def main():
     for p in all_includes:
         if any(d in p for d in project_src_dirs):
             continue
+        if not os.path.isabs(p):
+            p = os.path.normpath(os.path.join(idf_build_dir, p))
         idf_includes.append(p)
 
     """ Architecture and compiler flags """
