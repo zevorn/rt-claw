@@ -29,13 +29,14 @@ pio run -e esp32s3_default         # 实体硬件（16MB + PSRAM）
 pio run -e esp32s3_qemu            # QEMU 虚拟板
 ```
 
-预构建脚本（`scripts/pio_pre_build.py`）自动完成以下步骤：
+构建过程使用两个额外脚本：
 
-1. 检测 PlatformIO 自带的 ESP-IDF
-2. 配置 ESP-IDF（`idf.py set-target` + `reconfigure`）
-3. 生成 Meson 交叉编译文件
-4. 通过 Meson 构建 rt-claw 库
-5. 由 CMake 将目标文件合并到最终固件中
+1. **预构建**（`pio_pre_build.py`）：检查工具（meson、ninja）并设置
+   CMake 变量
+2. **后配置**（`pio_post_configure.py`）：在 ESP-IDF cmake 配置完成后
+   运行，调用 Meson 桥接助手从 PlatformIO 的 `compile_commands.json`
+   生成交叉编译文件，验证编译器一致性，检测过期 Meson 构建，并运行
+   `meson compile`
 
 ## 烧录
 

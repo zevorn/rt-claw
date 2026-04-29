@@ -30,13 +30,14 @@ pio run -e esp32s3_default         # real hardware (16MB + PSRAM)
 pio run -e esp32s3_qemu            # QEMU virtual board
 ```
 
-The pre-build script (`scripts/pio_pre_build.py`) automatically:
+The build uses two extra scripts:
 
-1. Detects the ESP-IDF bundled with PlatformIO
-2. Configures ESP-IDF (`idf.py set-target` + `reconfigure`)
-3. Generates Meson cross-compilation files
-4. Builds rt-claw libraries via Meson
-5. Lets CMake merge the objects into the final firmware
+1. **Pre-build** (`pio_pre_build.py`): checks tools (meson, ninja) and
+   sets CMake variables for the Meson bridge
+2. **Post-configure** (`pio_post_configure.py`): runs after ESP-IDF cmake
+   configure, invokes the Meson bridge helper which generates cross-files
+   from PlatformIO's `compile_commands.json`, validates compiler consistency,
+   detects stale Meson builds, and runs `meson compile`
 
 ## Flash
 
