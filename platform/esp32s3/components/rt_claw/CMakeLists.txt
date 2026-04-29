@@ -1,5 +1,9 @@
 set(RT_CLAW_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
-set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32s3-${RTCLAW_BOARD}/meson")
+if(DEFINED RTCLAW_MESON_BUILD_DIR)
+    set(MESON_BUILD_DIR "${RTCLAW_MESON_BUILD_DIR}")
+else()
+    set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32s3-${RTCLAW_BOARD}/meson")
+endif()
 
 # Headers exported to dependent components (e.g. main)
 set(CLAW_INC_DIRS

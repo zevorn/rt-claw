@@ -60,6 +60,9 @@ package-lock.json
 # Codex
 .codex
 
+# PlatformIO
+.pio/
+
 # Claude Code
 .claude/*
 !.claude/skills/
