@@ -58,9 +58,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: pio-${{ hashFiles('platform/esp32c3/platformio.ini') }}
+          key: pio-${{ hashFiles('platform/esp32c3/platformio.ini', 'platform/esp32s3/platformio.ini') }}
           restore-keys: pio-
 
       - name: Build ESP32-C3 devkit via PlatformIO
         working-directory: platform/esp32c3
         run: pio run -e esp32c3_devkit
+
+      - name: Build ESP32-S3 qemu via PlatformIO
+        working-directory: platform/esp32s3
+        run: pio run -e esp32s3_qemu
