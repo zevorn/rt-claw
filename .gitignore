@@ -70,5 +70,5 @@ package-lock.json
 slides
 
 # PlatformIO generated (per-env sdkconfig, stub sources)
-sdkconfig.*
+sdkconfig.esp32*
 rt_claw_stub.c
