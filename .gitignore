@@ -52,8 +52,23 @@ packages/
 sd.bin
 platform/*/cross.ini
 
+# Node.js (Codex CLI)
+node_modules/
+package.json
+package-lock.json
+
+# Codex
+.codex
+
+# PlatformIO
+.pio/
+
 # Claude Code
 .claude/*
 !.claude/skills/
 .humanize*
 slides
+
+# PlatformIO generated (per-env sdkconfig, stub sources)
+sdkconfig.esp32*
+rt_claw_stub.c

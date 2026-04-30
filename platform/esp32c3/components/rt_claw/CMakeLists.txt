@@ -1,12 +1,14 @@
 set(RT_CLAW_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
-set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32c3-${RTCLAW_BOARD}/meson")
+if(DEFINED RTCLAW_MESON_BUILD_DIR)
+    set(MESON_BUILD_DIR "${RTCLAW_MESON_BUILD_DIR}")
+else()
+    set(MESON_BUILD_DIR "${RT_CLAW_ROOT}/build/esp32c3-${RTCLAW_BOARD}/meson")
+endif()
 
-# Headers exported to dependent components (e.g. main)
 set(CLAW_INC_DIRS
     "${RT_CLAW_ROOT}/include"
 )
 
-# ESP-IDF component dependencies (needed for symbol resolution at link time)
 set(CLAW_REQUIRES
     freertos
     esp_netif
@@ -22,22 +24,14 @@ set(CLAW_REQUIRES
     esp_hw_support
 )
 
-# Unconditional: ESP-IDF processes component REQUIRES before sdkconfig
-# is available, so CONFIG_* conditionals cannot gate REQUIRES here.
-# These components always exist; unused ones add only include paths.
 list(APPEND CLAW_REQUIRES esp_eth esp_wifi esp_lcd esp_driver_i2c
      esp_driver_i2s app_update esp_http_server)
 
-# Stub source so the component produces a real static library
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/rt_claw_stub.c" "/* auto-generated */\n")
 set(CLAW_SRCS "${CMAKE_CURRENT_BINARY_DIR}/rt_claw_stub.c")
 
-# es8311 audio driver — compiled by CMake (not Meson) because it
-# depends on esp_codec_dev managed component headers.
 list(APPEND CLAW_SRCS "${RT_CLAW_ROOT}/drivers/audio/espressif/es8311_audio.c")
 
-# Platform OTA implementation — must live in rt_claw (not main) so the
-# linker resolves symbols referenced by Meson-compiled ota_service.o.
 if(CONFIG_RTCLAW_OTA_ENABLE)
     list(APPEND CLAW_SRCS "${RT_CLAW_ROOT}/platform/common/espressif/esp_ota.c")
 endif()
@@ -53,7 +47,6 @@ idf_component_register(
 target_compile_definitions(${COMPONENT_LIB} PUBLIC CLAW_PLATFORM_ESP_IDF)
 target_compile_options(${COMPONENT_LIB} PRIVATE -Werror)
 
-# Version from git describe
 execute_process(
     COMMAND git describe --tags --dirty=-dirty
     WORKING_DIRECTORY ${RT_CLAW_ROOT}
@@ -66,13 +59,12 @@ if(_GIT_RC EQUAL 0)
         RT_CLAW_VERSION=\"${_GIT_VERSION}\")
 endif()
 
-# Merge Meson pre-built objects into the component library so they
-# participate in ESP-IDF's normal link group (resolves cross-references).
-#
-# The glob runs at BUILD time (not configure time) via a helper script,
-# because Meson objects may not exist yet when CMake configures.
-set(_merge_script "${CMAKE_CURRENT_BINARY_DIR}/merge_meson_objs.cmake")
-file(WRITE "${_merge_script}" "
+if(NOT RTCLAW_PLATFORMIO)
+    # Makefile/idf.py path: merge Meson pre-built objects via POST_BUILD.
+    # PlatformIO path handles Meson via pio_post_configure.py + LINKFLAGS.
+    # Makefile/idf.py path: merge Meson pre-built objects via POST_BUILD.
+    set(_merge_script "${CMAKE_CURRENT_BINARY_DIR}/merge_meson_objs.cmake")
+    file(WRITE "${_merge_script}" "
 file(GLOB _objs
     \"${MESON_BUILD_DIR}/claw/librtclaw.a.p/*.o\"
     \"${MESON_BUILD_DIR}/osal/libosal.a.p/*.o\"
@@ -88,11 +80,12 @@ else()
 endif()
 ")
 
-add_custom_command(TARGET ${COMPONENT_LIB} POST_BUILD
-    COMMAND ${CMAKE_COMMAND}
-        -DAR=${CMAKE_AR}
-        -DRANLIB=${CMAKE_RANLIB}
-        -DLIB=$<TARGET_FILE:${COMPONENT_LIB}>
-        -P "${_merge_script}"
-    COMMENT "Merging Meson pre-built objects into ${COMPONENT_LIB}"
-)
+    add_custom_command(TARGET ${COMPONENT_LIB} POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DAR=${CMAKE_AR}
+            -DRANLIB=${CMAKE_RANLIB}
+            -DLIB=$<TARGET_FILE:${COMPONENT_LIB}>
+            -P "${_merge_script}"
+        COMMENT "Merging Meson pre-built objects into ${COMPONENT_LIB}"
+    )
+endif()

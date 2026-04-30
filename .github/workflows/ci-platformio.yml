@@ -1,0 +1,70 @@
+name: CI PlatformIO Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'claw/**'
+      - 'osal/**'
+      - 'include/**'
+      - 'drivers/**'
+      - 'platform/esp32c3/**'
+      - 'platform/esp32s3/**'
+      - 'platform/common/**'
+      - 'scripts/**'
+      - 'meson.build'
+      - 'meson_options.txt'
+      - 'claw_config.h'
+      - '.github/workflows/ci-platformio.yml'
+  pull_request:
+    paths:
+      - 'claw/**'
+      - 'osal/**'
+      - 'include/**'
+      - 'drivers/**'
+      - 'platform/esp32c3/**'
+      - 'platform/esp32s3/**'
+      - 'platform/common/**'
+      - 'scripts/**'
+      - 'meson.build'
+      - 'meson_options.txt'
+      - 'claw_config.h'
+      - '.github/workflows/ci-platformio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-platformio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and build tools
+        run: pip install platformio meson ninja
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platform/esp32c3/platformio.ini', 'platform/esp32s3/platformio.ini') }}
+          restore-keys: pio-
+
+      - name: Build ESP32-C3 devkit via PlatformIO
+        working-directory: platform/esp32c3
+        run: pio run -e esp32c3_devkit
+
+      - name: Build ESP32-S3 qemu via PlatformIO
+        working-directory: platform/esp32s3
+        run: pio run -e esp32s3_qemu

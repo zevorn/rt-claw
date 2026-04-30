@@ -7,8 +7,11 @@ endif()
 set(SDKCONFIG_DEFAULTS
     "${CMAKE_CURRENT_LIST_DIR}/boards/${RTCLAW_BOARD}/sdkconfig.defaults")
 
-# Put sdkconfig in the build directory (supports parallel multi-board builds)
-set(SDKCONFIG "${CMAKE_BINARY_DIR}/sdkconfig")
+# Put sdkconfig in the build directory (supports parallel multi-board builds).
+# PlatformIO passes -DSDKCONFIG=... so only set the default when not provided.
+if(NOT DEFINED SDKCONFIG)
+    set(SDKCONFIG "${CMAKE_BINARY_DIR}/sdkconfig")
+endif()
 
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/components")
 

@@ -14,6 +14,7 @@
 #   python3 scripts/gen-esp32s3-cross.py              # QEMU
 #   python3 scripts/gen-esp32s3-cross.py default       # real hardware
 
+import argparse
 import io
 import json
 import os
@@ -22,25 +23,45 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-BOARD = sys.argv[1] if len(sys.argv) > 1 else 'qemu'
 
-BOARD_BUILD_DIR = os.path.join(PROJECT_ROOT, 'build', f'esp32s3-{BOARD}')
-IDF_BUILD_DIR = os.path.join(BOARD_BUILD_DIR, 'idf')
-CC_JSON = os.path.join(IDF_BUILD_DIR, 'compile_commands.json')
-CROSS_INI = os.path.join(BOARD_BUILD_DIR, 'cross.ini')
-SDKCONFIG_H = os.path.join(IDF_BUILD_DIR, 'config', 'sdkconfig.h')
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Generate Meson cross-file for ESP32-S3 from ESP-IDF '
+                    'build config.')
+    parser.add_argument('board', nargs='?', default='qemu',
+                        help='Board name (default: qemu)')
+    parser.add_argument('--idf-build-dir',
+                        help='Override IDF build directory path')
+    parser.add_argument('--board-build-dir',
+                        help='Override board build directory path')
+    parser.add_argument('--cross-file',
+                        help='Override output cross-file path')
+    return parser.parse_args()
 
 
 def main():
-    if not os.path.exists(CC_JSON):
-        print(f'Error: {CC_JSON} not found.', file=sys.stderr)
+    args = parse_args()
+    board = args.board
+
+    board_build_dir = (args.board_build_dir or
+                       os.path.join(PROJECT_ROOT, 'build',
+                                    f'esp32s3-{board}'))
+    idf_build_dir = (args.idf_build_dir or
+                     os.path.join(board_build_dir, 'idf'))
+    cc_json = os.path.join(idf_build_dir, 'compile_commands.json')
+    cross_ini = (args.cross_file or
+                 os.path.join(board_build_dir, 'cross.ini'))
+    sdkconfig_h = os.path.join(idf_build_dir, 'config', 'sdkconfig.h')
+
+    if not os.path.exists(cc_json):
+        print(f'Error: {cc_json} not found.', file=sys.stderr)
         print('Run first:', file=sys.stderr)
-        print(f'  cd platform/esp32s3 && idf.py -B {IDF_BUILD_DIR} '
-              f'-DRTCLAW_BOARD={BOARD} set-target esp32s3',
+        print(f'  cd platform/esp32s3 && idf.py -B {idf_build_dir} '
+              f'-DRTCLAW_BOARD={board} set-target esp32s3',
               file=sys.stderr)
         return 1
 
-    with open(CC_JSON) as f:
+    with open(cc_json) as f:
         cc = json.load(f)
 
     """ Find a source entry to extract ESP-IDF flags """
@@ -74,6 +95,8 @@ def main():
     for p in all_includes:
         if any(d in p for d in project_src_dirs):
             continue
+        if not os.path.isabs(p):
+            p = os.path.normpath(os.path.join(idf_build_dir, p))
         idf_includes.append(p)
 
     """ Architecture and compiler flags (Xtensa LX7) """
@@ -86,9 +109,9 @@ def main():
     ]
 
     """ Force-include sdkconfig.h so CONFIG_* macros are available """
-    if os.path.exists(SDKCONFIG_H):
+    if os.path.exists(sdkconfig_h):
         c_args.append(f'-include')
-        c_args.append(SDKCONFIG_H)
+        c_args.append(sdkconfig_h)
 
     """ ESP-IDF platform defines """
     c_args.extend([
@@ -107,12 +130,12 @@ def main():
         c_args.append(inc)
 
     """ Write cross.ini (only update file if content changed) """
-    os.makedirs(os.path.dirname(CROSS_INI), exist_ok=True)
+    os.makedirs(os.path.dirname(cross_ini), exist_ok=True)
     buf = io.StringIO()
     f = buf
 
     f.write('# Auto-generated Meson cross-file for ESP32-S3 (ESP-IDF)\n')
-    f.write(f'# Board: {BOARD}\n')
+    f.write(f'# Board: {board}\n')
     f.write('# Regenerate: python3 scripts/gen-esp32s3-cross.py\n')
     f.write('# DO NOT edit manually or commit to git.\n\n')
 
@@ -151,8 +174,8 @@ def main():
         'CONFIG_RTCLAW_OTA_ENABLE':       'ota',
     }
     enabled = set()
-    if os.path.exists(SDKCONFIG_H):
-        with open(SDKCONFIG_H) as sh:
+    if os.path.exists(sdkconfig_h):
+        with open(sdkconfig_h) as sh:
             for line in sh:
                 for kconf in kconfig_to_meson:
                     if f'#define {kconf} ' in line or \
@@ -164,18 +187,18 @@ def main():
 
     new_content = buf.getvalue()
     old_content = ''
-    if os.path.exists(CROSS_INI):
-        with open(CROSS_INI) as existing:
+    if os.path.exists(cross_ini):
+        with open(cross_ini) as existing:
             old_content = existing.read()
     if new_content != old_content:
-        with open(CROSS_INI, 'w') as out:
+        with open(cross_ini, 'w') as out:
             out.write(new_content)
 
-    print(f'Generated: {CROSS_INI}')
-    print(f'  Board:     {BOARD}')
+    print(f'Generated: {cross_ini}')
+    print(f'  Board:     {board}')
     print(f'  Compiler:  {compiler}')
     print(f'  Includes:  {len(idf_includes)} ESP-IDF paths')
-    print(f'  sdkconfig: {SDKCONFIG_H}')
+    print(f'  sdkconfig: {sdkconfig_h}')
     return 0
 
 
