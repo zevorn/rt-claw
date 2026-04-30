@@ -9,9 +9,12 @@ on:
       - 'include/**'
       - 'drivers/**'
       - 'platform/esp32c3/**'
+      - 'platform/esp32s3/**'
+      - 'platform/common/**'
       - 'scripts/**'
       - 'meson.build'
       - 'meson_options.txt'
+      - 'claw_config.h'
       - '.github/workflows/ci-platformio.yml'
   pull_request:
     paths:
@@ -20,9 +23,12 @@ on:
       - 'include/**'
       - 'drivers/**'
       - 'platform/esp32c3/**'
+      - 'platform/esp32s3/**'
+      - 'platform/common/**'
       - 'scripts/**'
       - 'meson.build'
       - 'meson_options.txt'
+      - 'claw_config.h'
       - '.github/workflows/ci-platformio.yml'
   workflow_dispatch:
 

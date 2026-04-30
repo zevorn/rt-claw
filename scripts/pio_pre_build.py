@@ -33,6 +33,9 @@ def _check_tool(name):
 
 
 def pre_build():
+    if env.IsIntegrationDump():
+        return
+
     build_targets = COMMAND_LINE_TARGETS or ["buildprog"]  # noqa: F821
     skip_targets = {"clean", "cleanall", "idedata", "menuconfig"}
     if any(t in skip_targets for t in build_targets):
