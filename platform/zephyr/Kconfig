@@ -1,0 +1,9 @@
+mainmenu "rt-claw Configuration"
+
+config RTCLAW
+	bool "rt-claw AI assistant"
+	default y
+	help
+	  Enable the rt-claw embedded AI assistant framework.
+
+source "Kconfig.zephyr"

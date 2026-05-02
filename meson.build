@@ -63,13 +63,16 @@ elif osal_backend == 'freertos'
     else
         platform_defs += ['-DCLAW_PLATFORM_ESP_IDF']
     endif
+elif osal_backend == 'zephyr'
+    platform_defs += ['-DCLAW_PLATFORM_ZEPHYR']
 elif osal_backend == 'linux'
     platform_defs += ['-DCLAW_PLATFORM_LINUX']
 endif
 
 # Bare-metal platforms lack HTTPS/WebSocket; reject feishu/telegram.
 _bare_metal = (osal_backend == 'rtthread') or \
-              (osal_backend == 'freertos' and get_option('platform') == 'zynq-a9')
+              (osal_backend == 'freertos' and get_option('platform') == 'zynq-a9') or \
+              (osal_backend == 'zephyr')
 if _bare_metal and (get_option('feishu') or get_option('telegram'))
     error('feishu/telegram are not supported on bare-metal platforms (no HTTPS/WebSocket)')
 endif

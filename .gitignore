@@ -21,6 +21,11 @@ build/
 *.pyc
 __pycache__/
 
+# Zephyr west workspace (modules fetched by west update)
+vendor/os/.west/
+vendor/os/modules/
+vendor/os/tools/
+
 # ESP-IDF
 sdkconfig
 sdkconfig.old

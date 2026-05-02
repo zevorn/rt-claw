@@ -1,5 +1,5 @@
 option('osal', type: 'combo',
-    choices: ['rtthread', 'freertos', 'linux', 'none'],
+    choices: ['rtthread', 'freertos', 'linux', 'zephyr', 'none'],
     value: 'none',
     description: 'OSAL backend (none = library only, no OSAL compiled)')
 option('platform', type: 'string', value: '',

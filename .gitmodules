@@ -14,3 +14,6 @@
 	url = https://github.com/RT-Thread-packages/micropython.git
 	branch = master
 	ignore = untracked
+[submodule "vendor/os/zephyr"]
+	path = vendor/os/zephyr
+	url = https://github.com/zephyrproject-rtos/zephyr.git

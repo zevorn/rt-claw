@@ -28,6 +28,20 @@ elif osal_backend == 'freertos'
         link_with: osal_lib,
         include_directories: claw_inc,
     )
+elif osal_backend == 'zephyr'
+    osal_src = files(
+        'zephyr/claw_os_zephyr.c',
+        'zephyr/claw_net_zephyr.c',
+        'zephyr/claw_kv_zephyr.c',
+    )
+    osal_lib = static_library('osal', osal_src,
+        include_directories: [claw_inc] + platform_incs,
+        c_args: platform_defs,
+    )
+    osal_dep = declare_dependency(
+        link_with: osal_lib,
+        include_directories: claw_inc,
+    )
 elif osal_backend == 'linux'
     libcurl_dep = dependency('libcurl', required: true)
     osal_src = files(
