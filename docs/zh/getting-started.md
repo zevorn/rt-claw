@@ -3,8 +3,8 @@
 [English](../en/getting-started.md) | **中文**
 
 本指南涵盖在所有支持平台上构建、烧录和运行 rt-claw 的完整流程，
-包括 ESP32-C3、ESP32-S3、vexpress-a9（RT-Thread）、Zynq-A9（FreeRTOS）
-和 Linux 原生平台。
+包括 ESP32-C3、ESP32-S3、vexpress-a9（RT-Thread）、Zynq-A9（FreeRTOS）、
+Zephyr（Cortex-A9 / Cortex-M3）和 Linux 原生平台。
 
 ## 前置条件
 
@@ -251,6 +251,45 @@ make run-zynq-a9-qemu GDB=1        # 调试模式（GDB 端口 1234）
 > **注意：** Zynq-A9 使用 FreeRTOS+TCP 配合 Cadence GEM 以太网。
 > 与 vexpress-a9 一样，不支持 TLS — 需要使用 `scripts/api-proxy.py`
 > 将 HTTP 桥接到 HTTPS 以发起 AI API 请求。
+
+## Zephyr（Cortex-A9 / Cortex-M3）
+
+无需 ESP-IDF。需要安装 Zephyr SDK。rt-claw 源码由 Zephyr CMake 直接编译，
+无需 Meson 中间步骤。
+
+### 前置条件
+
+- Zephyr SDK 1.0.1（包含 ARM 工具链）
+- CMake 和 Ninja
+- Zephyr 内核已作为 `vendor/os/zephyr/` 子模块包含
+
+### Cortex-M3（标准 QEMU）
+
+```bash
+export RTCLAW_AI_API_KEY='sk-...'
+export RTCLAW_AI_API_URL='https://api.anthropic.com/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+
+make build-zephyr-cortex-m3-qemu
+make run-zephyr-cortex-m3-qemu
+make run-zephyr-cortex-m3-qemu GDB=1   # 调试模式（GDB 端口 1234）
+```
+
+### Cortex-A9（需要 Xilinx QEMU）
+
+```bash
+make build-zephyr-cortex-a9-qemu
+make run-zephyr-cortex-a9-qemu
+make run-zephyr-cortex-a9-qemu GDB=1   # 调试模式（GDB 端口 1234）
+```
+
+> **注意：** Zephyr qemu_cortex_a9 开发板需要 Xilinx QEMU 分支
+> （`qemu-system-aarch64` 并支持 `arm-generic-fdt-7series` 机型）。
+> 标准 `qemu-system-arm` 不支持此目标。
+> 安装地址：<https://github.com/Xilinx/qemu>
+
+> **HTTPS 支持：** Zephyr 平台通过 mbedTLS 原生支持 HTTPS，无需启动
+> `scripts/api-proxy.py` 代理即可直接调用 AI API。
 
 ## Linux 原生平台
 

@@ -57,6 +57,8 @@ Individual IoT devices work alone. Cross-device collaboration requires complex p
 | ESP32-S3 | Xtensa, 240MHz | FreeRTOS (ESP-IDF) | ✅ Real hardware + QEMU |
 | Zynq-A9 | ARM Cortex-A9 | FreeRTOS + FreeRTOS+TCP | ✅ QEMU |
 | vexpress-A9 | ARM Cortex-A9 | RT-Thread v5.3.0 | ✅ QEMU |
+| Zephyr qemu_cortex_a9 | ARM Cortex-A9 | Zephyr v4.4.0 | Build ✅ QEMU 🔧 (requires Xilinx QEMU) |
+| Zephyr qemu_cortex_m3 | ARM Cortex-M3 | Zephyr v4.4.0 | ✅ QEMU |
 
 ### Metrics
 
@@ -64,7 +66,7 @@ Individual IoT devices work alone. Cross-device collaboration requires complex p
 - **Memory footprint**: Core framework < 400KB RAM
 - **Tool response latency**: Local tool invocation < 10ms
 - **Built-in tools**: 30+ (GPIO / LCD / Network / Audio / Scheduler / OTA)
-- **RTOS coverage**: 2 RTOSes (FreeRTOS + RT-Thread), 4 hardware platforms
+- **RTOS coverage**: 3 RTOSes (FreeRTOS + RT-Thread + Zephyr), 6 platform targets
 - **Codebase**: Pure C99, ~8000 lines of core code, auditable and configurable
 
 ---

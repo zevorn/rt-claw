@@ -17,7 +17,7 @@
 <p align="center"><strong>中文</strong> | <a href="README.md">English</a></p>
 
 **RT-Claw** — 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，面向嵌入式设备的智能助手。
-通过 OSAL 支持多 OS（FreeRTOS、RT-Thread、Linux），以组网节点构建蜂群智能。
+通过 OSAL 支持多 OS（FreeRTOS、RT-Thread、Zephyr、Linux），以组网节点构建蜂群智能。
 ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 
 > 仅需一美元的硬件成本，即可快速部署你的专属 AI 助理——无缝融入工作与生活，高效连接物理世界。
@@ -39,7 +39,7 @@ ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 | 蜂群智能 | 节点发现、心跳检测、能力位图、跨节点远程工具调用 | 已完成 |
 | 定时任务 | 定时触发任务执行与周期性自动化；AI 可创建/查看/删除任务 | 已完成 |
 | 对话优先 Shell | UART 交互终端，支持插入模式编辑、Tab 补全、UTF-8；直接输入发送 AI 对话，/命令 执行系统操作 | 已完成 |
-| OSAL | 一次编写，在 FreeRTOS、RT-Thread 和 Linux 上零修改运行 | 已完成 |
+| OSAL | 一次编写，在 FreeRTOS、RT-Thread、Zephyr 和 Linux 上零修改运行 | 已完成 |
 | Gateway | 服务间线程安全的消息路由 | 已完成 |
 | 网络 | 以太网（QEMU）和 WiFi（真实硬件）；HTTP 客户端用于 API 调用 | 已完成 |
 | IM 集成 | 飞书（Lark）WebSocket 长连接 + Telegram HTTP 长轮询；计划中：钉钉、QQ | 已完成 |
@@ -65,11 +65,11 @@ ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 |       WiFi | ES8311 | SSD1306 | serial | LCD framebuffer       |
 +----------------------------------------------------------------+
 |                   osal/claw_os.h (OSAL API)                    |
-+----------------+----------------------+--------------+---------+
-| FreeRTOS (IDF) | FreeRTOS(standalone) |  RT-Thread   |  Linux  |
-+----------------+----------------------+--------------+---------+
-| ESP32-C3 / S3  |  QEMU Zynq-A9 (GEM)  | vexpress-a9  |  Native |
-+----------------+----------------------+--------------+---------+
++--------------+--------------+------------+----------+----------+
+|FreeRTOS(IDF) |FreeRTOS(std) | RT-Thread  |  Zephyr  |  Linux   |
++--------------+--------------+------------+----------+----------+
+| ESP32-C3/S3  | Zynq-A9 QEMU |vexpress-a9 | QEMU A9  |  Native  |
++--------------+--------------+------------+----------+----------+
 ```
 
 ## 支持平台
@@ -80,6 +80,8 @@ ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 | ESP32-S3 | QEMU、真实硬件 | FreeRTOS (ESP-IDF) | Meson + CMake | 已验证 |
 | Zynq-A9 | QEMU | FreeRTOS (standalone) | Meson（完整固件） | 已验证 |
 | vexpress-a9 | QEMU | RT-Thread | Meson + SCons | 已验证 |
+| Zephyr Cortex-A9 | QEMU (qemu_cortex_a9) | Zephyr v4.4.0 | Meson + West | 已验证 |
+| Zephyr Cortex-M3 | QEMU (qemu_cortex_m3) | Zephyr v4.4.0 | Meson + West | 已验证 |
 | Linux | 原生（x86_64、aarch64） | Linux (pthreads) | Meson | 已验证 |
 
 ## 快速开始
