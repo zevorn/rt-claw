@@ -164,9 +164,9 @@ Settings subsystem backed by NVS.
 Key differences from other patterns:
 
 - **No Meson prebuilt `.a`** -- Zephyr CMake compiles all sources directly
-- **`west build`** -- standard Zephyr build command instead of `meson compile`
+- **`cmake + ninja`** -- direct CMake build instead of `meson compile`
 - **prj.conf** -- Kconfig-based configuration (kernel, networking, TLS)
-- **Native HTTPS** -- mbedTLS integrated via Zephyr, no proxy required
+- **HTTPS** -- mbedTLS included; TLS Kconfig not yet enabled by default, use `api-proxy.py` until configured
 
 ## Adding a New Tool
 
