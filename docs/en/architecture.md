@@ -129,7 +129,8 @@ matching uses `struct claw_tool.required_caps` with prefix-based fallback.
 Platform-aware HTTP client. ESP-IDF: `esp_http_client` with mbedTLS for
 HTTPS. RT-Thread: BSD sockets routed through `scripts/api-proxy.py`
 (HTTP-to-HTTPS proxy for environments without native TLS). Zephyr: Zephyr
-HTTP Client with mbedTLS for native HTTPS (no proxy needed).
+HTTP Client with mbedTLS support (TLS Kconfig not yet enabled by default;
+use `scripts/api-proxy.py` until TLS is fully configured).
 
 ### Feishu IM (`claw/services/im/feishu.c`)
 
