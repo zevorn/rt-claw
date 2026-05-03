@@ -16,8 +16,9 @@ LOG_MODULE_REGISTER(rtclaw_main, LOG_LEVEL_INF);
 
 int main(void)
 {
-    claw_kv_init();
-    shell_nvs_config_load();
+    if (claw_kv_init() == 0) {
+        shell_nvs_config_load();
+    }
     claw_init();
 
     /*
