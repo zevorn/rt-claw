@@ -24,4 +24,33 @@ fi
 
 pip3 install --quiet pykwalify
 
+# --- Xilinx QEMU (for qemu_cortex_a9 runtime testing) ---
+XILINX_QEMU_DIR="$HOME/xilinx-qemu"
+XILINX_QEMU_BIN="$XILINX_QEMU_DIR/build/qemu-system-aarch64"
+
+if [ -x "$XILINX_QEMU_BIN" ]; then
+    echo "Xilinx QEMU already built"
+else
+    echo "Building Xilinx QEMU (for arm-generic-fdt-7series)..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq \
+        libglib2.0-dev libpixman-1-dev libslirp-dev \
+        pkg-config python3-venv > /dev/null 2>&1
+
+    git clone --depth 1 --branch xlnx_rel_v2024.1 \
+        https://github.com/Xilinx/qemu.git "$XILINX_QEMU_DIR"
+
+    cd "$XILINX_QEMU_DIR"
+    ./configure \
+        --target-list=aarch64-softmmu \
+        --prefix="$XILINX_QEMU_DIR/install" \
+        --enable-slirp \
+        --disable-docs \
+        --disable-werror
+    make -j"$(nproc)"
+    echo "Xilinx QEMU built at $XILINX_QEMU_BIN"
+fi
+
+echo "$XILINX_QEMU_DIR/build" >> "$GITHUB_PATH" 2>/dev/null || true
+
 echo "Zephyr SDK setup complete"
