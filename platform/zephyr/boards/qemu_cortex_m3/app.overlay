@@ -1,0 +1,23 @@
+/*
+ * DTS overlay for rt-claw on qemu_cortex_m3.
+ * Defines a storage partition on flash0 for NVS-backed Settings.
+ */
+
+/ {
+	chosen {
+		zephyr,settings-partition = &storage_partition;
+	};
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		storage_partition: partition@3c000 {
+			label = "storage";
+			reg = <0x3c000 0x4000>;
+		};
+	};
+};

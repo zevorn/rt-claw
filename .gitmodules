@@ -17,3 +17,15 @@
 [submodule "vendor/os/zephyr"]
 	path = vendor/os/zephyr
 	url = https://github.com/zephyrproject-rtos/zephyr.git
+[submodule "vendor/os/modules/hal/cmsis"]
+	path = vendor/os/modules/hal/cmsis
+	url = https://github.com/zephyrproject-rtos/cmsis.git
+[submodule "vendor/os/modules/hal/cmsis_6"]
+	path = vendor/os/modules/hal/cmsis_6
+	url = https://github.com/zephyrproject-rtos/CMSIS_6.git
+[submodule "vendor/os/modules/crypto/mbedtls"]
+	path = vendor/os/modules/crypto/mbedtls
+	url = https://github.com/zephyrproject-rtos/mbedtls.git
+[submodule "vendor/os/modules/crypto/tf-psa-crypto"]
+	path = vendor/os/modules/crypto/tf-psa-crypto
+	url = https://github.com/zephyrproject-rtos/tf-psa-crypto.git

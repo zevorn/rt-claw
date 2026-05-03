@@ -38,9 +38,10 @@ help:
 	@echo "  make build-zynq-a9-qemu         Build QEMU Zynq-A9"
 	@echo "  make run-zynq-a9-qemu           Build + launch Zynq-A9"
 	@echo ""
-	@echo "Zephyr (board = qemu_cortex_a9):"
-	@echo "  make build-zephyr-cortex-a9-qemu  Build Zephyr QEMU"
-	@echo "  make run-zephyr-cortex-a9-qemu    Build + launch Zephyr QEMU"
+	@echo "Zephyr (board = qemu_cortex_m3 | qemu_cortex_a9):"
+	@echo "  make build-zephyr-cortex-m3-qemu  Build Zephyr Cortex-M3 QEMU"
+	@echo "  make run-zephyr-cortex-m3-qemu    Build + launch Cortex-M3 QEMU"
+	@echo "  make build-zephyr-cortex-a9-qemu  Build Zephyr Cortex-A9 (Xilinx QEMU)"
 	@echo ""
 	@echo "Linux native:"
 	@echo "  make build-linux                Build Linux native"
@@ -159,69 +160,67 @@ test-smoke-zynq: build-zynq-a9-qemu
 		-s tests/functional -p 'test_boot.py' -v
 
 # --- Zephyr targets ---
-# Prerequisite: Zephyr SDK installed, west available
+# rt-claw sources are compiled directly within Zephyr CMake.
+# Prerequisite: Zephyr SDK installed
 #
-# Two-phase build:
-#   1. west build (CMake configure → extract toolchain)
-#   2. gen-zephyr-cross.py → Meson → west build (link libclaw.a)
+# Build: CMake configure (with ZEPHYR_MODULES) → ninja → zephyr.elf
+# Board: qemu_cortex_m3 (standard QEMU, lm3s6965evb machine)
 
 ZEPHYR_BASE_DIR  := $(PROJECT_ROOT)/vendor/os/zephyr
-ZEPHYR_BOARD     ?= qemu_cortex_a9
-ZEPHYR_BUILD_DIR := $(BUILD_DIR)/zephyr-$(ZEPHYR_BOARD)
 ZEPHYR_APP_DIR   := $(PROJECT_ROOT)/platform/zephyr
+ZEPHYR_MODULES   := $(PROJECT_ROOT)/vendor/os/modules/hal/cmsis;$(PROJECT_ROOT)/vendor/os/modules/hal/cmsis_6;$(PROJECT_ROOT)/vendor/os/modules/crypto/mbedtls;$(PROJECT_ROOT)/vendor/os/modules/crypto/tf-psa-crypto
 
-.PHONY: build-zephyr-cortex-a9-qemu
-build-zephyr-cortex-a9-qemu:
+# Helper: build a Zephyr board (usage: _zephyr-build BOARD=qemu_cortex_m3)
+ZEPHYR_BOARD     ?= qemu_cortex_m3
+ZEPHYR_BUILD_DIR  = $(BUILD_DIR)/zephyr-$(ZEPHYR_BOARD)
+
+define zephyr-configure
 	@mkdir -p $(ZEPHYR_BUILD_DIR)/zephyr
-	@# Phase 1: CMake configure to extract toolchain
 	@if [ ! -f $(ZEPHYR_BUILD_DIR)/zephyr/CMakeCache.txt ]; then \
-		echo "=== Phase 1: Zephyr CMake configure ==="; \
-		ZEPHYR_BASE=$(ZEPHYR_BASE_DIR) cmake \
+		echo "=== Zephyr CMake configure ($(ZEPHYR_BOARD)) ==="; \
+		ZEPHYR_BASE=$(ZEPHYR_BASE_DIR) \
+		ZEPHYR_MODULES="$(ZEPHYR_MODULES)" \
+		cmake \
 			-B $(ZEPHYR_BUILD_DIR)/zephyr \
 			-S $(ZEPHYR_APP_DIR) \
-			-DBOARD=qemu_cortex_a9 \
-			-DCONF_FILE=$(ZEPHYR_APP_DIR)/boards/qemu_cortex_a9/prj.conf \
-			-DDTC_OVERLAY_FILE=$(ZEPHYR_APP_DIR)/boards/qemu_cortex_a9/app.overlay \
+			-DBOARD=$(ZEPHYR_BOARD) \
+			-DCONF_FILE=$(ZEPHYR_APP_DIR)/boards/$(ZEPHYR_BOARD)/prj.conf \
+			-DDTC_OVERLAY_FILE=$(ZEPHYR_APP_DIR)/boards/$(ZEPHYR_BOARD)/app.overlay \
 			-GNinja; \
 	fi
-	@# Phase 2: Generate Meson cross-file from CMake cache
-	@echo "=== Phase 2: Generate Meson cross-file ==="
-	python3 scripts/gen-zephyr-cross.py qemu_cortex_a9
-	@# Phase 3: Meson build libclaw.a
-	@echo "=== Phase 3: Meson build ==="
-	@if [ ! -f $(ZEPHYR_BUILD_DIR)/meson/build.ninja ]; then \
-		meson setup $(ZEPHYR_BUILD_DIR)/meson \
-			--cross-file $(ZEPHYR_BUILD_DIR)/cross.ini \
-			-Dosal=zephyr; \
-	fi
-	meson compile -C $(ZEPHYR_BUILD_DIR)/meson
-	@# Phase 4: Zephyr build (links libclaw.a)
-	@echo "=== Phase 4: Zephyr firmware build ==="
+endef
+
+.PHONY: build-zephyr-cortex-m3-qemu
+build-zephyr-cortex-m3-qemu: ZEPHYR_BOARD = qemu_cortex_m3
+build-zephyr-cortex-m3-qemu:
+	$(call zephyr-configure)
+	@echo "=== Zephyr firmware build ==="
 	ZEPHYR_BASE=$(ZEPHYR_BASE_DIR) cmake --build $(ZEPHYR_BUILD_DIR)/zephyr
-	@# Create pflash image for NVS persistence
-	@if [ ! -f $(ZEPHYR_BUILD_DIR)/flash.bin ]; then \
-		dd if=/dev/zero of=$(ZEPHYR_BUILD_DIR)/flash.bin bs=1M count=1 2>/dev/null; \
-		echo "Created flash.bin (1MB pflash image)"; \
-	fi
 	@echo "Output: $(ZEPHYR_BUILD_DIR)/zephyr/zephyr/zephyr.elf"
 
-.PHONY: run-zephyr-cortex-a9-qemu
-run-zephyr-cortex-a9-qemu: build-zephyr-cortex-a9-qemu
+.PHONY: run-zephyr-cortex-m3-qemu
+run-zephyr-cortex-m3-qemu: build-zephyr-cortex-m3-qemu
 	@if [ "$(GDB)" = "1" ]; then \
 		echo "Starting QEMU in debug mode (GDB port 1234)..."; \
-		echo "Connect: arm-none-eabi-gdb $(ZEPHYR_BUILD_DIR)/zephyr/zephyr/zephyr.elf -ex 'target remote :1234'"; \
 	fi
 	qemu-system-arm \
-		-M vexpress-a9 \
+		-cpu cortex-m3 \
+		-machine lm3s6965evb \
 		-nographic \
-		-kernel $(ZEPHYR_BUILD_DIR)/zephyr/zephyr/zephyr.elf \
-		-nic user,model=lan9118 \
-		-drive if=pflash,file=$(ZEPHYR_BUILD_DIR)/flash.bin,format=raw \
+		-kernel $(BUILD_DIR)/zephyr-qemu_cortex_m3/zephyr/zephyr/zephyr.elf \
 		$(if $(filter 1,$(GDB)),-S -s)
 
-.PHONY: test-smoke-zephyr-cortex-a9
-test-smoke-zephyr-cortex-a9: build-zephyr-cortex-a9-qemu
-	RTCLAW_TEST_PLATFORM=zephyr-cortex-a9-qemu python3 -m unittest discover \
+.PHONY: build-zephyr-cortex-a9-qemu
+build-zephyr-cortex-a9-qemu: ZEPHYR_BOARD = qemu_cortex_a9
+build-zephyr-cortex-a9-qemu:
+	$(call zephyr-configure)
+	@echo "=== Zephyr firmware build ==="
+	ZEPHYR_BASE=$(ZEPHYR_BASE_DIR) cmake --build $(ZEPHYR_BUILD_DIR)/zephyr
+	@echo "Output: $(ZEPHYR_BUILD_DIR)/zephyr/zephyr/zephyr.elf"
+
+.PHONY: test-smoke-zephyr
+test-smoke-zephyr: build-zephyr-cortex-m3-qemu
+	RTCLAW_TEST_PLATFORM=zephyr-cortex-m3-qemu python3 -m unittest discover \
 		-s tests/functional -p 'test_boot.py' -v
 
 

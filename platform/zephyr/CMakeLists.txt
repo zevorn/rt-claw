@@ -14,53 +14,80 @@ target_include_directories(app PRIVATE
     ${RTCLAW_ROOT}/vendor/lib/cjson
 )
 
-# Suppress -Werror for rt-claw code compiled by Zephyr CMake.
-# rt-claw uses gnu99 conventions; Zephyr defaults to c17.
+# Zephyr platform: disable IM, OTA, swarm; enable core + AI + net + KV
+target_compile_definitions(app PRIVATE
+    CLAW_PLATFORM_ZEPHYR
+)
+
+# Compile options for rt-claw C99 code within Zephyr's c17 build
 target_compile_options(app PRIVATE
     -std=gnu99
     -Wno-double-promotion
 )
 
-# rt-claw OSAL backend (Zephyr)
+# --- rt-claw core sources ---
+target_sources(app PRIVATE
+    ${RTCLAW_ROOT}/claw/init.c
+    ${RTCLAW_ROOT}/claw/core/errno.c
+    ${RTCLAW_ROOT}/claw/core/console.c
+    ${RTCLAW_ROOT}/claw/core/service.c
+    ${RTCLAW_ROOT}/claw/core/driver.c
+    ${RTCLAW_ROOT}/claw/core/tool.c
+)
+
+# --- rt-claw services ---
+target_sources(app PRIVATE
+    ${RTCLAW_ROOT}/claw/services/gateway.c
+    ${RTCLAW_ROOT}/claw/services/sched.c
+    ${RTCLAW_ROOT}/claw/services/ai/ai_engine.c
+    ${RTCLAW_ROOT}/claw/services/ai/ai_memory.c
+    ${RTCLAW_ROOT}/claw/services/ai/ai_skill.c
+    ${RTCLAW_ROOT}/claw/services/im/im_util.c
+    ${RTCLAW_ROOT}/claw/services/im/feishu.c
+    ${RTCLAW_ROOT}/claw/services/im/telegram.c
+    ${RTCLAW_ROOT}/claw/services/net/net_service.c
+    ${RTCLAW_ROOT}/claw/services/swarm/swarm.c
+    ${RTCLAW_ROOT}/claw/services/ota/ota_service.c
+)
+
+# --- rt-claw tools ---
+target_sources(app PRIVATE
+    ${RTCLAW_ROOT}/claw/services/tools/tools.c
+    ${RTCLAW_ROOT}/claw/services/tools/lcd.c
+    ${RTCLAW_ROOT}/claw/services/tools/audio.c
+    ${RTCLAW_ROOT}/claw/services/tools/sched.c
+    ${RTCLAW_ROOT}/claw/services/tools/system.c
+    ${RTCLAW_ROOT}/claw/services/tools/net.c
+    ${RTCLAW_ROOT}/claw/services/tools/ota.c
+)
+
+# --- rt-claw shell ---
+target_sources(app PRIVATE
+    ${RTCLAW_ROOT}/claw/shell/shell_commands.c
+    ${RTCLAW_ROOT}/claw/shell/shell_history.c
+)
+
+# --- OTA platform stub (non-ESP, non-Linux) ---
+target_sources(app PRIVATE
+    ${RTCLAW_ROOT}/platform/linux/ota_stub.c
+)
+
+# Espressif-specific drivers excluded: SSD1306, ES8311, WiFi
+# (not applicable on Zephyr platforms)
+
+# --- OSAL Zephyr backend ---
 target_sources(app PRIVATE
     ${RTCLAW_ROOT}/osal/zephyr/claw_os_zephyr.c
     ${RTCLAW_ROOT}/osal/zephyr/claw_net_zephyr.c
     ${RTCLAW_ROOT}/osal/zephyr/claw_kv_zephyr.c
 )
 
-# rt-claw core
-target_sources(app PRIVATE
-    ${RTCLAW_ROOT}/claw/core/service.c
-    ${RTCLAW_ROOT}/claw/core/driver.c
-    ${RTCLAW_ROOT}/claw/core/tool.c
-    ${RTCLAW_ROOT}/claw/core/console.c
-    ${RTCLAW_ROOT}/claw/init.c
-)
-
-# rt-claw services
-target_sources(app PRIVATE
-    ${RTCLAW_ROOT}/claw/services/gateway.c
-    ${RTCLAW_ROOT}/claw/services/ai/ai_engine.c
-    ${RTCLAW_ROOT}/claw/services/ai/ai_memory.c
-    ${RTCLAW_ROOT}/claw/services/net/net_service.c
-)
-
-# rt-claw shell commands
-target_sources(app PRIVATE
-    ${RTCLAW_ROOT}/claw/shell/shell_commands.c
-)
-
-# cJSON
+# --- cJSON ---
 target_sources(app PRIVATE
     ${RTCLAW_ROOT}/vendor/lib/cjson/cJSON.c
 )
 
-# Platform defines
-target_compile_definitions(app PRIVATE
-    CLAW_PLATFORM_ZEPHYR
-)
-
-# Platform sources
+# --- Platform sources ---
 target_sources(app PRIVATE
     src/main.c
     src/board.c
