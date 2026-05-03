@@ -130,42 +130,45 @@ def _resolve_linux() -> PlatformConfig:
 
 
 def _resolve_zephyr_cortex_a9() -> PlatformConfig:
-    root = _project_root()
-    elf = root / "build" / "zephyr-qemu_cortex_a9" / "zephyr" / "zephyr" / "zephyr.elf"
-    dtb = root / "vendor" / "os" / "zephyr" / "boards" / "qemu" / "cortex_a9" / "fdt-zynq7000s.dtb"
+    elf = os.path.join(BUILD_DIR, "zephyr-qemu_cortex_a9", "zephyr",
+                       "zephyr", "zephyr.elf")
+    dtb = os.path.join(PROJECT_ROOT, "vendor", "os", "zephyr", "boards",
+                       "qemu", "cortex_a9", "fdt-zynq7000s.dtb")
     return PlatformConfig(
-        qemu_cmd=[
-            "qemu-system-aarch64",
+        name="zephyr-cortex-a9-qemu",
+        qemu_bin="qemu-system-aarch64",
+        boot_marker="RT-Claw",
+        shell_prompt="rt-claw>",
+        boot_timeout=15,
+        shell_timeout=10,
+        has_shell=True,
+        qemu_args=[
             "-machine", "arm-generic-fdt-7series",
-            "-dtb", str(dtb),
+            "-dtb", dtb,
             "-device", f"loader,file={elf},cpu-num=0",
             "-nographic",
             "-nic", "user",
         ],
-        boot_marker="RT-Claw",
-        shell_prompt="rt-claw>",
-        boot_timeout=15,
-        shell_timeout=10,
-        has_shell=True,
     )
 
 
 def _resolve_zephyr_cortex_m3() -> PlatformConfig:
-    root = _project_root()
-    elf = root / "build" / "zephyr-qemu_cortex_m3" / "zephyr" / "zephyr" / "zephyr.elf"
+    elf = os.path.join(BUILD_DIR, "zephyr-qemu_cortex_m3", "zephyr",
+                       "zephyr", "zephyr.elf")
     return PlatformConfig(
-        qemu_cmd=[
-            "qemu-system-arm",
-            "-cpu", "cortex-m3",
-            "-machine", "lm3s6965evb",
-            "-nographic",
-            "-kernel", str(elf),
-        ],
+        name="zephyr-cortex-m3-qemu",
+        qemu_bin="qemu-system-arm",
         boot_marker="RT-Claw",
         shell_prompt="rt-claw>",
         boot_timeout=15,
         shell_timeout=10,
         has_shell=True,
+        qemu_args=[
+            "-cpu", "cortex-m3",
+            "-machine", "lm3s6965evb",
+            "-nographic",
+            "-kernel", elf,
+        ],
     )
 
 
