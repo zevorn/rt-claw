@@ -134,6 +134,7 @@ def _resolve_zephyr_cortex_a9() -> PlatformConfig:
                        "zephyr", "zephyr.elf")
     dtb = os.path.join(PROJECT_ROOT, "vendor", "os", "zephyr", "boards",
                        "qemu", "cortex_a9", "fdt-zynq7000s.dtb")
+    flash = os.path.join(BUILD_DIR, "zephyr-qemu_cortex_a9", "flash.bin")
     return PlatformConfig(
         name="zephyr-cortex-a9-qemu",
         qemu_bin="qemu-system-aarch64",
@@ -142,12 +143,14 @@ def _resolve_zephyr_cortex_a9() -> PlatformConfig:
         boot_timeout=15,
         shell_timeout=10,
         has_shell=True,
+        flash_path=elf,
         qemu_args=[
             "-machine", "arm-generic-fdt-7series",
             "-dtb", dtb,
             "-device", f"loader,file={elf},cpu-num=0",
             "-nographic",
             "-nic", "user",
+            "-drive", f"if=pflash,file={flash},format=raw",
         ],
     )
 
@@ -163,6 +166,7 @@ def _resolve_zephyr_cortex_m3() -> PlatformConfig:
         boot_timeout=15,
         shell_timeout=10,
         has_shell=True,
+        flash_path=elf,
         qemu_args=[
             "-cpu", "cortex-m3",
             "-machine", "lm3s6965evb",
