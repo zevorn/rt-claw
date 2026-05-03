@@ -11,11 +11,14 @@
 #include "claw/init.h"
 #include "osal/claw_kv.h"
 #include "claw/shell/shell_commands.h"
+#include "platform/board.h"
 
 LOG_MODULE_REGISTER(rtclaw_main, LOG_LEVEL_INF);
 
 int main(void)
 {
+    board_early_init();
+
     if (claw_kv_init() == 0) {
         shell_nvs_config_load();
     }
