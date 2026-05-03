@@ -261,7 +261,11 @@ make run-zynq-a9-qemu GDB=1        # 调试模式（GDB 端口 1234）
 
 - Zephyr SDK 1.0.1（包含 ARM 工具链）
 - CMake 和 Ninja
-- Zephyr 内核已作为 `vendor/os/zephyr/` 子模块包含
+- Zephyr 内核及模块已作为子模块包含，首次使用需初始化：
+
+```bash
+git submodule update --init --recursive
+```
 
 ### Cortex-M3（标准 QEMU）
 

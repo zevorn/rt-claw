@@ -196,7 +196,7 @@ Makefile (entry point)
               |
               +---> esp32c3/esp32s3: idf.py build (CMakeLists.txt links .a)
               +---> vexpress-a9:     scons (SConstruct links .a)
-              +---> zephyr:          west build (CMake compiles sources directly)
+              +---> zephyr:          cmake + ninja (CMake compiles sources directly)
               |
               +---> Final firmware binary in build/<platform>/
 ```
