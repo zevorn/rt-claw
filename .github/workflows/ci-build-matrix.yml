@@ -113,7 +113,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/zephyr-sdk-*
-          key: zephyr-sdk-0.17.0-${{ runner.os }}
+          key: zephyr-sdk-1.0.1-${{ runner.os }}
 
       - name: Cache Xilinx QEMU
         if: ${{ matrix.zephyr }}

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-ZEPHYR_SDK_VERSION="0.17.0"
+ZEPHYR_SDK_VERSION="1.0.1"
 ZEPHYR_SDK_DIR="$HOME/zephyr-sdk-${ZEPHYR_SDK_VERSION}"
 
 if [ -d "$ZEPHYR_SDK_DIR" ]; then

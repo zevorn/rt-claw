@@ -164,10 +164,12 @@ static int create_and_connect(const struct parsed_url *pu)
 #ifdef CONFIG_NET_SOCKETS_SOCKOPT_TLS
     proto = pu->is_https ? IPPROTO_TLS_1_2 : IPPROTO_TCP;
 #else
-    proto = IPPROTO_TCP;
     if (pu->is_https) {
-        LOG_WRN("HTTPS not available (TLS not configured)");
+        LOG_ERR("HTTPS requested but TLS not configured");
+        zsock_freeaddrinfo(res);
+        return -1;
     }
+    proto = IPPROTO_TCP;
 #endif
 
     sock = zsock_socket(res->ai_family, SOCK_STREAM, proto);

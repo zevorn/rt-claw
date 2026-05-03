@@ -420,46 +420,22 @@ void net_print_ipinfo(void)
 
 #elif defined(CLAW_PLATFORM_ZEPHYR)
 
-#include <zephyr/net/net_if.h>
-#include <zephyr/net/net_mgmt.h>
-#include <zephyr/net/dhcpv4.h>
+/*
+ * Zephyr networking: DHCP and interface management are handled by the
+ * Zephyr kernel and prj.conf. The OSAL net service just reports status.
+ * No Zephyr headers here — claw/services/ depends only on OSAL.
+ */
 
 static claw_err_t net_platform_init(struct net_service_ctx *ctx)
 {
     (void)ctx;
-
-    struct net_if *iface = net_if_get_default();
-
-    if (iface) {
-        net_dhcpv4_start(iface);
-        CLAW_LOGI(TAG, "Zephyr networking initialized, DHCP started");
-    } else {
-        CLAW_LOGW(TAG, "No default network interface");
-    }
-
+    CLAW_LOGI(TAG, "Zephyr networking initialized (DHCP via Kconfig)");
     return CLAW_OK;
 }
 
 void net_print_ipinfo(void)
 {
-    struct net_if *iface = net_if_get_default();
-
-    if (!iface) {
-        claw_printf("  (no network interface)\n");
-        return;
-    }
-
-    struct net_if_ipv4 *ipv4 = iface->config.ip.ipv4;
-
-    if (ipv4) {
-        char addr_str[NET_IPV4_ADDR_LEN];
-        struct in_addr *addr = &ipv4->unicast[0].ipv4.address.in_addr;
-
-        net_addr_ntop(AF_INET, addr, addr_str, sizeof(addr_str));
-        claw_printf("  IPv4: %s\n", addr_str);
-    } else {
-        claw_printf("  (no IPv4 address)\n");
-    }
+    claw_printf("  (Zephyr: IP managed by kernel, see Zephyr shell)\n");
 }
 
 #else /* unknown platform */
