@@ -67,6 +67,14 @@ jobs:
           - target: esp32s3-default
             make_target: build-esp32s3
             esp_targets: esp32s3
+          - target: zephyr-cortex-a9-qemu
+            make_target: build-zephyr-cortex-a9-qemu
+            esp_targets: ""
+            zephyr: true
+          - target: zephyr-cortex-m3-qemu
+            make_target: build-zephyr-cortex-m3-qemu
+            esp_targets: ""
+            zephyr: true
 
     steps:
       - uses: actions/checkout@v4
@@ -100,8 +108,23 @@ jobs:
           source ~/esp/esp-idf/export.sh
           make ${{ matrix.make_target }}
 
+      - name: Cache Zephyr SDK
+        if: ${{ matrix.zephyr }}
+        uses: actions/cache@v4
+        with:
+          path: ~/zephyr-sdk-*
+          key: zephyr-sdk-0.17.0-${{ runner.os }}
+
+      - name: Setup Zephyr SDK
+        if: ${{ matrix.zephyr }}
+        run: scripts/ci/setup-zephyr-sdk.sh
+
+      - name: Build Zephyr target
+        if: ${{ matrix.zephyr }}
+        run: make ${{ matrix.make_target }}
+
       - name: Build non-ESP target
-        if: ${{ matrix.esp_targets == '' }}
+        if: ${{ matrix.esp_targets == '' && !matrix.zephyr }}
         run: make ${{ matrix.make_target }}
 
   # Tier 4: Linux Meson option matrix (fast, no cross-compiler)
