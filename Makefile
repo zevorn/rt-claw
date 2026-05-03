@@ -243,6 +243,7 @@ run-zephyr-cortex-a9-qemu: build-zephyr-cortex-a9-qemu
 		-device loader,file=$(BUILD_DIR)/zephyr-qemu_cortex_a9/zephyr/zephyr/zephyr.elf,cpu-num=0 \
 		-nographic \
 		-nic user \
+		-drive if=pflash,file=$(BUILD_DIR)/zephyr-qemu_cortex_a9/flash.bin,format=raw \
 		$(if $(filter 1,$(GDB)),-S -s)
 
 .PHONY: test-smoke-zephyr-cortex-a9
