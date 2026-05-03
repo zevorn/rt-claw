@@ -216,7 +216,39 @@ build-zephyr-cortex-a9-qemu:
 	$(call zephyr-configure)
 	@echo "=== Zephyr firmware build ==="
 	ZEPHYR_BASE=$(ZEPHYR_BASE_DIR) cmake --build $(ZEPHYR_BUILD_DIR)/zephyr
+	@if [ ! -f $(ZEPHYR_BUILD_DIR)/flash.bin ]; then \
+		dd if=/dev/zero of=$(ZEPHYR_BUILD_DIR)/flash.bin bs=1M count=1 2>/dev/null; \
+		echo "Created flash.bin (1MB pflash image)"; \
+	fi
 	@echo "Output: $(ZEPHYR_BUILD_DIR)/zephyr/zephyr/zephyr.elf"
+
+ZEPHYR_A9_BOARD_DIR := $(ZEPHYR_BASE_DIR)/boards/qemu/cortex_a9
+QEMU_XILINX         := qemu-system-aarch64
+
+.PHONY: run-zephyr-cortex-a9-qemu
+run-zephyr-cortex-a9-qemu: build-zephyr-cortex-a9-qemu
+	@command -v $(QEMU_XILINX) >/dev/null 2>&1 || \
+		{ echo "ERROR: $(QEMU_XILINX) not found."; \
+		  echo "Zephyr qemu_cortex_a9 requires Xilinx QEMU fork with"; \
+		  echo "  -machine arm-generic-fdt-7series support."; \
+		  echo "Install from: https://github.com/Xilinx/qemu"; \
+		  echo "Or set QEMU_BIN_PATH to the Xilinx QEMU directory."; \
+		  exit 1; }
+	@if [ "$(GDB)" = "1" ]; then \
+		echo "Starting QEMU in debug mode (GDB port 1234)..."; \
+	fi
+	$(QEMU_XILINX) \
+		-machine arm-generic-fdt-7series \
+		-dtb $(ZEPHYR_A9_BOARD_DIR)/fdt-zynq7000s.dtb \
+		-device loader,file=$(BUILD_DIR)/zephyr-qemu_cortex_a9/zephyr/zephyr/zephyr.elf,cpu-num=0 \
+		-nographic \
+		-nic user \
+		$(if $(filter 1,$(GDB)),-S -s)
+
+.PHONY: test-smoke-zephyr-cortex-a9
+test-smoke-zephyr-cortex-a9: build-zephyr-cortex-a9-qemu
+	RTCLAW_TEST_PLATFORM=zephyr-cortex-a9-qemu python3 -m unittest discover \
+		-s tests/functional -p 'test_boot.py' -v
 
 .PHONY: test-smoke-zephyr
 test-smoke-zephyr: build-zephyr-cortex-m3-qemu

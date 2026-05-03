@@ -4,6 +4,7 @@
  *
  * OSAL Key-Value storage for Zephyr RTOS.
  * Uses Zephyr Settings subsystem over NVS backend.
+ * Reads use settings_load_subtree() with a registered handler.
  */
 
 #include "osal/claw_kv.h"
@@ -22,6 +23,48 @@ LOG_MODULE_REGISTER(claw_kv, LOG_LEVEL_INF);
 
 static int s_initialized;
 
+/* --- Settings handler for reads --- */
+
+struct kv_read_ctx {
+    void   *dest;
+    size_t  dest_size;
+    size_t  read_len;
+    int     found;
+};
+
+static struct kv_read_ctx s_read_ctx;
+
+static int kv_settings_set(const char *key, size_t len,
+                            settings_read_cb read_cb, void *cb_arg)
+{
+    (void)key;
+
+    if (!s_read_ctx.dest || s_read_ctx.dest_size == 0) {
+        return -EINVAL;
+    }
+
+    size_t to_read = len;
+
+    if (to_read > s_read_ctx.dest_size) {
+        to_read = s_read_ctx.dest_size;
+    }
+
+    int rc = read_cb(cb_arg, s_read_ctx.dest, to_read);
+
+    if (rc >= 0) {
+        s_read_ctx.read_len = (size_t)rc;
+        s_read_ctx.found = 1;
+    }
+
+    return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(
+    claw_kv, "", NULL, kv_settings_set, NULL, NULL
+);
+
+/* --- helpers --- */
+
 static int build_path(char *out, size_t out_size,
                       const char *ns, const char *key)
 {
@@ -33,7 +76,26 @@ static int build_path(char *out, size_t out_size,
     return CLAW_OK;
 }
 
-/* ---------- public API ---------- */
+static int kv_read(const char *path, void *data, size_t size,
+                    size_t *out_len)
+{
+    memset(&s_read_ctx, 0, sizeof(s_read_ctx));
+    s_read_ctx.dest      = data;
+    s_read_ctx.dest_size = size;
+
+    int ret = settings_load_subtree(path);
+
+    if (ret < 0 || !s_read_ctx.found) {
+        return CLAW_ERR_NOENT;
+    }
+
+    if (out_len) {
+        *out_len = s_read_ctx.read_len;
+    }
+    return CLAW_OK;
+}
+
+/* --- public API --- */
 
 int claw_kv_init(void)
 {
@@ -79,14 +141,15 @@ int claw_kv_get_str(const char *ns, const char *key,
         return CLAW_ERR_INVALID;
     }
 
-    int ret = settings_runtime_get(path, buf, size);
+    size_t read_len = 0;
+    int ret = kv_read(path, buf, size, &read_len);
 
-    if (ret < 0) {
-        return CLAW_ERR_NOENT;
+    if (ret != CLAW_OK) {
+        return ret;
     }
 
-    if ((size_t)ret < size) {
-        buf[ret] = '\0';
+    if (read_len < size) {
+        buf[read_len] = '\0';
     } else if (size > 0) {
         buf[size - 1] = '\0';
     }
@@ -117,14 +180,7 @@ int claw_kv_get_blob(const char *ns, const char *key,
         return CLAW_ERR_INVALID;
     }
 
-    int ret = settings_runtime_get(path, data, *len);
-
-    if (ret < 0) {
-        return CLAW_ERR_NOENT;
-    }
-
-    *len = (size_t)ret;
-    return CLAW_OK;
+    return kv_read(path, data, *len, len);
 }
 
 int claw_kv_set_u8(const char *ns, const char *key, uint8_t val)
@@ -148,13 +204,7 @@ int claw_kv_get_u8(const char *ns, const char *key, uint8_t *val)
         return CLAW_ERR_INVALID;
     }
 
-    int ret = settings_runtime_get(path, val, sizeof(*val));
-
-    if (ret < 0) {
-        return CLAW_ERR_NOENT;
-    }
-
-    return CLAW_OK;
+    return kv_read(path, val, sizeof(*val), NULL);
 }
 
 int claw_kv_delete(const char *ns, const char *key)

@@ -129,12 +129,54 @@ def _resolve_linux() -> PlatformConfig:
     )
 
 
+def _resolve_zephyr_cortex_a9() -> PlatformConfig:
+    root = _project_root()
+    elf = root / "build" / "zephyr-qemu_cortex_a9" / "zephyr" / "zephyr" / "zephyr.elf"
+    dtb = root / "vendor" / "os" / "zephyr" / "boards" / "qemu" / "cortex_a9" / "fdt-zynq7000s.dtb"
+    return PlatformConfig(
+        qemu_cmd=[
+            "qemu-system-aarch64",
+            "-machine", "arm-generic-fdt-7series",
+            "-dtb", str(dtb),
+            "-device", f"loader,file={elf},cpu-num=0",
+            "-nographic",
+            "-nic", "user",
+        ],
+        boot_marker="RT-Claw",
+        shell_prompt="rt-claw>",
+        boot_timeout=15,
+        shell_timeout=10,
+        has_shell=True,
+    )
+
+
+def _resolve_zephyr_cortex_m3() -> PlatformConfig:
+    root = _project_root()
+    elf = root / "build" / "zephyr-qemu_cortex_m3" / "zephyr" / "zephyr" / "zephyr.elf"
+    return PlatformConfig(
+        qemu_cmd=[
+            "qemu-system-arm",
+            "-cpu", "cortex-m3",
+            "-machine", "lm3s6965evb",
+            "-nographic",
+            "-kernel", str(elf),
+        ],
+        boot_marker="RT-Claw",
+        shell_prompt="rt-claw>",
+        boot_timeout=15,
+        shell_timeout=10,
+        has_shell=True,
+    )
+
+
 _PLATFORM_MAP = {
     "esp32c3-qemu": _resolve_esp32c3,
     "esp32s3-qemu": _resolve_esp32s3,
     "vexpress-a9-qemu": _resolve_vexpress_a9,
     "zynq-a9-qemu": _resolve_zynq_a9,
     "linux": _resolve_linux,
+    "zephyr-cortex-a9-qemu": _resolve_zephyr_cortex_a9,
+    "zephyr-cortex-m3-qemu": _resolve_zephyr_cortex_m3,
 }
 
 

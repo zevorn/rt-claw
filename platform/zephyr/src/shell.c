@@ -24,20 +24,14 @@
 #include "claw/shell/shell_cmd.h"
 #include "claw/shell/shell_commands.h"
 #include "platform/board.h"
-#include "claw_config.h"
+#include "claw/services/ai/ai_engine.h"
 
 #include <stdio.h>
 #include <string.h>
 
 LOG_MODULE_REGISTER(rtclaw_shell, LOG_LEVEL_INF);
 
-/* Forward declaration */
-extern int ai_chat(const char *input, int channel);
-
-/* AI channel for shell input */
-#ifndef AI_CHANNEL_SHELL
-#define AI_CHANNEL_SHELL    0
-#endif
+#define AI_REPLY_SIZE  2048
 
 /* ---------- built-in commands ---------- */
 
@@ -113,9 +107,14 @@ static void process_line(char *line)
     }
 
     /* Non-command text: forward to AI engine */
-    int ret = ai_chat(line, AI_CHANNEL_SHELL);
+    static char ai_reply[AI_REPLY_SIZE];
 
-    if (ret != 0) {
+    ai_set_channel(AI_CHANNEL_SHELL);
+    int ret = ai_chat(line, ai_reply, sizeof(ai_reply));
+
+    if (ret == 0 && ai_reply[0] != '\0') {
+        claw_printf("%s\n", ai_reply);
+    } else if (ret != 0) {
         claw_printf("AI error: %d (check API key with /ai_status)\n",
                     ret);
     }
