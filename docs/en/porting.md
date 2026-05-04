@@ -7,7 +7,7 @@
 ### Minimum Requirements
 
 - 32-bit MCU with ≥256KB SRAM
-- A supported RTOS (FreeRTOS or RT-Thread) or willingness to write a new OSAL
+- A supported RTOS (FreeRTOS, RT-Thread, or Zephyr) or willingness to write a new OSAL
 - Network connectivity (Ethernet or WiFi)
 - C99 toolchain with cross-compilation support
 
@@ -15,8 +15,8 @@
 
 #### 1. OSAL Implementation
 
-If your RTOS is FreeRTOS or RT-Thread, reuse existing `osal/` code. Otherwise
-create `osal/<rtos>/claw_os_<rtos>.c` implementing all functions in
+If your RTOS is FreeRTOS, RT-Thread, or Zephyr, reuse existing `osal/` code.
+Otherwise create `osal/<rtos>/claw_os_<rtos>.c` implementing all functions in
 `include/osal/claw_os.h`:
 
 - **Thread:** create, delete, delay, yield
@@ -114,6 +114,7 @@ meson compile -C build/<name>-<board>/meson
 | ESP-IDF (FreeRTOS) | `platform/esp32c3/` | CMakeLists.txt, components/rt_claw/, boards/ |
 | Standalone FreeRTOS | `platform/zynq-a9/` | meson.build (full firmware), FreeRTOSConfig.h, startup.S |
 | RT-Thread (SCons) | `platform/vexpress-a9/` | SConstruct, rtconfig.py, cross.ini |
+| Zephyr (CMake/west) | `platform/zephyr/` | CMakeLists.txt, prj.conf, boards/ |
 
 ### Standalone FreeRTOS Pattern (Zynq-A9 Example)
 
@@ -147,6 +148,25 @@ Key differences from ESP-IDF pattern:
 - **FreeRTOS+TCP** — standalone TCP/IP stack in `vendor/lib/freertos-plus-tcp/`
 - **claw_net uses FreeRTOS+TCP sockets** — `FreeRTOS_socket/connect/send/recv`
   instead of ESP-IDF `esp_http_client` or POSIX sockets
+
+### Zephyr Pattern
+
+Zephyr uses CMake-native compilation -- OSAL and claw sources are compiled
+directly by the Zephyr CMake build system rather than linked as Meson-prebuilt
+static libraries. This avoids cross-build-system linking issues and integrates
+cleanly with Zephyr's Kconfig and devicetree infrastructure.
+
+OSAL backend: `osal/zephyr/` -- kernel primitives map to Zephyr kernel API
+(`k_thread`, `k_mutex`, `k_sem`, `k_msgq`, `k_timer`). Network uses the
+Zephyr HTTP Client with mbedTLS for native HTTPS. KV storage uses the Zephyr
+Settings subsystem backed by NVS.
+
+Key differences from other patterns:
+
+- **No Meson prebuilt `.a`** -- Zephyr CMake compiles all sources directly
+- **`cmake + ninja`** -- direct CMake build instead of `meson compile`
+- **prj.conf** -- Kconfig-based configuration (kernel, networking, TLS)
+- **HTTPS** -- mbedTLS included; TLS Kconfig not yet enabled by default, use `api-proxy.py` until configured
 
 ## Adding a New Tool
 

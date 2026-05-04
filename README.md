@@ -17,7 +17,7 @@
 <p align="center"><a href="README_zh.md">中文</a> | <strong>English</strong></p>
 
 **RT-Claw** is an [OpenClaw](https://github.com/openclaw/openclaw)-inspired intelligent assistant for embedded devices.
-Multi-OS support via OSAL (FreeRTOS, RT-Thread, Linux). Build swarm intelligence with networked nodes.
+Multi-OS support via OSAL (FreeRTOS, RT-Thread, Zephyr and Linux). Build swarm intelligence with networked nodes.
 ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimiclaw).
 
 > Deploy your own AI assistant on hardware that costs just one dollar — seamlessly integrated into your daily workflow, efficiently bridging the digital and physical worlds.
@@ -39,7 +39,7 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 | Swarm Intelligence | Node discovery, heartbeat, capability bitmap, remote tool invocation across nodes | Done |
 | Scheduled Tasks | Timer-driven task execution and periodic automation; AI can create/list/remove tasks | Done |
 | Chat-first Shell | UART REPL with insert-mode editing, tab completion, UTF-8; direct input goes to AI, /commands for system | Done |
-| OSAL | Write once, run on FreeRTOS, RT-Thread and Linux with zero code changes | Done |
+| OSAL | Write once, run on FreeRTOS, RT-Thread, Zephyr and Linux with zero code changes | Done |
 | Gateway | Thread-safe message routing between services | Done |
 | Networking | Ethernet (QEMU) and WiFi (real hardware); HTTP client for API calls | Done |
 | IM Integrations | Feishu (Lark) WebSocket + Telegram HTTP long polling; planned: DingTalk, QQ | Done |
@@ -65,11 +65,11 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 |       WiFi | ES8311 | SSD1306 | serial | LCD framebuffer       |
 +----------------------------------------------------------------+
 |                   osal/claw_os.h (OSAL API)                    |
-+----------------+----------------------+--------------+---------+
-| FreeRTOS (IDF) | FreeRTOS(standalone) |  RT-Thread   |  Linux  |
-+----------------+----------------------+--------------+---------+
-| ESP32-C3 / S3  |  QEMU Zynq-A9 (GEM)  | vexpress-a9  |  Native |
-+----------------+----------------------+--------------+---------+
++--------------+--------------+------------+----------+----------+
+|FreeRTOS(IDF) |FreeRTOS(std) | RT-Thread  |  Zephyr  |  Linux   |
++--------------+--------------+------------+----------+----------+
+| ESP32-C3/S3  | Zynq-A9 QEMU |vexpress-a9 | QEMU A9  |  Native  |
++--------------+--------------+------------+----------+----------+
 ```
 
 ## Supported Platforms
@@ -80,6 +80,8 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 | ESP32-S3 | QEMU, real hardware | FreeRTOS (ESP-IDF) | Meson + CMake | Verified |
 | Zynq-A9 | QEMU | FreeRTOS (standalone) | Meson (full firmware) | Verified |
 | vexpress-a9 | QEMU | RT-Thread | Meson + SCons | Verified |
+| Zephyr Cortex-A9 | QEMU (qemu_cortex_a9) | Zephyr v4.4.0 | CMake + Ninja | Verified |
+| Zephyr Cortex-M3 | QEMU (qemu_cortex_m3) | Zephyr v4.4.0 | CMake + Ninja | Verified |
 | Linux | Native (x86_64, aarch64) | Linux (pthreads) | Meson | Verified |
 
 ## Quick Start

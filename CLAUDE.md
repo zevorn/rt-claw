@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-rt-claw: OpenClaw-inspired AI assistant on embedded RTOS (FreeRTOS + RT-Thread) via OSAL.
+rt-claw: OpenClaw-inspired AI assistant on embedded RTOS (FreeRTOS + RT-Thread + Zephyr) via OSAL.
 
 ## Build
 
@@ -17,6 +17,8 @@ make vexpress-a9-qemu                  # Meson + SCons → build/vexpress-a9-qem
 make build-zynq-a9-qemu               # Meson full firmware → build/zynq-a9-qemu/
 make build-esp32s3-qemu                # Meson + idf.py (requires ESP-IDF)
 make esp32s3                           # Meson + idf.py (real hardware)
+make build-zephyr-cortex-a9-qemu       # Zephyr Cortex-A9 QEMU
+make build-zephyr-cortex-m3-qemu       # Zephyr Cortex-M3 QEMU (standard QEMU)
 make build-linux                       # Linux native (no cross-compile)
 make run-linux                         # Build + run directly
 
@@ -33,6 +35,13 @@ meson compile -C build/esp32c3-qemu/meson
 python3 scripts/gen-esp32s3-cross.py qemu
 meson setup build/esp32s3-qemu/meson --cross-file build/esp32s3-qemu/cross.ini
 meson compile -C build/esp32s3-qemu/meson
+
+# Zephyr: first build firmware (generates compile_commands.json),
+# then generate Meson cross-file from it
+make build-zephyr-cortex-a9-qemu       # CMake configure + build
+python3 scripts/gen-zephyr-cross.py qemu_cortex_a9
+meson setup build/zephyr-qemu_cortex_a9/meson --cross-file build/zephyr-qemu_cortex_a9/cross.ini
+meson compile -C build/zephyr-qemu_cortex_a9/meson
 ```
 
 ## Configuration
@@ -83,6 +92,13 @@ make run-esp32s3-qemu GDB=1           # debug mode (GDB port 1234)
 # ESP32-S3 real hardware
 make flash-esp32s3                     # build + flash firmware
 make monitor-esp32s3                   # serial monitor
+
+# Zephyr Cortex-A9 (requires Xilinx QEMU fork)
+make run-zephyr-cortex-a9-qemu        # build + launch QEMU
+make run-zephyr-cortex-a9-qemu GDB=1  # debug mode (GDB port 1234)
+
+# Zephyr Cortex-M3 (standard QEMU)
+make run-zephyr-cortex-m3-qemu        # build + launch QEMU
 
 # Linux native (no QEMU, no cross-compile)
 make build-linux                       # meson setup + compile
@@ -155,6 +171,8 @@ make test-smoke-esp32c3                # ESP32-C3 smoke tests
 make test-smoke-esp32s3                # ESP32-S3 smoke tests
 make test-smoke-vexpress               # vexpress-a9 boot test
 make test-smoke-zynq                   # zynq-a9 boot test
+make test-smoke-zephyr-cortex-a9       # Zephyr Cortex-A9 smoke test
+make test-smoke-zephyr                 # Zephyr Cortex-M3 smoke test
 ```
 
 Verify changes by:
@@ -166,6 +184,8 @@ Verify changes by:
    make build-zynq-a9-qemu
    # ESP32 requires: source ~/esp/esp-idf/export.sh
    bash -c 'source ~/esp/esp-idf/export.sh >/dev/null 2>&1 && make build-esp32c3-qemu'
+   make build-zephyr-cortex-a9-qemu
+   make build-zephyr-cortex-m3-qemu
    ```
 2. `scripts/check-patch.sh --staged` passes
 3. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-zynq-a9-qemu`
@@ -200,10 +220,12 @@ Project-level skills in `.claude/skills/`, invoked via `/command-name`:
 | `drivers/serial/espressif/` | Serial console driver |
 | `osal/freertos/` | FreeRTOS OSAL implementation |
 | `osal/rtthread/` | RT-Thread OSAL implementation |
+| `osal/zephyr/` | Zephyr OSAL implementation |
 | `osal/linux/` | Linux OSAL (pthreads + libcurl + file KV) |
 | `vendor/lib/cjson/` | cJSON library |
 | `vendor/os/freertos/` | FreeRTOS-Kernel (submodule) |
 | `vendor/os/rt-thread/` | RT-Thread (submodule) |
+| `vendor/os/zephyr/` | Zephyr RTOS (submodule) |
 | `include/claw/core/class.h` | OOP infrastructure (container_of, registration macros, ops validation) |
 | `include/claw/core/errno.h` | Unified error codes (`claw_err_t` enum + `claw_strerror()`) |
 | `include/claw/core/service.h` | Service base class (ops vtable, lifecycle state machine, deps) |
@@ -229,9 +251,12 @@ Project-level skills in `.claude/skills/`, invoked via `/command-name`:
 | `platform/linux/` | Linux native platform (pthreads, libcurl, stdin shell) |
 | `platform/zynq-a9/` | Zynq-A9 QEMU (FreeRTOS + FreeRTOS+TCP, Cadence GEM) |
 | `platform/zynq-a9/drivers/` | Patched Zynq GEM NetworkInterface (ISR/PHY fixes) |
+| `platform/zephyr/` | Zephyr platform (Zephyr Module wrapper) |
+| `platform/zephyr/boards/` | Board-specific configs (qemu_cortex_a9, qemu_cortex_m3) |
 | `platform/vexpress-a9/` | RT-Thread BSP + Meson cross-file |
 | `vendor/bsp/xilinx/` | Xilinx standalone BSP subset (GIC, Timer, EMAC PS) |
 | `vendor/lib/freertos-plus-tcp/` | FreeRTOS+TCP networking stack (submodule) |
 | `scripts/gen-esp32c3-cross.py` | Generate ESP32-C3 Meson cross-file |
 | `scripts/gen-esp32s3-cross.py` | Generate ESP32-S3 Meson cross-file |
+| `scripts/gen-zephyr-cross.py` | Generate Zephyr Meson cross-file |
 | `scripts/api-proxy.py` | HTTP→HTTPS proxy for QEMU without TLS |

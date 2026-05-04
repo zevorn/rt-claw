@@ -8,7 +8,7 @@
 
 **RT-Claw** is an open-source embedded AI assistant framework that brings Large Language Model (LLM) capabilities to low-cost microcontrollers. The name stands for "Real-Time Claw" — an AI claw running on RTOS that can grab and control any hardware resource.
 
-Inspired by the OpenClaw community, implemented in pure C99 with an OS Abstraction Layer (OSAL) for cross-RTOS portability. Currently supports FreeRTOS and RT-Thread across ESP32-C3, ESP32-S3, Zynq-A9, and vexpress-A9 platforms.
+Inspired by the OpenClaw community, implemented in pure C99 with an OS Abstraction Layer (OSAL) for cross-RTOS portability. Currently supports FreeRTOS, RT-Thread, and Zephyr across ESP32-C3, ESP32-S3, Zynq-A9, vexpress-A9, and Zephyr qemu_cortex_a9/m3 platforms.
 
 ---
 
@@ -29,11 +29,11 @@ Inspired by the OpenClaw community, implemented in pure C99 with an OS Abstracti
 | WiFi | ES8311 | SSD1306 | serial | LCD framebuffer           |
 +--------------------------------------------------------------+
 |                  osal/claw_os.h (OSAL API)                   |
-+-------------------+-----------------------+------------------+
-| FreeRTOS (IDF)    | FreeRTOS (standalone) |    RT-Thread     |
-+-------------------+-----------------------+------------------+
-| ESP32-C3 / S3     | QEMU Zynq-A9 (GEM)    | QEMU vexpress-a9 |
-+-------------------+-----------------------+------------------+
++-------------+------------+-----------+----------+------------+
+|FreeRTOS(IDF)|FreeRTOS(std)| RT-Thread |  Zephyr  |   Linux    |
++-------------+------------+-----------+----------+------------+
+| ESP32-C3/S3 |Zynq-A9 QEMU|vexpress-a9| QEMU A9  |   Native   |
++-------------+------------+-----------+----------+------------+
 ```
 
 ### Key Components
@@ -51,14 +51,14 @@ Inspired by the OpenClaw community, implemented in pure C99 with an OS Abstracti
 ## 3. Technical Highlights
 
 1. **Pure C99, minimal dependencies** — ~8000 lines core, only cJSON as external dependency
-2. **Multi-RTOS portability** — Same code on FreeRTOS + RT-Thread, zero platform-specific calls
+2. **Multi-RTOS portability** — Same code on FreeRTOS + RT-Thread + Zephyr, zero platform-specific calls
 
 ```
 claw/ code ----> #include "claw_os.h" ----> zero RTOS-specific code
                             |
-           +----------------+----------------+
-           |                |                |
-  claw_os_freertos.c  claw_os_rtthread.c  (future RTOS...)
+           +----------------+----------------+----------------+
+           |                |                |                |
+  claw_os_freertos.c  claw_os_rtthread.c  claw_os_zephyr.c  (future RTOS...)
 ```
 3. **AI-driven hardware control** — Natural language → tool selection → hardware action
 4. **Browser flashing** — Web Serial API + esptool-js, zero toolchain install

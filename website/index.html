@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RT-Claw — Making AI Assistants Cheap Again</title>
-    <meta name="description" content="RT-Claw: OpenClaw-inspired AI assistant on embedded systems (FreeRTOS, RT-Thread, Linux). Deploy your own AI on $1 hardware. Flash firmware directly from your browser.">
+    <meta name="description" content="RT-Claw: OpenClaw-inspired AI assistant on embedded systems (FreeRTOS, RT-Thread, Zephyr, Linux). Deploy your own AI on $1 hardware. Flash firmware directly from your browser.">
     <link rel="icon" type="image/png" href="img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -315,6 +315,7 @@
         .platform-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
         .platform-card:nth-child(4)::before { background: linear-gradient(90deg, #8b5cf6, var(--accent2)); }
         .platform-card:nth-child(5)::before { background: linear-gradient(90deg, var(--accent2), #8b5cf6); }
+        .platform-card:nth-child(6)::before { background: linear-gradient(90deg, #8b5cf6, var(--accent)); }
         .platform-card h3 { font-size: 1.15rem; margin-bottom: 0.75rem; font-weight: 600; }
         .platform-tag {
             display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
@@ -647,13 +648,13 @@
     <div class="container">
         <div class="section-label reveal" data-en="Why RT-Claw" data-zh="为什么选择 RT-Claw">Why RT-Claw</div>
         <h2 class="section-title reveal" data-en="Intelligence at the Edge" data-zh="边缘智能">Intelligence at the Edge</h2>
-        <p class="section-subtitle reveal" data-en="No cloud dependency. Pure C on FreeRTOS, RT-Thread, and Linux, with LLM superpowers." data-zh="无需云端依赖。纯 C 语言运行在 FreeRTOS、RT-Thread 和 Linux 上，拥有 LLM 超能力。">No cloud dependency. Pure C on FreeRTOS, RT-Thread, and Linux, with LLM superpowers.</p>
+        <p class="section-subtitle reveal" data-en="No cloud dependency. Pure C on FreeRTOS, RT-Thread, Zephyr, and Linux, with LLM superpowers." data-zh="无需云端依赖。纯 C 语言运行在 FreeRTOS、RT-Thread、Zephyr 和 Linux 上，拥有 LLM 超能力。">No cloud dependency. Pure C on FreeRTOS, RT-Thread, Zephyr, and Linux, with LLM superpowers.</p>
         <div class="highlights-grid">
             <div class="highlight-card reveal">
                 <div class="highlight-num">01</div>
                 <div class="highlight-icon">&#9889;</div>
                 <h3 data-en="Pure C, Zero Bloat" data-zh="纯 C 语言，零臃肿">Pure C, Zero Bloat</h3>
-                <p data-en="No Node.js. C99 on FreeRTOS, RT-Thread, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar." data-zh="无需 Node.js。C99 运行在 FreeRTOS、RT-Thread 和 Linux 上。仅需 400 KB RAM 的 MCU 或任何 Linux 主机。硬件成本仅一美元。">No Node.js. C99 on FreeRTOS, RT-Thread, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar.</p>
+                <p data-en="No Node.js. C99 on FreeRTOS, RT-Thread, Zephyr, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar." data-zh="无需 Node.js。C99 运行在 FreeRTOS、RT-Thread、Zephyr 和 Linux 上。仅需 400 KB RAM 的 MCU 或任何 Linux 主机。硬件成本仅一美元。">No Node.js. C99 on FreeRTOS, RT-Thread, Zephyr, and Linux. Runs on MCUs with 400 KB RAM or any Linux host. Hardware costs one dollar.</p>
             </div>
             <div class="highlight-card reveal">
                 <div class="highlight-num">02</div>
@@ -696,7 +697,7 @@
             <div class="feature-card reveal">
                 <div class="feature-icon">&#128736;</div>
                 <h3 data-en="OSAL Abstraction" data-zh="OSAL 抽象层">OSAL Abstraction</h3>
-                <p data-en="Write once, run on FreeRTOS, RT-Thread, and Linux. Clean claw_os.h hides all OS specifics." data-zh="一次编写，在 FreeRTOS、RT-Thread 和 Linux 上运行。简洁的 claw_os.h 屏蔽所有 OS 差异。">Write once, run on FreeRTOS, RT-Thread, and Linux. Clean claw_os.h hides all OS specifics.</p>
+                <p data-en="Write once, run on FreeRTOS, RT-Thread, Zephyr, and Linux. Clean claw_os.h hides all OS specifics." data-zh="一次编写，在 FreeRTOS、RT-Thread、Zephyr 和 Linux 上运行。简洁的 claw_os.h 屏蔽所有 OS 差异。">Write once, run on FreeRTOS, RT-Thread, Zephyr, and Linux. Clean claw_os.h hides all OS specifics.</p>
             </div>
             <div class="feature-card reveal">
                 <div class="feature-icon">&#129703;</div>
@@ -747,11 +748,11 @@
 |       WiFi | ES8311 | SSD1306 | serial | LCD framebuffer       |
 +----------------------------------------------------------------+
 |                   osal/claw_os.h (OSAL API)                    |
-+----------------+----------------------+--------------+---------+
-| FreeRTOS (IDF) | FreeRTOS(standalone) |  RT-Thread   |  Linux  |
-+----------------+----------------------+--------------+---------+
-| ESP32-C3 / S3  |  QEMU Zynq-A9 (GEM)  | vexpress-a9  |  Native |
-+----------------+----------------------+--------------+---------+</div>
++--------------+--------------+------------+----------+----------+
+|FreeRTOS(IDF) |FreeRTOS(std) | RT-Thread  |  Zephyr  |  Linux   |
++--------------+--------------+------------+----------+----------+
+| ESP32-C3/S3  | Zynq-A9 QEMU |vexpress-a9 | QEMU A9  |  Native  |
++--------------+--------------+------------+----------+----------+</div>
     </div>
 </section>
 
@@ -832,6 +833,21 @@
                     <li data-en="Full Meson firmware build" data-zh="完整 Meson 固件构建">Full Meson firmware build</li>
                     <li data-en="DHCP + HTTP verified on QEMU" data-zh="DHCP + HTTP 在 QEMU 上已验证">DHCP + HTTP verified on QEMU</li>
                     <li data-en="AI conversation via api-proxy" data-zh="通过 api-proxy 进行 AI 对话">AI conversation via api-proxy</li>
+                </ul>
+            </div>
+            <div class="platform-card reveal">
+                <h3>Zephyr QEMU</h3>
+                <div>
+                    <span class="platform-tag">ARM Cortex-A9/M3</span>
+                    <span class="platform-tag">Zephyr v4.4.0</span>
+                    <span class="platform-tag">mbedTLS</span>
+                    <span class="platform-tag">NVS</span>
+                </div>
+                <ul>
+                    <li data-en="Zephyr RTOS v4.4.0 (mbedTLS included, TLS WIP)" data-zh="Zephyr RTOS v4.4.0（含 mbedTLS，TLS 开发中）">Zephyr RTOS v4.4.0 (mbedTLS included, TLS WIP)</li>
+                    <li data-en="Cortex-A9 (Xilinx GEM) + Cortex-M3 targets" data-zh="Cortex-A9（Xilinx GEM）+ Cortex-M3 目标">Cortex-A9 (Xilinx GEM) + Cortex-M3 targets</li>
+                    <li data-en="Settings + NVS for persistent KV storage" data-zh="Settings + NVS 持久化 KV 存储">Settings + NVS for persistent KV storage</li>
+                    <li data-en="Zephyr Shell with bypass mode" data-zh="Zephyr Shell bypass 模式">Zephyr Shell with bypass mode</li>
                 </ul>
             </div>
             <div class="platform-card reveal">

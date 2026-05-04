@@ -4,7 +4,7 @@
 
 This guide covers building, flashing, and running rt-claw on every supported
 platform: ESP32-C3, ESP32-S3, vexpress-a9 (RT-Thread), Zynq-A9 (FreeRTOS),
-and Linux native.
+Zephyr (Cortex-A9 / Cortex-M3), and Linux native.
 
 ## Prerequisites
 
@@ -270,6 +270,49 @@ make run-linux
 The Linux OSAL uses pthreads, libcurl (with TLS), and file-based KV storage.
 See [HTTPS on Embedded Linux](#https-on-embedded-linux) for deployment
 considerations.
+
+## Zephyr (Cortex-A9 / Cortex-M3)
+
+### Prerequisites
+
+- **Zephyr SDK 1.0.1** -- install via the official
+  [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/)
+- Git submodules initialized (`git submodule update --init --recursive`)
+
+No ESP-IDF required. The Zephyr build uses CMake (west) and compiles
+OSAL + claw sources directly into the Zephyr application (no Meson
+prebuilt `.a` files).
+
+### Cortex-A9 QEMU (Xilinx QEMU)
+
+```bash
+export RTCLAW_AI_API_KEY='sk-...'
+# TLS not yet enabled by default — use api-proxy for HTTPS
+export RTCLAW_AI_API_URL='http://10.0.2.2:8888/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+
+# Start proxy in another terminal: python3 scripts/api-proxy.py
+make build-zephyr-cortex-a9-qemu
+make run-zephyr-cortex-a9-qemu
+```
+
+> **Note:** The Cortex-A9 target requires Xilinx QEMU (`qemu-system-aarch64`
+> with Xilinx machine support), not standard upstream QEMU.
+
+### Cortex-M3 QEMU (Standard QEMU)
+
+```bash
+make build-zephyr-cortex-m3-qemu
+make run-zephyr-cortex-m3-qemu
+```
+
+The Cortex-M3 target uses the standard `qemu-system-arm` with the
+`lm3s6965evb` machine, which is included in the system QEMU package.
+
+> **Note:** Zephyr includes mbedTLS for native HTTPS, but TLS
+> Kconfig is not yet enabled by default. Until then, use
+> `scripts/api-proxy.py` for AI API HTTPS requests, same as
+> vexpress-a9 and Zynq-A9.
 
 ## HTTPS on Embedded Linux
 

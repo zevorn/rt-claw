@@ -7,7 +7,7 @@
 ### 最低要求
 
 - 32 位 MCU，SRAM ≥256KB
-- 支持的 RTOS（FreeRTOS 或 RT-Thread），或愿意编写新的 OSAL 适配层
+- 支持的 RTOS（FreeRTOS、RT-Thread 或 Zephyr），或愿意编写新的 OSAL 适配层
 - 网络连接能力（以太网或 WiFi）
 - 支持交叉编译的 C99 工具链
 
@@ -15,7 +15,7 @@
 
 #### 1. OSAL 实现
 
-如果你的 RTOS 是 FreeRTOS 或 RT-Thread，可以直接复用现有的 `osal/` 代码。否则需要创建 `osal/<rtos>/claw_os_<rtos>.c`，实现 `include/osal/claw_os.h` 中的所有函数：
+如果你的 RTOS 是 FreeRTOS、RT-Thread 或 Zephyr，可以直接复用现有的 `osal/` 代码。否则需要创建 `osal/<rtos>/claw_os_<rtos>.c`，实现 `include/osal/claw_os.h` 中的所有函数：
 
 - **线程：** create、delete、delay、yield
 - **互斥锁：** create、lock、unlock、delete
@@ -112,6 +112,7 @@ meson compile -C build/<name>-<board>/meson
 | ESP-IDF (FreeRTOS) | `platform/esp32c3/` | CMakeLists.txt, components/rt_claw/, boards/ |
 | 独立 FreeRTOS | `platform/zynq-a9/` | meson.build（完整固件）、FreeRTOSConfig.h、startup.S |
 | RT-Thread (SCons) | `platform/vexpress-a9/` | SConstruct, rtconfig.py, cross.ini |
+| Zephyr (CMake/west) | `platform/zephyr/` | CMakeLists.txt, prj.conf, boards/ |
 
 ### 独立 FreeRTOS 模式（Zynq-A9 示例）
 
