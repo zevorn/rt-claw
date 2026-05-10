@@ -73,7 +73,7 @@ static void lcd_backlight_on(void)
 }
 
 /* SPI 总线创建 */ 
-static void create_spi_bus(int mosi, int sclk, int host)
+static esp_err_t create_spi_bus(int mosi, int sclk, int host)
 {
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = mosi,
@@ -87,7 +87,10 @@ static void create_spi_bus(int mosi, int sclk, int host)
     esp_err_t err = spi_bus_initialize(host, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "SPI init failed: %s", esp_err_to_name(err));
+        return err;
     }
+
+    return ESP_OK;
 }
 
 static lv_disp_t *s_lvgl_disp = NULL;
@@ -342,15 +345,19 @@ static void cmd_audio_level(int argc, char **argv)
 
 
 
-static void SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
+static int SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
                              esp_lcd_panel_handle_t panel,
                              int width, int height,
                              int offset_x, int offset_y,
                              bool mirror_x, bool mirror_y, bool swap_xy)
 {
-    /* 清屏 */ 
-    uint16_t *white_buf = heap_caps_malloc(width * sizeof(uint16_t), MALLOC_CAP_DMA);
-    if (!white_buf) return;
+    /* 清屏 */
+    uint16_t *white_buf = heap_caps_malloc(width * sizeof(uint16_t),
+                                           MALLOC_CAP_DMA);
+    if (!white_buf) {
+        ESP_LOGE(TAG, "display clear buffer alloc failed");
+        return -1;
+    }
 
     for (int i = 0; i < width; i++) {
         white_buf[i] = 0xFFFF;
@@ -360,15 +367,14 @@ static void SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
     }
     heap_caps_free(white_buf);
 
-    /* 打开显示 */ 
+    /* 打开显示 */
     ESP_LOGI(TAG, "Turning display on");
     esp_err_t err = esp_lcd_panel_disp_on_off(panel, true);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Display on failed: %s", esp_err_to_name(err));
     }
 
-
-    /* 初始化 LVGL */ 
+    /* 初始化 LVGL */
     ESP_LOGI(TAG, "Init LVGL");
 
     lv_init();
@@ -384,7 +390,7 @@ static void SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 5;
 #if CONFIG_SOC_CPU_CORES_NUM > 1
-    port_cfg.task_affinity = 1;  
+    port_cfg.task_affinity = 1;
 #endif
 
     ESP_ERROR_CHECK(lvgl_port_init(&port_cfg));
@@ -393,7 +399,7 @@ static void SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = panel_io,
         .panel_handle = panel,
-        .buffer_size = width * 20,    
+        .buffer_size = width * 20,
         .double_buffer = false,
         .hres = width,
         .vres = height,
@@ -412,13 +418,14 @@ static void SpiLcdDisplayInit(esp_lcd_panel_io_handle_t panel_io,
     s_lvgl_disp = lvgl_port_add_disp(&disp_cfg);
     if (s_lvgl_disp == NULL) {
         ESP_LOGE(TAG, "Failed add LVGL display");
-        return;
+        return -1;
     }
 
     ESP_LOGI(TAG, "LVGL initialized OK");
 
     ui_init();
     ui_controller_init();
+    return 0;
 }
 
 /* ST7789 屏幕初始化 */
@@ -426,6 +433,7 @@ static void st7789_display_init(spi_host_device_t host)
 {
     esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_handle_t panel_handle = NULL;
+    esp_err_t err;
 
     /* IO 配置 */
     esp_lcd_panel_io_spi_config_t io_cfg = {
@@ -437,7 +445,11 @@ static void st7789_display_init(spi_host_device_t host)
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
     };
-    esp_lcd_new_panel_io_spi(host, &io_cfg, &io_handle);
+    err = esp_lcd_new_panel_io_spi(host, &io_cfg, &io_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel IO create failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     /* ST7789 配置 */
     esp_lcd_panel_dev_config_t panel_cfg = {
@@ -446,23 +458,60 @@ static void st7789_display_init(spi_host_device_t host)
         .bits_per_pixel = 16,
         .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
     };
-    esp_lcd_new_panel_st7789(io_handle, &panel_cfg, &panel_handle);
+    err = esp_lcd_new_panel_st7789(io_handle, &panel_cfg, &panel_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel create failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     /* 复位 + 初始化 */
-    esp_lcd_panel_reset(panel_handle);
-    esp_lcd_panel_init(panel_handle);
-    esp_lcd_panel_set_gap(panel_handle, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y);
+    err = esp_lcd_panel_reset(panel_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel reset failed: %s", esp_err_to_name(err));
+        return;
+    }
+    err = esp_lcd_panel_init(panel_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel init failed: %s", esp_err_to_name(err));
+        return;
+    }
+    err = esp_lcd_panel_set_gap(panel_handle, DISPLAY_OFFSET_X,
+                                DISPLAY_OFFSET_Y);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel set gap failed: %s", esp_err_to_name(err));
+        return;
+    }
     lcd_backlight_on();
 
     /* 旋转 + 镜像 + 反色 */
-    esp_lcd_panel_invert_color(panel_handle, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
-    esp_lcd_panel_swap_xy(panel_handle, DISPLAY_SWAP_XY);
-    esp_lcd_panel_mirror(panel_handle, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+    err = esp_lcd_panel_invert_color(panel_handle,
+                                     DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel invert failed: %s", esp_err_to_name(err));
+        return;
+    }
+    err = esp_lcd_panel_swap_xy(panel_handle, DISPLAY_SWAP_XY);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel swap_xy failed: %s", esp_err_to_name(err));
+        return;
+    }
+    err = esp_lcd_panel_mirror(panel_handle, DISPLAY_MIRROR_X,
+                               DISPLAY_MIRROR_Y);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "panel mirror failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    if (SpiLcdDisplayInit(io_handle, panel_handle,
+                          DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                          DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
+                          DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
+                          DISPLAY_SWAP_XY) != 0) {
+        return;
+    }
 
     s_lcd_panel = panel_handle;
     s_oled_ready = 1;
-    SpiLcdDisplayInit(io_handle, panel_handle, 
-        DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
 
     ESP_LOGI(TAG, "ST7789 LCD initialized OK");
 }
@@ -473,8 +522,9 @@ void board_early_init(void)
     wifi_board_early_init();
 
 #ifdef CLAW_PLATFORM_ESP_IDF
-    create_spi_bus(LCD_MOSI_PIN, LCD_SCLK_PIN, LCD_HOST);
-    st7789_display_init(LCD_HOST);
+    if (create_spi_bus(LCD_MOSI_PIN, LCD_SCLK_PIN, LCD_HOST) == ESP_OK) {
+        st7789_display_init(LCD_HOST);
+    }
 #endif /* CLAW_PLATFORM_ESP_IDF */
 }
 
