@@ -491,9 +491,11 @@ ATK_ESP_S3_DIR := platform/atk-esp32s3-lvgl
 build-atk-esp32s3: build-atk-esp32s3-default
 
 # ---- All boards: build ----
-.PHONY: build-atk-esp32s3-default
+.PHONY: build-atk-esp32s3-default build-atk-esp32s3-coolse-sp-v2
 build-atk-esp32s3-default: ATK_S3_BOARD = default
 build-atk-esp32s3-default: _atk_s3-build
+build-atk-esp32s3-coolse-sp-v2: ATK_S3_BOARD = coolse-sp-v2
+build-atk-esp32s3-coolse-sp-v2: _atk_s3-build
 
 # Backwards-compatible alias
 .PHONY: atk-esp32s3
@@ -513,9 +515,19 @@ flash-atk-esp32s3: ATK_S3_BOARD = default
 flash-atk-esp32s3: build-atk-esp32s3-default
 	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf flash
 
+.PHONY: flash-atk-esp32s3-coolse-sp-v2
+flash-atk-esp32s3-coolse-sp-v2: ATK_S3_BOARD = coolse-sp-v2
+flash-atk-esp32s3-coolse-sp-v2: build-atk-esp32s3-coolse-sp-v2
+	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf flash
+
 .PHONY: monitor-atk-esp32s3
 monitor-atk-esp32s3: ATK_S3_BOARD = default
 monitor-atk-esp32s3:
+	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf monitor
+
+.PHONY: monitor-atk-esp32s3-coolse-sp-v2
+monitor-atk-esp32s3-coolse-sp-v2: ATK_S3_BOARD = coolse-sp-v2
+monitor-atk-esp32s3-coolse-sp-v2:
 	cd $(ATK_ESP_S3_DIR) && idf.py -B $(BUILD_DIR)/atk-esp32s3-$(ATK_S3_BOARD)/idf monitor
 # ---- Internal: shared build logic for all ATK-ESP32-S3 boards ----
 .PHONY: _atk_s3-build
