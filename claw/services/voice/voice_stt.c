@@ -41,6 +41,8 @@ struct voice_stt_session {
     int                          finished;
 #ifdef CLAW_PLATFORM_LINUX
     CURL                        *ws_curl;
+    char                         rx_buf[VOICE_STT_RESP_SIZE];
+    size_t                       rx_len;
 #elif defined(CLAW_PLATFORM_ESP_IDF)
     esp_websocket_client_handle_t ws_client;
     struct claw_sem             *connect_sem;
@@ -317,16 +319,37 @@ voice_stt_xfyun_ws_send_text(struct voice_stt_session *session,
 
 #ifdef CLAW_PLATFORM_LINUX
     {
-        size_t sent = 0;
-        CURLcode rc;
+        size_t offset = 0;
+        uint32_t deadline;
 
         if (!session->ws_curl) {
             return CLAW_ERR_INVALID;
         }
-        rc = curl_ws_send(session->ws_curl, text, len, &sent, 0, CURLWS_TEXT);
-        if (rc != CURLE_OK || sent != len) {
-            CLAW_LOGE(TAG, "ws send failed: %s", curl_easy_strerror(rc));
-            return CLAW_ERR_IO;
+        deadline = claw_tick_ms() + (uint32_t)session->cfg.stt_timeout_ms;
+        while (offset < len) {
+            size_t sent = 0;
+            CURLcode rc;
+
+            rc = curl_ws_send(session->ws_curl,
+                              text + offset,
+                              len - offset,
+                              &sent,
+                              0,
+                              CURLWS_TEXT);
+            if (rc == CURLE_AGAIN || (rc == CURLE_OK && sent == 0)) {
+                if ((int32_t)(claw_tick_ms() - deadline) >= 0) {
+                    CLAW_LOGE(TAG, "ws send timed out after %dms",
+                              session->cfg.stt_timeout_ms);
+                    return CLAW_ERR_TIMEOUT;
+                }
+                claw_thread_delay_ms(20);
+                continue;
+            }
+            if (rc != CURLE_OK) {
+                CLAW_LOGE(TAG, "ws send failed: %s", curl_easy_strerror(rc));
+                return CLAW_ERR_IO;
+            }
+            offset += sent;
         }
         return CLAW_OK;
     }
@@ -461,6 +484,29 @@ voice_stt_xfyun_handle_message(struct voice_stt_session *session,
 
 #ifdef CLAW_PLATFORM_LINUX
 static claw_err_t
+voice_stt_xfyun_append_message(char *message,
+                               size_t message_size,
+                               size_t *message_len,
+                               const char *chunk,
+                               size_t chunk_len)
+{
+    if (!message || !message_len || !chunk) {
+        return CLAW_ERR_INVALID;
+    }
+    if (*message_len + chunk_len >= message_size) {
+        CLAW_LOGE(TAG, "xfyun ws message too large: current=%u chunk=%u cap=%u",
+                  (unsigned int)*message_len,
+                  (unsigned int)chunk_len,
+                  (unsigned int)message_size);
+        return CLAW_ERR_FULL;
+    }
+    memcpy(message + *message_len, chunk, chunk_len);
+    *message_len += chunk_len;
+    message[*message_len] = '\0';
+    return CLAW_OK;
+}
+
+static claw_err_t
 voice_stt_xfyun_recv_until_done(struct voice_stt_session *session)
 {
     uint32_t deadline;
@@ -496,8 +542,10 @@ voice_stt_xfyun_recv_until_done(struct voice_stt_session *session)
             continue;
         }
         buf[nread] = '\0';
-        CLAW_LOGD(TAG, "xfyun ws recv flags=0x%x len=%u",
-                  meta->flags, (unsigned int)nread);
+        CLAW_LOGD(TAG, "xfyun ws recv flags=0x%x len=%u left=%u",
+                  meta->flags,
+                  (unsigned int)nread,
+                  (unsigned int)meta->bytesleft);
         if (meta->flags & CURLWS_CLOSE) {
             CLAW_LOGE(TAG, "xfyun ws closed by peer");
             return CLAW_ERR_IO;
@@ -505,7 +553,22 @@ voice_stt_xfyun_recv_until_done(struct voice_stt_session *session)
         if (!(meta->flags & CURLWS_TEXT)) {
             continue;
         }
-        err = voice_stt_xfyun_handle_message(session, buf, &done);
+
+        err = voice_stt_xfyun_append_message(session->rx_buf,
+                                             sizeof(session->rx_buf),
+                                             &session->rx_len,
+                                             buf,
+                                             nread);
+        if (err != CLAW_OK) {
+            return err;
+        }
+        if (meta->bytesleft > 0 || (meta->flags & CURLWS_CONT)) {
+            continue;
+        }
+
+        err = voice_stt_xfyun_handle_message(session, session->rx_buf, &done);
+        session->rx_len = 0;
+        session->rx_buf[0] = '\0';
         if (err != CLAW_OK) {
             return err;
         }
@@ -574,7 +637,8 @@ voice_stt_xfyun_handle_data_event(struct voice_stt_session *session,
     }
     if (payload_offset + data_len > payload_len ||
         payload_offset + data_len >= sizeof(session->rx_buf)) {
-        CLAW_LOGE(TAG, "xfyun ESP payload bounds invalid: off=%u len=%u total=%u",
+        CLAW_LOGE(TAG,
+                  "xfyun ESP payload bounds invalid: off=%u len=%u total=%u",
                   (unsigned int)payload_offset,
                   (unsigned int)data_len,
                   (unsigned int)payload_len);
@@ -743,7 +807,8 @@ out:
 }
 
 #if defined(CLAW_PLATFORM_LINUX)
-static claw_err_t voice_stt_xfyun_session_start(struct voice_stt_session *session)
+static claw_err_t
+voice_stt_xfyun_session_start(struct voice_stt_session *session)
 {
     char url[1024];
     CURLcode rc;
@@ -776,7 +841,8 @@ static claw_err_t voice_stt_xfyun_session_start(struct voice_stt_session *sessio
     return CLAW_OK;
 }
 #elif defined(CLAW_PLATFORM_ESP_IDF)
-static claw_err_t voice_stt_xfyun_session_start(struct voice_stt_session *session)
+static claw_err_t
+voice_stt_xfyun_session_start(struct voice_stt_session *session)
 {
     char url[1024];
     esp_websocket_client_config_t ws_cfg = { 0 };
@@ -844,7 +910,8 @@ static claw_err_t voice_stt_xfyun_session_start(struct voice_stt_session *sessio
     return CLAW_OK;
 }
 #else
-static claw_err_t voice_stt_xfyun_session_start(struct voice_stt_session *session)
+static claw_err_t
+voice_stt_xfyun_session_start(struct voice_stt_session *session)
 {
     (void)session;
     return CLAW_ERR_NOENT;
