@@ -11,12 +11,24 @@ platform_src = files(
 if get_option('tool_script')
     platform_src += files('scripting.c')
 endif
+if get_option('linux_web_voice')
+    if not get_option('voice')
+        error('linux_web_voice requires voice=true')
+    endif
+    platform_src += files('web_voice_server.c')
+endif
 
 thread_dep = dependency('threads')
 platform_c_args = platform_defs
 
 if get_option('tool_script')
     platform_c_args += '-DCONFIG_RTCLAW_TOOL_SCRIPT'
+endif
+if get_option('voice')
+    platform_c_args += '-DCONFIG_RTCLAW_VOICE_ENABLE'
+endif
+if get_option('linux_web_voice')
+    platform_c_args += '-DCONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE'
 endif
 
 rtclaw_exe = executable('rtclaw',
@@ -34,6 +46,9 @@ test_platform_src = files('ota_stub.c')
 
 if get_option('tool_script')
     test_platform_src += files('scripting.c')
+endif
+if get_option('linux_web_voice')
+    test_platform_src += files('web_voice_server.c')
 endif
 
 rtclaw_test_exe = executable('rtclaw_test',

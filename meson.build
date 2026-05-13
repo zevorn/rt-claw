@@ -103,10 +103,21 @@ _int_overrides = {
     'ai_context_size':    ['RTCLAW_AI_CONTEXT_SIZE',     'CONFIG_RTCLAW_AI_CONTEXT_SIZE'],
     'ai_memory_max_msgs': ['RTCLAW_AI_MEMORY_MAX_MSGS',  'CONFIG_RTCLAW_AI_MEMORY_MAX_MSGS'],
     'ota_check_interval_ms': ['RTCLAW_OTA_CHECK_INTERVAL_MS', 'CONFIG_RTCLAW_OTA_CHECK_INTERVAL_MS'],
+    'voice_max_turn_bytes': ['RTCLAW_VOICE_MAX_TURN_BYTES', 'CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES'],
+    'voice_text_buf_size': ['RTCLAW_VOICE_TEXT_BUF_SIZE', 'CONFIG_RTCLAW_VOICE_TEXT_BUF_SIZE'],
+    'voice_stt_resp_size': ['RTCLAW_VOICE_STT_RESP_SIZE', 'CONFIG_RTCLAW_VOICE_STT_RESP_SIZE'],
+    'voice_stt_timeout_ms': ['RTCLAW_VOICE_STT_TIMEOUT_MS', 'CONFIG_RTCLAW_VOICE_STT_TIMEOUT_MS'],
+    'voice_tts_resp_size': ['RTCLAW_VOICE_TTS_RESP_SIZE', 'CONFIG_RTCLAW_VOICE_TTS_RESP_SIZE'],
+    'voice_tts_audio_buf_size': ['RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE', 'CONFIG_RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE'],
 }
 
 conf_data = configuration_data()
 _has_any = false
+
+if get_option('linux_web_voice')
+    conf_data.set('CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE', 1)
+    _has_any = true
+endif
 
 # Version from git describe (e.g. "v0.2.0" or "v0.2.0-3-gabcdef").
 # Without --always so it fails cleanly when no tag is reachable

@@ -271,6 +271,37 @@ The Linux OSAL uses pthreads, libcurl (with TLS), and file-based KV storage.
 See [HTTPS on Embedded Linux](#https-on-embedded-linux) for deployment
 considerations.
 
+### Linux Web Voice MVP
+
+To enable the browser voice endpoint on Linux, rebuild with voice options:
+
+```bash
+meson setup build/linux --reconfigure \
+    -Dosal=linux \
+    -Dvoice=true \
+    -Dlinux_web_voice=true
+meson compile -C build/linux
+./build/linux/platform/linux/rtclaw
+```
+
+Then in the shell:
+
+```text
+/voice_enable on
+/voice_set stt_provider xfyun
+/voice_set stt_xfyun_app_id <APPID>
+/voice_set stt_xfyun_api_key <APIKey>
+/voice_set stt_xfyun_api_secret <APISecret>
+/voice_status
+```
+
+Open `http://127.0.0.1:8080/voice.html` in a local browser to test the Linux
+web voice page.
+
+For longer MiMo TTS replies, tune the two buffers separately: use
+`-Dvoice_tts_resp_size=` for the full HTTP JSON response that contains base64
+audio, and `-Dvoice_tts_audio_buf_size=` for the decoded audio output.
+
 ## Zephyr (Cortex-A9 / Cortex-M3)
 
 ### Prerequisites

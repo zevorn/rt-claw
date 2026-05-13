@@ -35,10 +35,90 @@ Commands start with `/`.
 | `/ota update [url]` | Install update (or direct URL) |
 | `/ota rollback` | Roll back to previous firmware |
 | `/ota version` | Show running firmware version |
+| `/voice_enable on\|off` | Enable or disable the voice service |
+| `/voice_set <field> <value>` | Set voice runtime config and persist it |
+| `/voice_status` | Show current voice config and runtime state |
 | `/help` | List commands |
 
 > WiFi commands (`/wifi_*`) only available on WiFi-capable boards.
 > OTA commands (`/ota`) only available on boards with OTA partitions (xiaozhi-xmini, ESP32-S3 default).
+
+## Voice (Linux web endpoint)
+
+The current voice MVP keeps browser transport separate from voice business
+logic. On Linux, `platform/linux/web_voice_server.c` provides a browser-facing
+endpoint, while `claw/services/voice/voice_service.c` owns the state machine,
+STT orchestration, AI handoff, and TTS handoff.
+
+### Build-time switches
+
+```bash
+meson setup build/linux --reconfigure \
+    -Dosal=linux \
+    -Dvoice=true \
+    -Dlinux_web_voice=true
+```
+
+`linux_web_voice` requires `voice=true`.
+
+### Runtime configuration
+
+Voice config can come from three places, in this priority order:
+
+1. Shell runtime config stored via OSAL KV (`/voice_set`, `/voice_enable`)
+2. Meson options / environment variables for compile-time defaults
+3. `claw_config.h` platform defaults
+
+Current compile-time voice tuning entries:
+
+- `RTCLAW_VOICE_MAX_TURN_BYTES` / `-Dvoice_max_turn_bytes=`
+- `RTCLAW_VOICE_TEXT_BUF_SIZE` / `-Dvoice_text_buf_size=`
+- `RTCLAW_VOICE_STT_RESP_SIZE` / `-Dvoice_stt_resp_size=`
+- `RTCLAW_VOICE_STT_TIMEOUT_MS` / `-Dvoice_stt_timeout_ms=`
+- `RTCLAW_VOICE_TTS_RESP_SIZE` / `-Dvoice_tts_resp_size=`
+- `RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE` / `-Dvoice_tts_audio_buf_size=`
+
+Linux defaults are larger than embedded defaults for turn bytes, STT response
+buffer sizing, and TTS buffers. `voice_tts_resp_size` is the full HTTP JSON
+response buffer for MiMo TTS, including base64 audio and JSON overhead;
+`voice_tts_audio_buf_size` is the decoded audio output buffer after base64
+decode. If logs show `MiMo response truncated`, increase
+`voice_tts_resp_size`. If logs show `MiMo audio decode exceeded output buffer`,
+increase `voice_tts_audio_buf_size`.
+
+### Shell commands
+
+```text
+/voice_enable on
+/voice_set web_port 8080
+/voice_set stt_provider xfyun
+/voice_set stt_xfyun_app_id <APPID>
+/voice_set stt_xfyun_api_key <APIKey>
+/voice_set stt_xfyun_api_secret <APISecret>
+/voice_status
+```
+
+`/voice_status` masks sensitive fields and, on Linux web voice builds, also
+shows whether the web endpoint is currently running.
+
+### Runtime flow
+
+1. Browser connects to the event stream and attaches a voice session.
+2. Browser sends `start_capture` with audio format metadata.
+3. Browser streams PCM chunks with `audio_chunk`.
+4. `voice_service` forwards chunks to the selected STT session and enforces
+   `CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES` as a hard cutoff.
+5. `end_capture` finalizes STT, sends the transcript into `ai_chat()`, then
+   returns assistant text and TTS audio back to the endpoint.
+
+### Browser page
+
+For Linux web voice builds, the browser test page is served from:
+
+- `http://127.0.0.1:<web_port>/voice.html`
+
+Remote/mobile microphone access still depends on the browser security model;
+raw LAN HTTP is typically not enough for `getUserMedia()` on phones.
 
 ## Tool Use
 

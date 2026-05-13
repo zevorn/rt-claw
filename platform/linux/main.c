@@ -12,6 +12,12 @@
 #include "osal/claw_kv.h"
 #include "platform/board.h"
 #include "claw/shell/shell_commands.h"
+#ifdef CONFIG_RTCLAW_VOICE_ENABLE
+#include "claw/services/voice/voice_service.h"
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+#include "platform/linux/web_voice_server.h"
+#endif
 
 extern int claw_init(void);
 extern void claw_deinit(void);
@@ -40,8 +46,16 @@ int main(void)
     board_early_init();
     shell_nvs_config_load();
     claw_init();
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+    if (web_voice_server_init() == CLAW_OK && voice_config_get_enabled()) {
+        web_voice_server_start();
+    }
+#endif
     linux_shell_loop();
 
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+    web_voice_server_stop();
+#endif
     claw_deinit();
 
     return 0;

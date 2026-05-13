@@ -43,6 +43,8 @@ ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 | Gateway | 服务间线程安全的消息路由 | 已完成 |
 | 网络 | 以太网（QEMU）和 WiFi（真实硬件）；HTTP 客户端用于 API 调用 | 已完成 |
 | IM 集成 | 飞书（Lark）WebSocket 长连接 + Telegram HTTP 长轮询；计划中：钉钉、QQ | 已完成 |
+| 语音服务 | 配置驱动的语音链路（`input backend -> voice_service -> STT -> ai_chat() -> TTS -> output backend`），带单轮硬截断、AI 分通道记忆复用、运行时 provider 选择和带音频格式元数据的事件流 | 开发中 |
+| Linux Web 语音端点 | Linux 内置浏览器麦克风/扬声器端点，基于 SSE + HTTP POST，支持 session attach/detach、运行时 Shell 配置，以及面向浏览器的 assistant 文本和 TTS 音频回放 | 开发中 |
 | Web 刷写与串口 | 浏览器端固件刷写（esptool-js）+ 串口终端（ANSI 彩色渲染） | 已完成 |
 | 多模型 API | Claude 原生 API + OpenAI 兼容格式（GPT、DeepSeek、GLM/智谱、MiniMax、Grok、Moonshot/Kimi、百川、通义千问、豆包、Llama/Ollama）；按模型名自动识别 | 已完成 |
 | Web 配置页面 | 内置轻量 Web 页面，支持在线配置 API Key、选择模型、调整参数 | 计划中 |
@@ -53,7 +55,7 @@ ESP32-S3 WiFi 支持参考了 [MimiClaw](https://github.com/memovai/mimiclaw)。
 ```
 +----------------------------------------------------------------+
 |                      rt-claw Application                       |
-|     gateway | net | swarm | ai_engine | shell | sched | im     |
+| gateway | net | swarm | ai_engine | shell | sched | im | voice |
 +----------------------------------------------------------------+
 |                       skills (AI Skills)                       |
 |              (one skill composes multiple tools)               |
@@ -100,7 +102,7 @@ make run-esp32c3-qemu
 
 > **没有硬件？没关系。** 试试 [CNB 云原生开发环境](https://cnb.cool/gevico.online/rtclaw/rt-claw)——所有工具链已预装，在浏览器中即可编译运行。
 
-真实硬件（ESP32-S3/C3）、WiFi 配置、飞书机器人等详细步骤请参阅 **[快速开始指南](docs/zh/getting-started.md)**。
+真实硬件（ESP32-S3/C3）、WiFi 配置、飞书机器人、Linux Web 语音等详细步骤请参阅 **[快速开始指南](docs/zh/getting-started.md)** 和 **[使用指南](docs/zh/usage.md)**。
 
 ## 社区
 

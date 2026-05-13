@@ -12,7 +12,7 @@
 #include <curl/curl.h>
 
 #define TAG "net_http"
-#define HTTP_TIMEOUT_S  30
+#define HTTP_TIMEOUT_S  60
 
 static int s_curl_initialized;
 

@@ -35,10 +35,88 @@
 | `/ota update [url]` | 安装更新（或直接 URL） |
 | `/ota rollback` | 回滚到上一版本固件 |
 | `/ota version` | 显示当前固件版本 |
+| `/voice_enable on\|off` | 启用或关闭语音服务 |
+| `/voice_set <field> <value>` | 设置语音运行时配置并持久化 |
+| `/voice_status` | 显示当前语音配置和运行时状态 |
 | `/help` | 列出命令 |
 
 > WiFi 命令（`/wifi_*`）仅在支持 WiFi 的开发板上可用。
 > OTA 命令（`/ota`）仅在有 OTA 分区的开发板上可用（xiaozhi-xmini、ESP32-S3 default）。
+
+## 语音（Linux Web 端点）
+
+当前语音 MVP 将浏览器传输和语音业务逻辑解耦。在 Linux 上，
+`platform/linux/web_voice_server.c` 负责面向浏览器的端点，
+`claw/services/voice/voice_service.c` 则负责状态机、STT 编排、AI 交接和 TTS 交接。
+
+### 构建期开关
+
+```bash
+meson setup build/linux --reconfigure \
+    -Dosal=linux \
+    -Dvoice=true \
+    -Dlinux_web_voice=true
+```
+
+`linux_web_voice` 依赖 `voice=true`。
+
+### 运行时配置
+
+语音配置目前有三层来源，优先级如下：
+
+1. 通过 OSAL KV 保存的 Shell 运行时配置（`/voice_set`、`/voice_enable`）
+2. 通过 Meson 选项 / 环境变量注入的编译期默认值
+3. `claw_config.h` 中的平台默认值
+
+当前可用的编译期语音调优项：
+
+- `RTCLAW_VOICE_MAX_TURN_BYTES` / `-Dvoice_max_turn_bytes=`
+- `RTCLAW_VOICE_TEXT_BUF_SIZE` / `-Dvoice_text_buf_size=`
+- `RTCLAW_VOICE_STT_RESP_SIZE` / `-Dvoice_stt_resp_size=`
+- `RTCLAW_VOICE_STT_TIMEOUT_MS` / `-Dvoice_stt_timeout_ms=`
+- `RTCLAW_VOICE_TTS_RESP_SIZE` / `-Dvoice_tts_resp_size=`
+- `RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE` / `-Dvoice_tts_audio_buf_size=`
+
+Linux 的单轮音频上限、STT 响应缓冲和 TTS 缓冲默认值高于嵌入式平台。
+`voice_tts_resp_size` 是 MiMo TTS 的完整 HTTP JSON 响应缓冲，包含
+base64 音频和 JSON 外壳；`voice_tts_audio_buf_size` 是 base64 解码后的音频
+输出缓冲。如果日志出现 `MiMo response truncated`，需要调大
+`voice_tts_resp_size`；如果日志出现 `MiMo audio decode exceeded output buffer`，
+需要调大 `voice_tts_audio_buf_size`。
+
+### Shell 命令
+
+```text
+/voice_enable on
+/voice_set web_port 8080
+/voice_set stt_provider xfyun
+/voice_set stt_xfyun_app_id <APPID>
+/voice_set stt_xfyun_api_key <APIKey>
+/voice_set stt_xfyun_api_secret <APISecret>
+/voice_status
+```
+
+`/voice_status` 会对敏感字段做掩码显示；在 Linux web voice 构建下，还会显示
+当前 web 端点是否正在运行。
+
+### 运行流程
+
+1. 浏览器连接事件流并附加一个 voice session。
+2. 浏览器发送带音频格式元数据的 `start_capture`。
+3. 浏览器通过 `audio_chunk` 流式发送 PCM 数据块。
+4. `voice_service` 将数据块转发到当前选定的 STT session，并用
+   `CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES` 做单轮硬截断。
+5. `end_capture` 触发 STT 收尾，再把 transcript 送入 `ai_chat()`，最后将
+   assistant 文本和 TTS 音频回传给端点。
+
+### 浏览器页面
+
+在 Linux web voice 构建下，浏览器测试页面由以下地址提供：
+
+- `http://127.0.0.1:<web_port>/voice.html`
+
+远程/手机端麦克风可用性仍然受浏览器安全模型限制；仅使用局域网 HTTP 时，
+手机浏览器通常无法直接通过 `getUserMedia()` 取麦克风。
 
 ## Tool Use
 
