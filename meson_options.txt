@@ -34,6 +34,8 @@ option('voice', type: 'boolean', value: false,
     description: 'Enable voice service')
 option('linux_web_voice', type: 'boolean', value: false,
     description: 'Enable Linux web voice endpoint backend')
+option('linux_local_voice', type: 'boolean', value: false,
+    description: 'Enable Linux local ALSA voice endpoint backend')
 option('voice_max_turn_bytes', type: 'integer', value: 0, min: 0,
     description: 'Max PCM bytes per voice turn, 0=use default (env: RTCLAW_VOICE_MAX_TURN_BYTES)')
 option('voice_text_buf_size', type: 'integer', value: 0, min: 0,

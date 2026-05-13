@@ -26,6 +26,9 @@
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
 #include "platform/linux/web_voice_server.h"
 #endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+#include "platform/linux/local_voice_endpoint.h"
+#endif
 #endif
 
 #ifdef CONFIG_RTCLAW_SKILL_ENABLE
@@ -94,7 +97,7 @@ void shell_nvs_config_load(void)
     }
     if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "web_port",
                         buf, sizeof(buf)) == CLAW_OK) {
-        voice_config_set_web_port((int)strtol(buf, NULL, 10));
+        voice_config_set_web_port((int)atoi(buf));
     }
     if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "endpoint_backend",
                         buf, sizeof(buf)) == CLAW_OK) {
@@ -180,6 +183,16 @@ void shell_nvs_config_load(void)
                         buf, sizeof(buf)) == CLAW_OK) {
         voice_config_set_string("tts_stream", buf);
     }
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "local_input",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        local_voice_endpoint_set_input(buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "local_output",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        local_voice_endpoint_set_output(buf);
+    }
+#endif
 #endif
 }
 
@@ -315,13 +328,29 @@ static void cmd_voice_enable(int argc, char **argv)
         voice_config_set_enabled(1);
         shell_nvs_save_str(SHELL_NVS_NS_VOICE, "enabled", "on");
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
-        if (web_voice_server_init() != CLAW_OK) {
-            claw_printf("Voice enabled, but Linux web voice init failed.\n");
-            return;
+        if (strcmp(voice_config_get()->endpoint_backend, "web") == 0) {
+            if (web_voice_server_init() != CLAW_OK) {
+                claw_printf("Voice enabled, but web voice init failed.\n");
+                return;
+            }
+            if (!web_voice_server_running() &&
+                web_voice_server_start() != CLAW_OK) {
+                claw_printf("Voice enabled, but web voice start failed.\n");
+                return;
+            }
         }
-        if (!web_voice_server_running() && web_voice_server_start() != CLAW_OK) {
-            claw_printf("Voice enabled, but Linux web voice start failed.\n");
-            return;
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+        if (strcmp(voice_config_get()->endpoint_backend, "local") == 0) {
+            if (local_voice_endpoint_init() != CLAW_OK) {
+                claw_printf("Voice enabled, but local voice init failed.\n");
+                return;
+            }
+            if (!local_voice_endpoint_running() &&
+                local_voice_endpoint_start() != CLAW_OK) {
+                claw_printf("Voice enabled, but local voice start failed.\n");
+                return;
+            }
         }
 #endif
         claw_printf("Voice enabled.\n");
@@ -329,6 +358,11 @@ static void cmd_voice_enable(int argc, char **argv)
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
         if (web_voice_server_running()) {
             web_voice_server_stop();
+        }
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+        if (local_voice_endpoint_running()) {
+            local_voice_endpoint_stop();
         }
 #endif
         voice_config_set_enabled(0);
@@ -358,7 +392,7 @@ static void cmd_voice_set(int argc, char **argv)
     }
 
     if (strcmp(argv[1], "web_port") == 0) {
-        int port = (int)strtol(value, NULL, 10);
+        int port = (int)atoi(value);
         if (voice_config_set_web_port(port) != CLAW_OK) {
             claw_printf("[error] invalid web_port\n");
             return;
@@ -392,6 +426,16 @@ static void cmd_voice_status(int argc, char **argv)
     claw_printf("  Web running:      %s\n",
                 web_voice_server_running() ? "yes" : "no");
 #endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    claw_printf("  Local running:    %s\n",
+                local_voice_endpoint_running() ? "yes" : "no");
+    claw_printf("  Local input:      %s\n",
+                local_voice_endpoint_get_input()[0] ?
+                local_voice_endpoint_get_input() : "default");
+    claw_printf("  Local output:     %s\n",
+                local_voice_endpoint_get_output()[0] ?
+                local_voice_endpoint_get_output() : "default");
+#endif
     claw_printf("  Max turn bytes:   %d\n", CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES);
     claw_printf("  STT Provider:     %s\n",
                 cfg->stt_provider[0] ? cfg->stt_provider : "(not set)");
@@ -401,8 +445,10 @@ static void cmd_voice_status(int argc, char **argv)
     claw_printf("  STT Model:        %s\n",
                 cfg->stt_model[0] ? cfg->stt_model : "(not set)");
     claw_printf("  XFYUN App ID:     %s\n", mask_secret(cfg->stt_xfyun_app_id));
-    claw_printf("  XFYUN API Key:    %s\n", mask_secret(cfg->stt_xfyun_api_key));
-    claw_printf("  XFYUN API Secret: %s\n", mask_secret(cfg->stt_xfyun_api_secret));
+    claw_printf("  XFYUN API Key:    %s\n",
+                mask_secret(cfg->stt_xfyun_api_key));
+    claw_printf("  XFYUN API Secret: %s\n",
+                mask_secret(cfg->stt_xfyun_api_secret));
     claw_printf("  STT Timeout:      %d ms\n", cfg->stt_timeout_ms);
     claw_printf("  Input Format:     %d Hz, %d ch, %d bit, %s\n",
                 cfg->input_sample_rate,
@@ -425,6 +471,42 @@ static void cmd_voice_status(int argc, char **argv)
     claw_printf("  TTS Stream:       %s\n",
                 cfg->tts_stream ? "on" : "off");
 }
+
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+static void cmd_voice_local(int argc, char **argv)
+{
+    int rc;
+
+    if (argc < 2) {
+        claw_printf("Usage: /voice_local start|stop|cancel|input|output\n");
+        return;
+    }
+    if (strcmp(argv[1], "start") == 0) {
+        rc = local_voice_endpoint_capture_start();
+    } else if (strcmp(argv[1], "stop") == 0) {
+        rc = local_voice_endpoint_capture_stop();
+    } else if (strcmp(argv[1], "cancel") == 0) {
+        rc = local_voice_endpoint_cancel();
+    } else if (strcmp(argv[1], "input") == 0 && argc >= 3) {
+        rc = local_voice_endpoint_set_input(argv[2]);
+    } else if (strcmp(argv[1], "output") == 0 && argc >= 3) {
+        rc = local_voice_endpoint_set_output(argv[2]);
+    } else {
+        claw_printf("Usage: /voice_local start|stop|cancel|input|output\n");
+        return;
+    }
+    if (rc != CLAW_OK) {
+        claw_printf("[error] local voice failed: %s\n", claw_strerror(rc));
+        return;
+    }
+    if (strcmp(argv[1], "input") == 0) {
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "local_input", argv[2]);
+    } else if (strcmp(argv[1], "output") == 0) {
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "local_output", argv[2]);
+    }
+    claw_printf("Local voice %s ok.\n", argv[1]);
+}
+#endif
 #endif
 
 static void cmd_feishu_set(int argc, char **argv)
@@ -694,6 +776,9 @@ const shell_cmd_t shell_common_commands[] = {
     SHELL_CMD("/voice_enable",  cmd_voice_enable,  "Enable or disable voice"),
     SHELL_CMD("/voice_set",     cmd_voice_set,     "Set voice config (NVS)"),
     SHELL_CMD("/voice_status",  cmd_voice_status,  "Show voice config"),
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    SHELL_CMD("/voice_local",   cmd_voice_local,   "Control local voice I/O"),
+#endif
 #endif
     SHELL_CMD("/feishu_set",    cmd_feishu_set,    "Set Feishu creds (NVS)"),
     SHELL_CMD("/feishu_status", cmd_feishu_status, "Show Feishu config"),

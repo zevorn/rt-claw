@@ -43,11 +43,12 @@ Commands start with `/`.
 > WiFi commands (`/wifi_*`) only available on WiFi-capable boards.
 > OTA commands (`/ota`) only available on boards with OTA partitions (xiaozhi-xmini, ESP32-S3 default).
 
-## Voice (Linux web endpoint)
+## Voice (Linux endpoints)
 
-The current voice MVP keeps browser transport separate from voice business
+The current voice MVP keeps input/output endpoints separate from voice business
 logic. On Linux, `platform/linux/web_voice_server.c` provides a browser-facing
-endpoint, while `claw/services/voice/voice_service.c` owns the state machine,
+endpoint, `platform/linux/local_voice_endpoint.c` provides a local ALSA toolchain
+endpoint, and `claw/services/voice/voice_service.c` owns the state machine,
 STT orchestration, AI handoff, and TTS handoff.
 
 ### Build-time switches
@@ -56,10 +57,11 @@ STT orchestration, AI handoff, and TTS handoff.
 meson setup build/linux --reconfigure \
     -Dosal=linux \
     -Dvoice=true \
-    -Dlinux_web_voice=true
+    -Dlinux_web_voice=true \
+    -Dlinux_local_voice=true
 ```
 
-`linux_web_voice` requires `voice=true`.
+`linux_web_voice` and `linux_local_voice` both require `voice=true`.
 
 ### Runtime configuration
 
@@ -89,27 +91,36 @@ increase `voice_tts_audio_buf_size`.
 ### Shell commands
 
 ```text
+/voice_set endpoint_backend local
 /voice_enable on
-/voice_set web_port 8080
+/voice_local input plughw:1,0
+/voice_local output default
 /voice_set stt_provider xfyun
 /voice_set stt_xfyun_app_id <APPID>
 /voice_set stt_xfyun_api_key <APIKey>
 /voice_set stt_xfyun_api_secret <APISecret>
+/voice_local start
+/voice_local stop
 /voice_status
 ```
 
-`/voice_status` masks sensitive fields and, on Linux web voice builds, also
-shows whether the web endpoint is currently running.
+`/voice_status` masks sensitive fields and, on Linux voice builds, also shows
+whether the web/local endpoint is currently running and which local devices are
+configured.
 
 ### Runtime flow
 
-1. Browser connects to the event stream and attaches a voice session.
-2. Browser sends `start_capture` with audio format metadata.
-3. Browser streams PCM chunks with `audio_chunk`.
+1. An endpoint attaches a voice session. The web endpoint is attached by the
+   browser event stream; the local endpoint is attached by `/voice_enable on` or
+   `/voice_local start`.
+2. The endpoint sends `start_capture` with audio format metadata.
+3. The web endpoint streams PCM chunks over HTTP; the local endpoint reads PCM
+   chunks from a USB microphone through `arecord`.
 4. `voice_service` forwards chunks to the selected STT session and enforces
    `CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES` as a hard cutoff.
 5. `end_capture` finalizes STT, sends the transcript into `ai_chat()`, then
-   returns assistant text and TTS audio back to the endpoint.
+   returns assistant text and TTS audio back to the endpoint. The local endpoint
+   plays TTS audio through `aplay`.
 
 ### Browser page
 
@@ -119,6 +130,30 @@ For Linux web voice builds, the browser test page is served from:
 
 Remote/mobile microphone access still depends on the browser security model;
 raw LAN HTTP is typically not enough for `getUserMedia()` on phones.
+
+### Raspberry Pi 3 local audio
+
+On 64-bit Raspberry Pi OS, the local endpoint reuses the system ALSA toolchain:
+`arecord` captures from a USB microphone and `aplay` plays to the headphone jack
+or the system default output. First list devices with:
+
+```bash
+arecord -l
+aplay -l
+```
+
+A common setup is `plughw:1,0` for the USB microphone and `default` for output,
+with the system default output selected as the 3.5 mm headphone jack through
+`raspi-config` or desktop audio settings. Runtime setup example:
+
+```text
+/voice_set endpoint_backend local
+/voice_local input plughw:1,0
+/voice_local output default
+/voice_enable on
+/voice_local start
+/voice_local stop
+```
 
 ## Tool Use
 

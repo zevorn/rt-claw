@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <string.h>
 
 #include "osal/claw_os.h"
 #include "osal/claw_kv.h"
@@ -17,6 +18,9 @@
 #endif
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
 #include "platform/linux/web_voice_server.h"
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+#include "platform/linux/local_voice_endpoint.h"
 #endif
 
 extern int claw_init(void);
@@ -47,14 +51,24 @@ int main(void)
     shell_nvs_config_load();
     claw_init();
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
-    if (web_voice_server_init() == CLAW_OK && voice_config_get_enabled()) {
+    if (web_voice_server_init() == CLAW_OK && voice_config_get_enabled() &&
+        strcmp(voice_config_get()->endpoint_backend, "web") == 0) {
         web_voice_server_start();
+    }
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    if (local_voice_endpoint_init() == CLAW_OK && voice_config_get_enabled() &&
+        strcmp(voice_config_get()->endpoint_backend, "local") == 0) {
+        local_voice_endpoint_start();
     }
 #endif
     linux_shell_loop();
 
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
     web_voice_server_stop();
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    local_voice_endpoint_stop();
 #endif
     claw_deinit();
 

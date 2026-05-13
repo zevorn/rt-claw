@@ -587,9 +587,16 @@ MESON_BUILDDIR_LINUX := $(BUILD_DIR)/linux
 build-linux:
 	@if [ ! -f $(MESON_BUILDDIR_LINUX)/build.ninja ]; then \
 		meson setup $(MESON_BUILDDIR_LINUX) -Dosal=linux \
-			-Dtool_script=true; \
+			-Dtool_script=true \
+			-Dvoice=true \
+			-Dlinux_web_voice=true \
+			-Dlinux_local_voice=true; \
 	else \
-		meson configure $(MESON_BUILDDIR_LINUX) -Dtool_script=true; \
+		meson setup $(MESON_BUILDDIR_LINUX) --reconfigure \
+			-Dtool_script=true \
+			-Dvoice=true \
+			-Dlinux_web_voice=true \
+			-Dlinux_local_voice=true; \
 	fi
 	meson compile -C $(MESON_BUILDDIR_LINUX)
 	@echo "Output: $(MESON_BUILDDIR_LINUX)/platform/linux/rtclaw"

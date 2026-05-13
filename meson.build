@@ -118,6 +118,10 @@ if get_option('linux_web_voice')
     conf_data.set('CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE', 1)
     _has_any = true
 endif
+if get_option('linux_local_voice')
+    conf_data.set('CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE', 1)
+    _has_any = true
+endif
 
 # Version from git describe (e.g. "v0.2.0" or "v0.2.0-3-gabcdef").
 # Without --always so it fails cleanly when no tag is reachable
