@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+Read `AGENTS.md` first. This file adds Claude Code-specific build, run, test,
+and slash-command reference details for rt-claw.
+
 rt-claw: OpenClaw-inspired AI assistant on embedded RTOS (FreeRTOS + RT-Thread + Zephyr) via OSAL.
 
 ## Build
@@ -151,6 +154,7 @@ git worktree remove ../rt-claw-wifi-fix
 scripts/check-patch.sh                 # all source files
 scripts/check-patch.sh --staged        # staged changes only
 scripts/check-patch.sh --file <path>   # specific file
+make check-agent-skills                # validate .agents skill metadata
 
 # DCO (Signed-off-by) check
 scripts/check-dco.sh                   # commits since main
@@ -188,19 +192,14 @@ Verify changes by:
    make build-zephyr-cortex-m3-qemu
    ```
 2. `scripts/check-patch.sh --staged` passes
-3. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-zynq-a9-qemu`
+3. `make check-agent-skills` passes when `.agents/` changes
+4. QEMU boot test: `make run-vexpress-a9-qemu` or `make run-esp32c3-qemu` or `make run-zynq-a9-qemu`
 
-## Skills (Claude Code Slash Commands)
+## Agent Skills
 
-Project-level skills in `.claude/skills/`, invoked via `/command-name`:
-
-| Command | Description |
-|---------|-------------|
-| `/build-test [platform]` | Build and run on QEMU or flash to real hardware |
-| `/new-module <type> <name>` | Scaffold a new service, driver, or tool module |
-| `/diagnose` | Analyze pasted error logs (build, runtime, CI, network) |
-| `/sync-docs [scope]` | Update EN/ZH docs after code changes |
-| `/platform-port <name>` | Guide porting to a new hardware platform |
+Agent-agnostic development skills live under `.agents/skills/`. Use them when
+working with tools that support repository-local skills, or read the matching
+`SKILL.md` directly for task-specific guidance.
 
 ## Key Paths
 

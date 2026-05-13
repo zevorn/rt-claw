@@ -1,0 +1,41 @@
+name: agent-skills
+
+on:
+  push:
+    paths:
+      - '.agents/**'
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/agent-skills.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'GEMINI.md'
+      - 'Makefile'
+      - 'scripts/check-agent-skills.py'
+  pull_request:
+    paths:
+      - '.agents/**'
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/agent-skills.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'GEMINI.md'
+      - 'Makefile'
+      - 'scripts/check-agent-skills.py'
+  workflow_dispatch:
+
+jobs:
+  check-agent-skills:
+    name: check agent skills
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout rt-claw
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Validate agent skills
+        run: make check-agent-skills

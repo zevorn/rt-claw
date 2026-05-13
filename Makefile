@@ -86,6 +86,7 @@ help:
 	@echo ""
 	@echo "Checks:"
 	@echo "  make check                 Run code style checks"
+	@echo "  make check-agent-skills    Validate .agents skill metadata"
 
 # --- QEMU vexpress-a9 (RT-Thread) ---
 MESON_BUILDDIR_A9 := $(BUILD_DIR)/vexpress-a9-qemu
@@ -752,9 +753,13 @@ test-online-esp32s3: run-esp32s3-qemu-flash
 
 # --- Checks ---
 .PHONY: check
-check:
+check: check-agent-skills
 	scripts/check-patch.sh
 
 .PHONY: check-staged
 check-staged:
 	scripts/check-patch.sh --staged
+
+.PHONY: check-agent-skills
+check-agent-skills:
+	python3 scripts/check-agent-skills.py

@@ -66,9 +66,8 @@ package-lock.json
 # PlatformIO
 .pio/
 
-# Claude Code
-.claude/*
-!.claude/skills/
+# Local agent state
+.claude/
 .humanize*
 slides
 
