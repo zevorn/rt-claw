@@ -9,6 +9,7 @@ unit_test_src = files(
     'test_script_tool.c',
     'test_im_util.c',
     'test_voice_endpoint.c',
+    'test_voice_service.c',
 )
 
 test_defs = platform_defs

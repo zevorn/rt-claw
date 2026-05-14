@@ -342,17 +342,12 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
 {
     claw_err_t rc;
 
-    if (!ctx->cfg.enabled) {
-        voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
-        return;
-    }
-
     switch (event->type) {
     case VOICE_ENDPOINT_EVENT_ATTACH:
         CLAW_LOGI(TAG, "endpoint attached: session=%d", event->session_id);
         voice_abort_turn(ctx);
         ctx->active_session_id = event->session_id;
-        voice_set_state(ctx, VOICE_ENDPOINT_SESSION_READY, NULL);
+        voice_set_ready_state(ctx);
         break;
     case VOICE_ENDPOINT_EVENT_DETACH:
         CLAW_LOGI(TAG, "endpoint detached: session=%d", event->session_id);
@@ -363,6 +358,10 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         }
         break;
     case VOICE_ENDPOINT_EVENT_START_CAPTURE:
+        if (!ctx->cfg.enabled) {
+            voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
+            break;
+        }
         CLAW_LOGI(TAG, "start capture: session=%d active=%d provider=%s",
                   event->session_id,
                   ctx->active_session_id,
@@ -395,9 +394,17 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         voice_set_state(ctx, VOICE_ENDPOINT_CAPTURING, NULL);
         break;
     case VOICE_ENDPOINT_EVENT_AUDIO_CHUNK:
+        if (!ctx->cfg.enabled) {
+            voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
+            break;
+        }
         voice_handle_audio_chunk(ctx, event);
         break;
     case VOICE_ENDPOINT_EVENT_END_CAPTURE:
+        if (!ctx->cfg.enabled) {
+            voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
+            break;
+        }
         CLAW_LOGI(TAG, "end capture: session=%d total=%u",
                   event->session_id,
                   (unsigned int)ctx->turn_bytes);
@@ -412,6 +419,10 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         voice_set_ready_state(ctx);
         break;
     case VOICE_ENDPOINT_EVENT_PLAYBACK_DONE:
+        if (!ctx->cfg.enabled) {
+            voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
+            break;
+        }
         CLAW_LOGI(TAG, "playback done: session=%d", event->session_id);
         if (ctx->state == VOICE_ENDPOINT_PLAYING) {
             voice_reset_turn(ctx);

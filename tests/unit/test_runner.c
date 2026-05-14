@@ -16,6 +16,7 @@ extern int test_im_util_suite(void);
 extern int test_ota_suite(void);
 extern int test_ai_skill_suite(void);
 extern int test_voice_endpoint_suite(void);
+extern int test_voice_service_suite(void);
 
 int run_all_unit_tests(void)
 {
@@ -31,6 +32,7 @@ int run_all_unit_tests(void)
     failed += test_ota_suite();
     failed += test_ai_skill_suite();
     failed += test_voice_endpoint_suite();
+    failed += test_voice_service_suite();
 
     printf("\n========================================\n");
     if (failed) {

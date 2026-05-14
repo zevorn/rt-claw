@@ -15,6 +15,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 #define TAG "web_voice"
 #define WEB_VOICE_SESSION_ID 1
 #define HTTP_BUF_SIZE 16384
@@ -70,7 +74,10 @@ static int web_voice_send_all(int fd, const void *buf, size_t len)
     const uint8_t *ptr = (const uint8_t *)buf;
 
     while (len > 0) {
-        ssize_t sent = send(fd, ptr, len, 0);
+        ssize_t sent = send(fd, ptr, len, MSG_NOSIGNAL);
+        if (sent < 0 && errno == EINTR) {
+            continue;
+        }
         if (sent <= 0) {
             return -1;
         }
@@ -359,10 +366,17 @@ static claw_err_t send_error(int session_id, const char *message)
     return ret;
 }
 
-static size_t web_voice_parse_content_length(const uint8_t *req)
+static int web_voice_parse_content_length(const uint8_t *req,
+                                          size_t *content_length)
 {
     const char *hdr = strstr((const char *)req, "\r\nContent-Length:");
+    char *end = NULL;
+    unsigned long parsed;
 
+    if (!content_length) {
+        return -1;
+    }
+    *content_length = 0;
     if (!hdr) {
         hdr = strstr((const char *)req, "\r\ncontent-length:");
     }
@@ -371,9 +385,15 @@ static size_t web_voice_parse_content_length(const uint8_t *req)
     }
     hdr = strchr(hdr, ':');
     if (!hdr) {
-        return 0;
+        return -1;
     }
-    return (size_t)strtoul(hdr + 1, NULL, 10);
+    errno = 0;
+    parsed = strtoul(hdr + 1, &end, 10);
+    if (errno != 0 || end == hdr + 1 || parsed > HTTP_BODY_MAX) {
+        return -1;
+    }
+    *content_length = (size_t)parsed;
+    return 0;
 }
 
 static void web_voice_parse_content_type(struct http_request *req)
@@ -426,8 +446,13 @@ static int web_voice_read_request(int fd, struct http_request *req)
             continue;
         }
         req->header_len = (size_t)(hdr_end - req->buf) + 4;
-        content_length = web_voice_parse_content_length(req->buf);
-        if (req->header_len + content_length > used) {
+        if (web_voice_parse_content_length(req->buf, &content_length) != 0) {
+            return -1;
+        }
+        if (content_length > sizeof(req->buf) - req->header_len) {
+            return -1;
+        }
+        if (content_length > used - req->header_len) {
             continue;
         }
         req->body_len = content_length;
