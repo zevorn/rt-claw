@@ -15,6 +15,7 @@
 
 #define TAG "voice_tts"
 #define VOICE_TTS_RESP_SIZE  CONFIG_RTCLAW_VOICE_TTS_RESP_SIZE
+#define VOICE_TTS_STREAM_CHUNK_SIZE 4096U
 
 enum voice_tts_provider_type {
     VOICE_TTS_PROVIDER_MIMO = 0,
@@ -247,6 +248,164 @@ voice_tts_mimo_build_request(const voice_runtime_config_t *cfg,
     return CLAW_OK;
 }
 
+struct mimo_stream_ctx {
+    const char           *format;
+    const char           *mime_type;
+    voice_tts_audio_cb_t  audio_cb;
+    void                 *audio_user;
+    uint8_t               audio_buf[VOICE_TTS_STREAM_CHUNK_SIZE];
+    size_t                audio_len;
+    char                  key_window[16];
+    size_t                key_len;
+    char                  b64[4];
+    size_t                b64_len;
+    int                   in_audio;
+    int                   audio_done;
+    int                   escape;
+};
+
+static int voice_tts_b64_value(char ch)
+{
+    if (ch >= 'A' && ch <= 'Z') {
+        return ch - 'A';
+    }
+    if (ch >= 'a' && ch <= 'z') {
+        return ch - 'a' + 26;
+    }
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0' + 52;
+    }
+    if (ch == '+') {
+        return 62;
+    }
+    if (ch == '/') {
+        return 63;
+    }
+    if (ch == '=') {
+        return 0;
+    }
+    return -1;
+}
+
+static claw_err_t mimo_stream_emit(struct mimo_stream_ctx *ctx)
+{
+    claw_err_t rc;
+
+    if (ctx->audio_len == 0) {
+        return CLAW_OK;
+    }
+    rc = ctx->audio_cb(ctx->audio_buf, ctx->audio_len,
+                       ctx->mime_type, ctx->audio_user);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+    ctx->audio_len = 0;
+    return CLAW_OK;
+}
+
+static claw_err_t mimo_stream_put_audio(struct mimo_stream_ctx *ctx,
+                                        uint8_t byte)
+{
+    ctx->audio_buf[ctx->audio_len++] = byte;
+    if (ctx->audio_len >= sizeof(ctx->audio_buf)) {
+        return mimo_stream_emit(ctx);
+    }
+    return CLAW_OK;
+}
+
+static claw_err_t mimo_stream_decode_quad(struct mimo_stream_ctx *ctx)
+{
+    int a = voice_tts_b64_value(ctx->b64[0]);
+    int b = voice_tts_b64_value(ctx->b64[1]);
+    int c = voice_tts_b64_value(ctx->b64[2]);
+    int d = voice_tts_b64_value(ctx->b64[3]);
+    uint32_t chunk;
+    claw_err_t rc;
+
+    if (a < 0 || b < 0 || c < 0 || d < 0) {
+        return CLAW_ERR_INVALID;
+    }
+    chunk = ((uint32_t)a << 18) | ((uint32_t)b << 12) |
+            ((uint32_t)c << 6) | (uint32_t)d;
+    rc = mimo_stream_put_audio(ctx, (uint8_t)((chunk >> 16) & 0xff));
+    if (rc != CLAW_OK || ctx->b64[2] == '=') {
+        return rc;
+    }
+    rc = mimo_stream_put_audio(ctx, (uint8_t)((chunk >> 8) & 0xff));
+    if (rc != CLAW_OK || ctx->b64[3] == '=') {
+        return rc;
+    }
+    return mimo_stream_put_audio(ctx, (uint8_t)(chunk & 0xff));
+}
+
+static int mimo_stream_http_cb(const void *data, size_t len, void *user)
+{
+    struct mimo_stream_ctx *ctx = (struct mimo_stream_ctx *)user;
+    const char *src = (const char *)data;
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        char ch = src[i];
+
+        if (!ctx->in_audio) {
+            if (ctx->audio_done) {
+                continue;
+            }
+            if (ctx->key_len < sizeof(ctx->key_window) - 1) {
+                ctx->key_window[ctx->key_len++] = ch;
+            } else {
+                memmove(ctx->key_window, ctx->key_window + 1,
+                        sizeof(ctx->key_window) - 2);
+                ctx->key_window[sizeof(ctx->key_window) - 2] = ch;
+            }
+            ctx->key_window[ctx->key_len] = '\0';
+            if (strstr(ctx->key_window, "\"data\":\"") != NULL ||
+                strstr(ctx->key_window, "\"data\" : \"") != NULL) {
+                ctx->in_audio = 1;
+                ctx->mime_type = voice_tts_format_mime(ctx->format);
+            }
+            continue;
+        }
+
+        if (ctx->escape) {
+            ctx->escape = 0;
+            if (ch == '/') {
+                ch = '/';
+            } else if (ch == 'n' || ch == 'r' || ch == 't') {
+                continue;
+            } else {
+                CLAW_LOGE(TAG, "invalid escaped MiMo audio byte: 0x%02x",
+                          (unsigned int)(uint8_t)ch);
+                return CLAW_ERR_INVALID;
+            }
+        } else if (ch == '\\') {
+            ctx->escape = 1;
+            continue;
+        } else if (ch == '"') {
+            ctx->in_audio = 0;
+            ctx->audio_done = 1;
+            continue;
+        }
+        if (ch == '\r' || ch == '\n' || ch == ' ' || ch == '\t') {
+            continue;
+        }
+        if (voice_tts_b64_value(ch) < 0) {
+            CLAW_LOGE(TAG, "invalid MiMo audio base64 byte: 0x%02x",
+                      (unsigned int)(uint8_t)ch);
+            return CLAW_ERR_INVALID;
+        }
+        ctx->b64[ctx->b64_len++] = ch;
+        if (ctx->b64_len == 4) {
+            claw_err_t rc = mimo_stream_decode_quad(ctx);
+            if (rc != CLAW_OK) {
+                return rc;
+            }
+            ctx->b64_len = 0;
+        }
+    }
+    return CLAW_OK;
+}
+
 static claw_err_t voice_tts_mimo_parse_response(const char *resp,
                                                 const char *format,
                                                 void *audio,
@@ -307,6 +466,67 @@ static claw_err_t voice_tts_mimo_parse_response(const char *resp,
     *mime_type = voice_tts_format_mime(format);
     CLAW_LOGI(TAG, "MiMo audio decoded: %u bytes mime=%s",
               (unsigned int)*audio_len, *mime_type);
+    return CLAW_OK;
+}
+
+static claw_err_t voice_tts_mimo_synthesize_stream(
+    const voice_runtime_config_t *cfg,
+    const char *text,
+    voice_tts_audio_cb_t cb,
+    void *user,
+    const char **mime_type)
+{
+    char auth[VOICE_KEY_MAX + 8];
+    claw_net_header_t headers[2];
+    char *body = NULL;
+    size_t resp_len = 0;
+    int status;
+    claw_err_t rc;
+    struct mimo_stream_ctx stream_ctx;
+
+    if (!cfg || !text || !cb || !mime_type) {
+        return CLAW_ERR_INVALID;
+    }
+
+    rc = voice_tts_mimo_build_request(cfg, text, &body);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+
+    memset(&stream_ctx, 0, sizeof(stream_ctx));
+    stream_ctx.format = cfg->tts_format;
+    stream_ctx.mime_type = voice_tts_format_mime(cfg->tts_format);
+    stream_ctx.audio_cb = cb;
+    stream_ctx.audio_user = user;
+    *mime_type = stream_ctx.mime_type;
+
+    snprintf(auth, sizeof(auth), "Bearer %s", cfg->tts_key);
+    headers[0] = (claw_net_header_t){ "Content-Type", "application/json" };
+    headers[1] = (claw_net_header_t){ "Authorization", auth };
+
+    status = claw_net_post_stream(cfg->tts_url, headers, 2,
+                                  body, strlen(body),
+                                  mimo_stream_http_cb, &stream_ctx,
+                                  &resp_len);
+    cJSON_free(body);
+    if (status < 0) {
+        CLAW_LOGE(TAG, "MiMo stream HTTP transport failed");
+        return CLAW_ERR_IO;
+    }
+    CLAW_LOGI(TAG, "MiMo stream HTTP status=%d resp_len=%u",
+              status, (unsigned int)resp_len);
+    if (status != 200) {
+        CLAW_LOGE(TAG, "MiMo TTS stream HTTP %d", status);
+        return CLAW_ERR_GENERIC;
+    }
+    if (stream_ctx.b64_len != 0 || stream_ctx.in_audio ||
+        !stream_ctx.audio_done || stream_ctx.mime_type == NULL) {
+        return CLAW_ERR_INVALID;
+    }
+    rc = mimo_stream_emit(&stream_ctx);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
     return CLAW_OK;
 }
 
@@ -421,7 +641,7 @@ static claw_err_t voice_tts_mimo_synthesize(const voice_runtime_config_t *cfg,
                       (unsigned int)resp_cap,
                       (unsigned int)audio_size,
                       (unsigned int)VOICE_TTS_RESP_SIZE);
-            rc = CLAW_ERR_IO;
+            rc = CLAW_ERR_FULL;
         }
         CLAW_LOGE(TAG, "MiMo response parse failed: %s", claw_strerror(rc));
     }
@@ -453,6 +673,33 @@ claw_err_t voice_tts_synthesize(const voice_runtime_config_t *cfg,
         return voice_tts_mimo_synthesize(cfg, text,
                                          audio, audio_size,
                                          audio_len, mime_type);
+    default:
+        return CLAW_ERR_INVALID;
+    }
+}
+
+claw_err_t voice_tts_synthesize_stream(const voice_runtime_config_t *cfg,
+                                       const char *text,
+                                       voice_tts_audio_cb_t cb,
+                                       void *user,
+                                       const char **mime_type)
+{
+    enum voice_tts_provider_type provider;
+    claw_err_t rc;
+
+    if (!cfg || !text || !text[0] || !cb || !mime_type) {
+        return CLAW_ERR_INVALID;
+    }
+
+    rc = voice_tts_parse_provider(cfg, &provider);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+
+    switch (provider) {
+    case VOICE_TTS_PROVIDER_MIMO:
+        return voice_tts_mimo_synthesize_stream(cfg, text, cb,
+                                                user, mime_type);
     default:
         return CLAW_ERR_INVALID;
     }

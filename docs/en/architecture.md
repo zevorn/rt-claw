@@ -161,10 +161,10 @@ into `ai_chat()`. The returned assistant text is sent both to the endpoint and
 then into TTS, whose decoded audio is handed back to the active output backend.
 Current implementation includes config-driven provider selection for both STT
 and TTS, per-turn byte cutoff, audio format metadata, queue-based event
-handoff, and a Linux web endpoint backend under
-`platform/linux/web_voice_server.c`. The Linux web path uses browser HTTP POST
-for PCM upload and SSE for state / transcript / assistant text / TTS audio
-updates.
+handoff, MiMo TTS response streaming with buffered fallback, and a Linux web
+endpoint backend under `platform/linux/web_voice_server.c`. The Linux web path
+uses browser HTTP POST for PCM upload and SSE for state / transcript /
+assistant text / TTS audio updates.
 
 At the interface level, `include/claw/services/voice/voice_endpoint.h` defines
 session states, endpoint event types, and the backend callback contract.

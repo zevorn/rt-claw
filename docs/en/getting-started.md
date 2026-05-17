@@ -298,7 +298,8 @@ Then in the shell:
 Open `http://127.0.0.1:8080/voice.html` in a local browser to test the Linux
 web voice page.
 
-For longer MiMo TTS replies, tune the two buffers separately: use
+For longer MiMo TTS replies, the voice service streams decoded audio chunks to
+the endpoint when possible. The buffered fallback still has two tunables: use
 `-Dvoice_tts_resp_size=` for the full HTTP JSON response that contains base64
 audio, and `-Dvoice_tts_audio_buf_size=` for the decoded audio output.
 

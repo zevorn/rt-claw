@@ -22,6 +22,26 @@
 #define TAG "net_http"
 #define HTTP_TIMEOUT_SEC 60
 
+typedef struct {
+    char   *buf;
+    size_t  size;
+    size_t  len;
+} resp_ctx_t;
+
+static int write_body_cb(const void *data, size_t len, void *user)
+{
+    resp_ctx_t *ctx = (resp_ctx_t *)user;
+    size_t avail = ctx->size - ctx->len - 1;
+    size_t copy = (len < avail) ? len : avail;
+
+    if (copy > 0) {
+        memcpy(ctx->buf + ctx->len, data, copy);
+        ctx->len += copy;
+        ctx->buf[ctx->len] = '\0';
+    }
+    return CLAW_OK;
+}
+
 static int parse_url(const char *url, char *host, size_t host_sz,
                      int *port, char *path, size_t path_sz)
 {
@@ -65,19 +85,22 @@ static int parse_url(const char *url, char *host, size_t host_sz,
     return 0;
 }
 
-static int http_recv_response(int sock, char *buf, size_t buf_size,
-                              size_t *body_len_out, int *status_out)
+static int http_recv_response_cb(int sock,
+                                 claw_net_body_cb_t cb,
+                                 void *user,
+                                 size_t *body_len_out,
+                                 int *status_out)
 {
     char tmp[512];
-    size_t total_len = 0;
+    char header[1024];
+    size_t header_len = 0;
     int header_done = 0;
-    char *body_start = NULL;
     int content_length = -1;
     int body_received = 0;
 
     *status_out = 0;
     *body_len_out = 0;
-    buf[0] = '\0';
+    header[0] = '\0';
 
     while (1) {
         int n = recv(sock, tmp, sizeof(tmp) - 1, 0);
@@ -87,42 +110,45 @@ static int http_recv_response(int sock, char *buf, size_t buf_size,
         tmp[n] = '\0';
 
         if (!header_done) {
-            size_t avail = buf_size - total_len - 1;
+            char *body_start;
+            size_t avail = sizeof(header) - header_len - 1;
             size_t copy = ((size_t)n < avail) ? (size_t)n : avail;
-            memcpy(buf + total_len, tmp, copy);
-            total_len += copy;
-            buf[total_len] = '\0';
 
-            body_start = strstr(buf, "\r\n\r\n");
+            memcpy(header + header_len, tmp, copy);
+            header_len += copy;
+            header[header_len] = '\0';
+            body_start = strstr(header, "\r\n\r\n");
             if (body_start) {
+                size_t body_len;
+
                 header_done = 1;
                 body_start += 4;
-
-                if (sscanf(buf, "HTTP/%*d.%*d %d", status_out) != 1) {
+                if (sscanf(header, "HTTP/%*d.%*d %d", status_out) != 1) {
                     *status_out = 0;
                 }
-
-                char *cl = strstr(buf, "Content-Length:");
-                if (!cl) {
-                    cl = strstr(buf, "content-length:");
+                {
+                    char *cl = strstr(header, "Content-Length:");
+                    if (!cl) {
+                        cl = strstr(header, "content-length:");
+                    }
+                    if (cl) {
+                        content_length = atoi(cl + 15);
+                    }
                 }
-                if (cl) {
-                    content_length = atoi(cl + 15);
+                body_len = header_len - (size_t)(body_start - header);
+                if (body_len > 0 && cb &&
+                    cb(body_start, body_len, user) != CLAW_OK) {
+                    return -1;
                 }
-
-                size_t bl = total_len - (body_start - buf);
-                memmove(buf, body_start, bl);
-                total_len = bl;
-                buf[total_len] = '\0';
-                body_received = (int)bl;
+                body_received = (int)body_len;
+                *body_len_out += body_len;
             }
         } else {
-            size_t avail = buf_size - total_len - 1;
-            size_t copy = ((size_t)n < avail) ? (size_t)n : avail;
-            memcpy(buf + total_len, tmp, copy);
-            total_len += copy;
-            buf[total_len] = '\0';
+            if (n > 0 && cb && cb(tmp, (size_t)n, user) != CLAW_OK) {
+                return -1;
+            }
             body_received += n;
+            *body_len_out += (size_t)n;
         }
 
         if (header_done && content_length >= 0 &&
@@ -131,8 +157,21 @@ static int http_recv_response(int sock, char *buf, size_t buf_size,
         }
     }
 
-    *body_len_out = total_len;
     return header_done ? 0 : -1;
+}
+
+static int http_recv_response(int sock, char *buf, size_t buf_size,
+                              size_t *body_len_out, int *status_out)
+{
+    resp_ctx_t ctx = { .buf = buf, .size = buf_size, .len = 0 };
+
+    buf[0] = '\0';
+    if (http_recv_response_cb(sock, write_body_cb, &ctx,
+                              body_len_out, status_out) < 0) {
+        return -1;
+    }
+    *body_len_out = ctx.len;
+    return 0;
 }
 
 int claw_net_post(const char *url,
@@ -222,6 +261,95 @@ int claw_net_post(const char *url,
 
     if (resp_len) {
         *resp_len = rlen;
+    }
+    return status;
+}
+
+int claw_net_post_stream(const char *url,
+                         const claw_net_header_t *headers, int header_count,
+                         const char *body, size_t body_len,
+                         claw_net_body_cb_t cb, void *user,
+                         size_t *resp_len)
+{
+    char host[128];
+    char path[256];
+    int port;
+
+    if (resp_len) {
+        *resp_len = 0;
+    }
+
+    if (parse_url(url, host, sizeof(host),
+                  &port, path, sizeof(path)) < 0) {
+        CLAW_LOGE(TAG, "invalid URL: %s", url);
+        return CLAW_ERROR;
+    }
+
+    if (port == 443) {
+        CLAW_LOGW(TAG, "HTTPS not supported, trying plain HTTP on 443");
+    }
+
+    struct hostent *he = gethostbyname(host);
+    if (!he) {
+        CLAW_LOGE(TAG, "DNS failed: %s", host);
+        return CLAW_ERROR;
+    }
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        CLAW_LOGE(TAG, "socket create failed");
+        return CLAW_ERROR;
+    }
+
+    struct timeval tv = { .tv_sec = HTTP_TIMEOUT_SEC, .tv_usec = 0 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_in server;
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    memcpy(&server.sin_addr, he->h_addr, he->h_length);
+
+    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+        CLAW_LOGE(TAG, "connect failed: %s:%d", host, port);
+        close(sock);
+        return CLAW_ERROR;
+    }
+
+    char hdr[512];
+    int hdr_len = snprintf(hdr, sizeof(hdr),
+        "POST %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Content-Length: %d\r\n"
+        "Connection: close\r\n",
+        path, host, (int)body_len);
+
+    for (int i = 0; i < header_count; i++) {
+        hdr_len += snprintf(hdr + hdr_len, sizeof(hdr) - hdr_len,
+                            "%s: %s\r\n",
+                            headers[i].key, headers[i].value);
+    }
+    hdr_len += snprintf(hdr + hdr_len, sizeof(hdr) - hdr_len, "\r\n");
+
+    if (send(sock, hdr, hdr_len, 0) < 0 ||
+        send(sock, body, body_len, 0) < 0) {
+        CLAW_LOGE(TAG, "send failed");
+        close(sock);
+        return CLAW_ERROR;
+    }
+
+    int status = 0;
+    size_t rlen = 0;
+    int rc = http_recv_response_cb(sock, cb, user, &rlen, &status);
+    close(sock);
+
+    if (resp_len) {
+        *resp_len = rlen;
+    }
+    if (rc < 0) {
+        CLAW_LOGE(TAG, "stream response parse failed");
+        return CLAW_ERROR;
     }
     return status;
 }

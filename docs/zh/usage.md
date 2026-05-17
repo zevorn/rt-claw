@@ -80,11 +80,12 @@ meson setup build/linux --reconfigure \
 - `RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE` / `-Dvoice_tts_audio_buf_size=`
 
 Linux 的单轮音频上限、STT 响应缓冲和 TTS 缓冲默认值高于嵌入式平台。
-`voice_tts_resp_size` 是 MiMo TTS 的完整 HTTP JSON 响应缓冲，包含
-base64 音频和 JSON 外壳；`voice_tts_audio_buf_size` 是 base64 解码后的音频
-输出缓冲。如果日志出现 `MiMo response truncated`，需要调大
-`voice_tts_resp_size`；如果日志出现 `MiMo audio decode exceeded output buffer`，
-需要调大 `voice_tts_audio_buf_size`。
+MiMo TTS 在可用时会走流式响应路径，解码后的音频可以分块转发给端点，
+不再强制依赖一次完整的解码输出缓冲。缓冲式回退路径仍然使用
+`voice_tts_resp_size` 保存完整 HTTP JSON 响应，并使用
+`voice_tts_audio_buf_size` 保存解码后的音频。如果日志出现
+`MiMo response truncated`，需要调大 `voice_tts_resp_size`；如果日志出现
+`MiMo audio decode exceeded output buffer`，需要调大 `voice_tts_audio_buf_size`。
 
 ### Shell 命令
 

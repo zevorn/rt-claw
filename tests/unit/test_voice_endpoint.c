@@ -14,6 +14,7 @@ static int s_state_calls;
 static int s_transcript_calls;
 static int s_assistant_calls;
 static int s_tts_calls;
+static int s_tts_done_calls;
 static int s_error_calls;
 static int s_last_session_id;
 static int s_last_state;
@@ -26,6 +27,7 @@ static void reset_backend_state(void)
     s_transcript_calls = 0;
     s_assistant_calls = 0;
     s_tts_calls = 0;
+    s_tts_done_calls = 0;
     s_error_calls = 0;
     s_last_session_id = -1;
     s_last_state = -1;
@@ -73,6 +75,13 @@ static claw_err_t test_send_tts_audio(int session_id,
     return CLAW_OK;
 }
 
+static claw_err_t test_send_tts_done(int session_id)
+{
+    s_tts_done_calls++;
+    s_last_session_id = session_id;
+    return CLAW_OK;
+}
+
 static claw_err_t test_send_error(int session_id, const char *message)
 {
     s_error_calls++;
@@ -87,6 +96,7 @@ static const struct voice_endpoint_backend s_backend = {
     .send_transcript = test_send_transcript,
     .send_assistant_text = test_send_assistant_text,
     .send_tts_audio = test_send_tts_audio,
+    .send_tts_done = test_send_tts_done,
     .send_error = test_send_error,
 };
 
@@ -133,10 +143,27 @@ static void test_endpoint_routes_callbacks(void)
     TEST_ASSERT_EQ(s_last_audio_len, sizeof(audio));
     TEST_ASSERT_STR_EQ(s_last_text, "audio/wav");
 
+    TEST_ASSERT_EQ(voice_endpoint_send_tts_done(), CLAW_OK);
+    TEST_ASSERT_EQ(s_tts_done_calls, 1);
+    TEST_ASSERT_EQ(s_last_session_id, TEST_VOICE_SESSION_ID);
+
     TEST_ASSERT_EQ(voice_endpoint_send_error("boom"), CLAW_OK);
     TEST_ASSERT_EQ(s_error_calls, 1);
     TEST_ASSERT_STR_EQ(s_last_text, "boom");
 
+    voice_endpoint_detach(TEST_VOICE_SESSION_ID);
+}
+
+static void test_endpoint_tts_done_optional(void)
+{
+    struct voice_endpoint_backend backend = s_backend;
+
+    reset_backend_state();
+    backend.send_tts_done = NULL;
+    TEST_ASSERT_EQ(voice_endpoint_attach(TEST_VOICE_SESSION_ID,
+                                         &backend), CLAW_OK);
+    TEST_ASSERT_EQ(voice_endpoint_send_tts_done(), CLAW_OK);
+    TEST_ASSERT_EQ(s_tts_done_calls, 0);
     voice_endpoint_detach(TEST_VOICE_SESSION_ID);
 }
 
@@ -152,6 +179,7 @@ static void test_endpoint_rejects_missing_backend(void)
                    CLAW_ERR_NOENT);
     TEST_ASSERT_EQ(voice_endpoint_send_tts_audio("x", 1, "audio/wav"),
                    CLAW_ERR_NOENT);
+    TEST_ASSERT_EQ(voice_endpoint_send_tts_done(), CLAW_ERR_NOENT);
     TEST_ASSERT_EQ(voice_endpoint_send_error("unused"), CLAW_ERR_NOENT);
 }
 
@@ -162,6 +190,7 @@ int test_voice_endpoint_suite(void)
 
     RUN_TEST(test_endpoint_attach_and_detach);
     RUN_TEST(test_endpoint_routes_callbacks);
+    RUN_TEST(test_endpoint_tts_done_optional);
     RUN_TEST(test_endpoint_rejects_missing_backend);
 
     TEST_END();

@@ -23,7 +23,7 @@ int voice_config_get_enabled(void);
 claw_err_t voice_config_set_web_port(int port);
 int voice_config_get_web_port(void);
 claw_err_t voice_config_set_string(const char *key, const char *value);
-const voice_runtime_config_t *voice_config_get(void);
+claw_err_t voice_config_snapshot(voice_runtime_config_t *cfg);
 int voice_state_get(void);
 const char *voice_state_name(int state);
 claw_err_t voice_submit_event(const struct voice_endpoint_event *event);

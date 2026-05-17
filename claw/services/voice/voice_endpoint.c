@@ -93,11 +93,12 @@ claw_err_t voice_endpoint_send_state(int state, const char *detail)
 {
     claw_err_t ret;
 
-    if (!s_endpoint.attached) {
-        return CLAW_ERR_NOENT;
-    }
     if (endpoint_lock() != CLAW_OK) {
         return CLAW_ERR_STATE;
+    }
+    if (!s_endpoint.attached || !s_endpoint.backend.send_state) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
     }
     ret = endpoint_call_state(s_endpoint.session_id, state, detail);
     endpoint_unlock();
@@ -108,11 +109,12 @@ claw_err_t voice_endpoint_send_transcript(const char *text)
 {
     claw_err_t ret;
 
-    if (!s_endpoint.attached || !s_endpoint.backend.send_transcript) {
-        return CLAW_ERR_NOENT;
-    }
     if (endpoint_lock() != CLAW_OK) {
         return CLAW_ERR_STATE;
+    }
+    if (!s_endpoint.attached || !s_endpoint.backend.send_transcript) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
     }
     ret = s_endpoint.backend.send_transcript(s_endpoint.session_id, text);
     endpoint_unlock();
@@ -123,11 +125,12 @@ claw_err_t voice_endpoint_send_assistant_text(const char *text)
 {
     claw_err_t ret;
 
-    if (!s_endpoint.attached || !s_endpoint.backend.send_assistant_text) {
-        return CLAW_ERR_NOENT;
-    }
     if (endpoint_lock() != CLAW_OK) {
         return CLAW_ERR_STATE;
+    }
+    if (!s_endpoint.attached || !s_endpoint.backend.send_assistant_text) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
     }
     ret = s_endpoint.backend.send_assistant_text(s_endpoint.session_id, text);
     endpoint_unlock();
@@ -140,14 +143,33 @@ claw_err_t voice_endpoint_send_tts_audio(const void *data,
 {
     claw_err_t ret;
 
-    if (!s_endpoint.attached || !s_endpoint.backend.send_tts_audio) {
-        return CLAW_ERR_NOENT;
-    }
     if (endpoint_lock() != CLAW_OK) {
         return CLAW_ERR_STATE;
     }
+    if (!s_endpoint.attached || !s_endpoint.backend.send_tts_audio) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
+    }
     ret = s_endpoint.backend.send_tts_audio(s_endpoint.session_id,
                                             data, data_len, mime_type);
+    endpoint_unlock();
+    return ret;
+}
+
+claw_err_t voice_endpoint_send_tts_done(void)
+{
+    claw_err_t ret = CLAW_OK;
+
+    if (endpoint_lock() != CLAW_OK) {
+        return CLAW_ERR_STATE;
+    }
+    if (!s_endpoint.attached) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
+    }
+    if (s_endpoint.backend.send_tts_done) {
+        ret = s_endpoint.backend.send_tts_done(s_endpoint.session_id);
+    }
     endpoint_unlock();
     return ret;
 }
@@ -156,11 +178,12 @@ claw_err_t voice_endpoint_send_error(const char *message)
 {
     claw_err_t ret;
 
-    if (!s_endpoint.attached || !s_endpoint.backend.send_error) {
-        return CLAW_ERR_NOENT;
-    }
     if (endpoint_lock() != CLAW_OK) {
         return CLAW_ERR_STATE;
+    }
+    if (!s_endpoint.attached || !s_endpoint.backend.send_error) {
+        endpoint_unlock();
+        return CLAW_ERR_NOENT;
     }
     ret = s_endpoint.backend.send_error(s_endpoint.session_id, message);
     endpoint_unlock();

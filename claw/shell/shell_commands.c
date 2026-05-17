@@ -306,6 +306,19 @@ static void cmd_ai_status(int argc, char **argv)
 }
 
 #ifdef CONFIG_RTCLAW_VOICE_ENABLE
+#if defined(CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE) || \
+    defined(CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE)
+static int voice_endpoint_backend_is(const char *backend)
+{
+    voice_runtime_config_t cfg;
+
+    if (voice_config_snapshot(&cfg) != CLAW_OK) {
+        return 0;
+    }
+    return strcmp(cfg.endpoint_backend, backend) == 0;
+}
+#endif
+
 static const char *mask_secret(const char *value)
 {
     size_t len;
@@ -328,7 +341,7 @@ static void cmd_voice_enable(int argc, char **argv)
         voice_config_set_enabled(1);
         shell_nvs_save_str(SHELL_NVS_NS_VOICE, "enabled", "on");
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
-        if (strcmp(voice_config_get()->endpoint_backend, "web") == 0) {
+        if (voice_endpoint_backend_is("web")) {
             if (web_voice_server_init() != CLAW_OK) {
                 claw_printf("Voice enabled, but web voice init failed.\n");
                 return;
@@ -341,7 +354,7 @@ static void cmd_voice_enable(int argc, char **argv)
         }
 #endif
 #ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
-        if (strcmp(voice_config_get()->endpoint_backend, "local") == 0) {
+        if (voice_endpoint_backend_is("local")) {
             if (local_voice_endpoint_init() != CLAW_OK) {
                 claw_printf("Voice enabled, but local voice init failed.\n");
                 return;
@@ -410,18 +423,22 @@ static void cmd_voice_set(int argc, char **argv)
 
 static void cmd_voice_status(int argc, char **argv)
 {
-    const voice_runtime_config_t *cfg = voice_config_get();
+    voice_runtime_config_t cfg;
 
     (void)argc;
     (void)argv;
+    if (voice_config_snapshot(&cfg) != CLAW_OK) {
+        claw_printf("Voice config unavailable.\n");
+        return;
+    }
     claw_printf("Voice:\n");
     claw_printf("  Enabled:          %s\n",
                 voice_config_get_enabled() ? "on" : "off");
     claw_printf("  State:            %s\n",
                 voice_state_name(voice_state_get()));
     claw_printf("  Endpoint backend: %s\n",
-                cfg->endpoint_backend[0] ? cfg->endpoint_backend : "(not set)");
-    claw_printf("  Web port:         %d\n", cfg->web_port);
+                cfg.endpoint_backend[0] ? cfg.endpoint_backend : "(not set)");
+    claw_printf("  Web port:         %d\n", cfg.web_port);
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
     claw_printf("  Web running:      %s\n",
                 web_voice_server_running() ? "yes" : "no");
@@ -438,38 +455,38 @@ static void cmd_voice_status(int argc, char **argv)
 #endif
     claw_printf("  Max turn bytes:   %d\n", CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES);
     claw_printf("  STT Provider:     %s\n",
-                cfg->stt_provider[0] ? cfg->stt_provider : "(not set)");
+                cfg.stt_provider[0] ? cfg.stt_provider : "(not set)");
     claw_printf("  STT URL:          %s\n",
-                cfg->stt_url[0] ? cfg->stt_url : "(not set)");
-    claw_printf("  STT Key:          %s\n", mask_secret(cfg->stt_key));
+                cfg.stt_url[0] ? cfg.stt_url : "(not set)");
+    claw_printf("  STT Key:          %s\n", mask_secret(cfg.stt_key));
     claw_printf("  STT Model:        %s\n",
-                cfg->stt_model[0] ? cfg->stt_model : "(not set)");
-    claw_printf("  XFYUN App ID:     %s\n", mask_secret(cfg->stt_xfyun_app_id));
+                cfg.stt_model[0] ? cfg.stt_model : "(not set)");
+    claw_printf("  XFYUN App ID:     %s\n", mask_secret(cfg.stt_xfyun_app_id));
     claw_printf("  XFYUN API Key:    %s\n",
-                mask_secret(cfg->stt_xfyun_api_key));
+                mask_secret(cfg.stt_xfyun_api_key));
     claw_printf("  XFYUN API Secret: %s\n",
-                mask_secret(cfg->stt_xfyun_api_secret));
-    claw_printf("  STT Timeout:      %d ms\n", cfg->stt_timeout_ms);
+                mask_secret(cfg.stt_xfyun_api_secret));
+    claw_printf("  STT Timeout:      %d ms\n", cfg.stt_timeout_ms);
     claw_printf("  Input Format:     %d Hz, %d ch, %d bit, %s\n",
-                cfg->input_sample_rate,
-                cfg->input_channels,
-                cfg->input_bits_per_sample,
-                cfg->input_encoding[0] ? cfg->input_encoding : "(not set)");
+                cfg.input_sample_rate,
+                cfg.input_channels,
+                cfg.input_bits_per_sample,
+                cfg.input_encoding[0] ? cfg.input_encoding : "(not set)");
     claw_printf("  TTS Provider:     %s\n",
-                cfg->tts_provider[0] ? cfg->tts_provider : "(not set)");
+                cfg.tts_provider[0] ? cfg.tts_provider : "(not set)");
     claw_printf("  TTS URL:          %s\n",
-                cfg->tts_url[0] ? cfg->tts_url : "(not set)");
-    claw_printf("  TTS Key:          %s\n", mask_secret(cfg->tts_key));
+                cfg.tts_url[0] ? cfg.tts_url : "(not set)");
+    claw_printf("  TTS Key:          %s\n", mask_secret(cfg.tts_key));
     claw_printf("  TTS Model:        %s\n",
-                cfg->tts_model[0] ? cfg->tts_model : "(not set)");
+                cfg.tts_model[0] ? cfg.tts_model : "(not set)");
     claw_printf("  TTS Voice:        %s\n",
-                cfg->tts_voice[0] ? cfg->tts_voice : "(not set)");
+                cfg.tts_voice[0] ? cfg.tts_voice : "(not set)");
     claw_printf("  TTS Style Prompt: %s\n",
-                cfg->tts_style_prompt[0] ? cfg->tts_style_prompt : "(not set)");
+                cfg.tts_style_prompt[0] ? cfg.tts_style_prompt : "(not set)");
     claw_printf("  TTS Format:       %s\n",
-                cfg->tts_format[0] ? cfg->tts_format : "(not set)");
+                cfg.tts_format[0] ? cfg.tts_format : "(not set)");
     claw_printf("  TTS Stream:       %s\n",
-                cfg->tts_stream ? "on" : "off");
+                cfg.tts_stream ? "on" : "off");
 }
 
 #ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE

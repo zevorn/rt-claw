@@ -62,6 +62,7 @@ struct voice_endpoint_backend {
                                  const void *data,
                                  size_t data_len,
                                  const char *mime_type);
+    claw_err_t (*send_tts_done)(int session_id);
     claw_err_t (*send_error)(int session_id, const char *message);
 };
 
@@ -76,6 +77,7 @@ claw_err_t voice_endpoint_send_assistant_text(const char *text);
 claw_err_t voice_endpoint_send_tts_audio(const void *data,
                                          size_t data_len,
                                          const char *mime_type);
+claw_err_t voice_endpoint_send_tts_done(void);
 claw_err_t voice_endpoint_send_error(const char *message);
 
 #ifdef __cplusplus

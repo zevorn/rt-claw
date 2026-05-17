@@ -19,20 +19,18 @@
 #define LOCAL_VOICE_SESSION_ID 2
 #define LOCAL_VOICE_DEVICE_MAX 96
 #define LOCAL_VOICE_CHUNK_SIZE 4096
-#define LOCAL_VOICE_WAV_PATH "/tmp/rtclaw-voice-tts.wav"
-
-struct playback_job {
-    char path[64];
-    char device[LOCAL_VOICE_DEVICE_MAX];
-};
+#define LOCAL_VOICE_WRITE_CLOSED 1
 
 struct local_voice_ctx {
     int running;
     int capturing;
     int capture_fd;
+    int playback_fd;
+    int playback_active;
+    int playback_done_pending;
     pid_t capture_pid;
+    pid_t playback_pid;
     struct claw_thread *capture_thread;
-    struct claw_thread *playback_thread;
     struct claw_mutex *lock;
     char input_device[LOCAL_VOICE_DEVICE_MAX];
     char output_device[LOCAL_VOICE_DEVICE_MAX];
@@ -40,7 +38,9 @@ struct local_voice_ctx {
 
 static struct local_voice_ctx s_local_voice = {
     .capture_fd = -1,
+    .playback_fd = -1,
     .capture_pid = -1,
+    .playback_pid = -1,
 };
 
 static int local_voice_lock(void)
@@ -181,79 +181,173 @@ static void local_voice_capture_thread(void *arg)
     }
 }
 
-static int local_voice_write_file(const char *path,
-                                  const void *data,
-                                  size_t data_len)
+static int local_voice_wait_pid(pid_t *pid)
 {
-    FILE *fp;
-
-    fp = fopen(path, "wb");
-    if (!fp) {
-        return CLAW_ERR_IO;
-    }
-    if (data_len > 0 && fwrite(data, 1, data_len, fp) != data_len) {
-        fclose(fp);
-        return CLAW_ERR_IO;
-    }
-    if (fclose(fp) != 0) {
-        return CLAW_ERR_IO;
-    }
-    return CLAW_OK;
-}
-
-static int local_voice_play_file(const char *path, const char *device)
-{
-    pid_t pid;
     int status;
 
-    pid = fork();
-    if (pid < 0) {
-        return CLAW_ERR_IO;
+    if (*pid <= 0) {
+        return CLAW_OK;
     }
-    if (pid == 0) {
-        if (device && device[0]) {
-            execlp("aplay", "aplay", "-q", "-D", device, path, NULL);
-        } else {
-            execlp("aplay", "aplay", "-q", path, NULL);
+    while (waitpid(*pid, &status, 0) < 0) {
+        if (errno == EINTR) {
+            continue;
         }
-        _exit(127);
-    }
-    if (waitpid(pid, &status, 0) < 0) {
+        if (errno == ECHILD) {
+            *pid = -1;
+            return CLAW_OK;
+        }
+        *pid = -1;
         return CLAW_ERR_IO;
     }
+    *pid = -1;
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         return CLAW_ERR_IO;
     }
     return CLAW_OK;
 }
 
-static void local_voice_playback_thread(void *arg)
+static int local_voice_spawn_playback(const char *device,
+                                      int *write_fd,
+                                      pid_t *pid_out)
 {
-    struct playback_job *job = (struct playback_job *)arg;
+    int pipefd[2];
+    pid_t pid;
 
-    if (job) {
-        if (local_voice_play_file(job->path, job->device) != CLAW_OK) {
-            CLAW_LOGE(TAG, "tts playback failed");
-        }
-        unlink(job->path);
-        claw_free(job);
+    if (pipe(pipefd) != 0) {
+        return CLAW_ERR_IO;
     }
-    (void)local_voice_submit_event(VOICE_ENDPOINT_EVENT_PLAYBACK_DONE,
-                                   NULL, NULL, 0);
+    pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return CLAW_ERR_IO;
+    }
+    if (pid == 0) {
+        dup2(pipefd[0], STDIN_FILENO);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        if (device && device[0]) {
+            execlp("aplay", "aplay", "-q", "-D", device, "-", NULL);
+        } else {
+            execlp("aplay", "aplay", "-q", "-", NULL);
+        }
+        _exit(127);
+    }
+
+    close(pipefd[0]);
+    *write_fd = pipefd[1];
+    *pid_out = pid;
+    return CLAW_OK;
+}
+
+static int local_voice_write_all(int fd, const void *data, size_t data_len)
+{
+    const uint8_t *src = (const uint8_t *)data;
+    size_t off = 0;
+
+    while (off < data_len) {
+        ssize_t nwrite = write(fd, src + off, data_len - off);
+
+        if (nwrite < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            if (errno == EPIPE) {
+                return LOCAL_VOICE_WRITE_CLOSED;
+            }
+            return CLAW_ERR_IO;
+        }
+        if (nwrite == 0) {
+            return CLAW_ERR_IO;
+        }
+        off += (size_t)nwrite;
+    }
+    return CLAW_OK;
+}
+
+static int local_voice_take_playback(pid_t *pid, int *fd,
+                                     int *active, int *done_pending)
+{
+    if (local_voice_lock() != CLAW_OK) {
+        return CLAW_ERR_STATE;
+    }
+    *fd = s_local_voice.playback_fd;
+    *pid = s_local_voice.playback_pid;
+    *active = s_local_voice.playback_active;
+    *done_pending = s_local_voice.playback_done_pending;
+    s_local_voice.playback_fd = -1;
+    s_local_voice.playback_pid = -1;
+    s_local_voice.playback_active = 0;
+    s_local_voice.playback_done_pending = 0;
+    local_voice_unlock();
+    return CLAW_OK;
+}
+
+static int local_voice_finish_playback(int submit_done)
+{
+    pid_t pid = -1;
+    int fd = -1;
+    int active = 0;
+    int done_pending = 0;
+    int rc;
+
+    rc = local_voice_take_playback(&pid, &fd, &active, &done_pending);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+    local_voice_close_fd(&fd);
+    rc = local_voice_wait_pid(&pid);
+    if ((active || done_pending) && submit_done) {
+        (void)local_voice_submit_event(VOICE_ENDPOINT_EVENT_PLAYBACK_DONE,
+                                       NULL, NULL, 0);
+    }
+    return rc;
+}
+
+static int local_voice_mark_playback_closed(void)
+{
+    pid_t pid = -1;
+    int fd = -1;
+    int active = 0;
+    int done_pending = 0;
+    int rc;
+
+    rc = local_voice_take_playback(&pid, &fd, &active, &done_pending);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+    local_voice_close_fd(&fd);
+    rc = local_voice_wait_pid(&pid);
+    if (rc != CLAW_OK) {
+        return rc;
+    }
+    if (done_pending) {
+        if (local_voice_lock() != CLAW_OK) {
+            return CLAW_ERR_STATE;
+        }
+        s_local_voice.playback_done_pending = 1;
+        local_voice_unlock();
+    }
+    (void)active;
+    return CLAW_OK;
 }
 
 static void local_voice_cleanup_playback(void)
 {
-    struct claw_thread *thread = NULL;
+    pid_t pid = -1;
+    int fd = -1;
 
     if (local_voice_lock() == CLAW_OK) {
-        thread = s_local_voice.playback_thread;
-        s_local_voice.playback_thread = NULL;
+        fd = s_local_voice.playback_fd;
+        pid = s_local_voice.playback_pid;
+        s_local_voice.playback_fd = -1;
+        s_local_voice.playback_pid = -1;
+        s_local_voice.playback_active = 0;
+        s_local_voice.playback_done_pending = 0;
         local_voice_unlock();
     }
-    if (thread) {
-        claw_thread_delete(thread);
-    }
+    local_voice_close_fd(&fd);
+    local_voice_stop_pid(&pid);
 }
 
 static claw_err_t send_state(int session_id, int state, const char *detail)
@@ -286,42 +380,67 @@ static claw_err_t send_tts_audio(int session_id,
                                  size_t data_len,
                                  const char *mime_type)
 {
-    struct playback_job *job;
-    struct claw_thread *thread;
+    char device[LOCAL_VOICE_DEVICE_MAX];
+    int fd;
+    pid_t pid;
+    int rc;
 
     (void)session_id;
-    CLAW_LOGI(TAG, "playing tts audio: bytes=%u mime=%s",
-              (unsigned int)data_len, mime_type ? mime_type : "unknown");
-    job = (struct playback_job *)claw_calloc(1, sizeof(*job));
-    if (!job) {
-        return CLAW_ERR_NOMEM;
+    if (!data || data_len == 0) {
+        return CLAW_OK;
     }
-    snprintf(job->path, sizeof(job->path), "%s", LOCAL_VOICE_WAV_PATH);
+    CLAW_LOGI(TAG, "playing tts audio chunk: bytes=%u mime=%s",
+              (unsigned int)data_len, mime_type ? mime_type : "unknown");
+
     if (local_voice_lock() != CLAW_OK) {
-        claw_free(job);
         return CLAW_ERR_STATE;
     }
-    snprintf(job->device, sizeof(job->device), "%s",
-             s_local_voice.output_device);
+    if (s_local_voice.playback_done_pending && !s_local_voice.playback_active) {
+        local_voice_unlock();
+        return CLAW_OK;
+    }
+    if (!s_local_voice.playback_active) {
+        snprintf(device, sizeof(device), "%s", s_local_voice.output_device);
+        local_voice_unlock();
+        fd = -1;
+        pid = -1;
+        rc = local_voice_spawn_playback(device, &fd, &pid);
+        if (rc != CLAW_OK) {
+            return rc;
+        }
+        if (local_voice_lock() != CLAW_OK) {
+            local_voice_close_fd(&fd);
+            local_voice_stop_pid(&pid);
+            return CLAW_ERR_STATE;
+        }
+        s_local_voice.playback_fd = fd;
+        s_local_voice.playback_pid = pid;
+        s_local_voice.playback_active = 1;
+        s_local_voice.playback_done_pending = 1;
+    }
+    fd = s_local_voice.playback_fd;
     local_voice_unlock();
 
-    if (local_voice_write_file(job->path, data, data_len) != CLAW_OK) {
-        claw_free(job);
+    rc = local_voice_write_all(fd, data, data_len);
+    if (rc == LOCAL_VOICE_WRITE_CLOSED) {
+        if (local_voice_mark_playback_closed() == CLAW_OK) {
+            return CLAW_OK;
+        }
+        rc = CLAW_ERR_IO;
+    }
+    if (rc != CLAW_OK) {
+        local_voice_cleanup_playback();
+    }
+    return rc;
+}
+
+static claw_err_t send_tts_done(int session_id)
+{
+    (void)session_id;
+    if (local_voice_finish_playback(1) != CLAW_OK) {
+        CLAW_LOGE(TAG, "tts playback failed");
         return CLAW_ERR_IO;
     }
-    thread = claw_thread_create("voice_play", local_voice_playback_thread,
-                                job, 8192, 20);
-    if (!thread) {
-        unlink(job->path);
-        claw_free(job);
-        return CLAW_ERR_NOMEM;
-    }
-    if (local_voice_lock() != CLAW_OK) {
-        claw_thread_delete(thread);
-        return CLAW_ERR_STATE;
-    }
-    s_local_voice.playback_thread = thread;
-    local_voice_unlock();
     return CLAW_OK;
 }
 
@@ -350,6 +469,7 @@ int local_voice_endpoint_start(void)
         .send_transcript = send_transcript,
         .send_assistant_text = send_assistant_text,
         .send_tts_audio = send_tts_audio,
+        .send_tts_done = send_tts_done,
         .send_error = send_error,
     };
     int err;
@@ -398,6 +518,9 @@ int local_voice_endpoint_capture_start(void)
     pid_t pid = -1;
     int err;
 
+    if (!voice_config_get_enabled()) {
+        return CLAW_ERR_STATE;
+    }
     if (!s_local_voice.running) {
         err = local_voice_endpoint_start();
         if (err != CLAW_OK) {
@@ -408,8 +531,15 @@ int local_voice_endpoint_capture_start(void)
         return CLAW_ERR_BUSY;
     }
 
-    sample_rate = voice_config_get()->input_sample_rate;
-    channels = voice_config_get()->input_channels;
+    {
+        voice_runtime_config_t cfg;
+
+        if (voice_config_snapshot(&cfg) != CLAW_OK) {
+            return CLAW_ERR_STATE;
+        }
+        sample_rate = cfg.input_sample_rate;
+        channels = cfg.input_channels;
+    }
     if (sample_rate <= 0) {
         sample_rate = 16000;
     }

@@ -51,15 +51,27 @@ int main(void)
     shell_nvs_config_load();
     claw_init();
 #ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
-    if (web_voice_server_init() == CLAW_OK && voice_config_get_enabled() &&
-        strcmp(voice_config_get()->endpoint_backend, "web") == 0) {
-        web_voice_server_start();
+    {
+        voice_runtime_config_t cfg;
+
+        if (web_voice_server_init() == CLAW_OK &&
+            voice_config_get_enabled() &&
+            voice_config_snapshot(&cfg) == CLAW_OK &&
+            strcmp(cfg.endpoint_backend, "web") == 0) {
+            web_voice_server_start();
+        }
     }
 #endif
 #ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
-    if (local_voice_endpoint_init() == CLAW_OK && voice_config_get_enabled() &&
-        strcmp(voice_config_get()->endpoint_backend, "local") == 0) {
-        local_voice_endpoint_start();
+    {
+        voice_runtime_config_t cfg;
+
+        if (local_voice_endpoint_init() == CLAW_OK &&
+            voice_config_get_enabled() &&
+            voice_config_snapshot(&cfg) == CLAW_OK &&
+            strcmp(cfg.endpoint_backend, "local") == 0) {
+            local_voice_endpoint_start();
+        }
     }
 #endif
     linux_shell_loop();

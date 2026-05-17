@@ -30,6 +30,13 @@ typedef struct {
     size_t  len;
 } resp_ctx_t;
 
+typedef struct {
+    claw_net_body_cb_t cb;
+    void              *user;
+    size_t             len;
+    int                err;
+} stream_ctx_t;
+
 static size_t write_cb(void *data, size_t size, size_t nmemb, void *userp)
 {
     resp_ctx_t *ctx = (resp_ctx_t *)userp;
@@ -42,6 +49,23 @@ static size_t write_cb(void *data, size_t size, size_t nmemb, void *userp)
         ctx->len += copy;
         ctx->buf[ctx->len] = '\0';
     }
+    return total;
+}
+
+static size_t stream_write_cb(void *data, size_t size, size_t nmemb,
+                              void *userp)
+{
+    stream_ctx_t *ctx = (stream_ctx_t *)userp;
+    size_t total = size * nmemb;
+
+    if (total > 0 && ctx->cb) {
+        int rc = ctx->cb(data, total, ctx->user);
+        if (rc != CLAW_OK) {
+            ctx->err = rc;
+            return 0;
+        }
+    }
+    ctx->len += total;
     return total;
 }
 
@@ -99,6 +123,65 @@ int claw_net_post(const char *url,
 
     if (resp_len) {
         *resp_len = ctx.len;
+    }
+    return (int)status;
+}
+
+int claw_net_post_stream(const char *url,
+                         const claw_net_header_t *headers, int header_count,
+                         const char *body, size_t body_len,
+                         claw_net_body_cb_t cb, void *user,
+                         size_t *resp_len)
+{
+    ensure_curl_init();
+
+    stream_ctx_t ctx = { .cb = cb, .user = user, .len = 0, .err = CLAW_OK };
+
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        CLAW_LOGE(TAG, "curl_easy_init failed");
+        return CLAW_ERROR;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)body_len);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, stream_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)HTTP_TIMEOUT_S);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+
+    struct curl_slist *hdr_list = NULL;
+    for (int i = 0; i < header_count; i++) {
+        char hdr[512];
+        snprintf(hdr, sizeof(hdr), "%s: %s",
+                 headers[i].key, headers[i].value);
+        hdr_list = curl_slist_append(hdr_list, hdr);
+    }
+    if (hdr_list) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, hdr_list);
+    }
+
+    CURLcode res = curl_easy_perform(curl);
+    long status = 0;
+
+    if (res == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+    } else if (ctx.err != CLAW_OK) {
+        CLAW_LOGE(TAG, "HTTP POST stream callback failed: %d", ctx.err);
+    } else {
+        CLAW_LOGE(TAG, "HTTP POST stream failed: %s", curl_easy_strerror(res));
+    }
+
+    curl_slist_free_all(hdr_list);
+    curl_easy_cleanup(curl);
+
+    if (resp_len) {
+        *resp_len = ctx.len;
+    }
+    if (res != CURLE_OK) {
+        return CLAW_ERROR;
     }
     return (int)status;
 }

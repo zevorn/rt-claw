@@ -31,6 +31,7 @@ struct voice_service_ctx {
     int                       turn_truncated;
     size_t                    turn_bytes;
     struct voice_audio_format turn_format;
+    voice_runtime_config_t    turn_cfg;
     char                      transcript[VOICE_TEXT_BUF_SIZE];
     char                      reply[VOICE_TEXT_BUF_SIZE];
     voice_runtime_config_t    cfg;
@@ -103,9 +104,41 @@ static void voice_abort_turn(struct voice_service_ctx *ctx)
     voice_reset_turn(ctx);
 }
 
+static void voice_cfg_lock(struct voice_service_ctx *ctx)
+{
+    if (ctx->lock) {
+        claw_mutex_lock(ctx->lock, CLAW_WAIT_FOREVER);
+    }
+}
+
+static void voice_cfg_unlock(struct voice_service_ctx *ctx)
+{
+    if (ctx->lock) {
+        claw_mutex_unlock(ctx->lock);
+    }
+}
+
+static void voice_cfg_snapshot(struct voice_service_ctx *ctx,
+                               voice_runtime_config_t *cfg)
+{
+    voice_cfg_lock(ctx);
+    memcpy(cfg, &ctx->cfg, sizeof(*cfg));
+    voice_cfg_unlock(ctx);
+}
+
+static int voice_cfg_enabled(struct voice_service_ctx *ctx)
+{
+    int enabled;
+
+    voice_cfg_lock(ctx);
+    enabled = ctx->cfg.enabled;
+    voice_cfg_unlock(ctx);
+    return enabled;
+}
+
 static void voice_set_ready_state(struct voice_service_ctx *ctx)
 {
-    if (!ctx->cfg.enabled) {
+    if (!voice_cfg_enabled(ctx)) {
         voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
     } else if (ctx->active_session_id >= 0) {
         voice_set_state(ctx, VOICE_ENDPOINT_SESSION_READY, NULL);
@@ -128,11 +161,11 @@ static void voice_fill_turn_format(struct voice_service_ctx *ctx,
                                    const struct voice_endpoint_event *event)
 {
     memset(&ctx->turn_format, 0, sizeof(ctx->turn_format));
-    ctx->turn_format.sample_rate = ctx->cfg.input_sample_rate;
-    ctx->turn_format.channels = ctx->cfg.input_channels;
-    ctx->turn_format.bits_per_sample = ctx->cfg.input_bits_per_sample;
+    ctx->turn_format.sample_rate = ctx->turn_cfg.input_sample_rate;
+    ctx->turn_format.channels = ctx->turn_cfg.input_channels;
+    ctx->turn_format.bits_per_sample = ctx->turn_cfg.input_bits_per_sample;
     snprintf(ctx->turn_format.encoding, sizeof(ctx->turn_format.encoding),
-             "%s", ctx->cfg.input_encoding);
+             "%s", ctx->turn_cfg.input_encoding);
 
     if (event->format.sample_rate > 0) {
         ctx->turn_format.sample_rate = event->format.sample_rate;
@@ -150,10 +183,34 @@ static void voice_fill_turn_format(struct voice_service_ctx *ctx,
     }
 }
 
-static claw_err_t voice_run_tts(struct voice_service_ctx *ctx,
-                                 const char **mime_type,
-                                 uint8_t **audio_out,
-                                 size_t *audio_out_len)
+struct voice_tts_stream_send_ctx {
+    struct voice_service_ctx *voice;
+    int emitted;
+};
+
+static claw_err_t voice_tts_send_chunk(const void *data,
+                                       size_t data_len,
+                                       const char *mime_type,
+                                       void *user)
+{
+    struct voice_tts_stream_send_ctx *stream =
+        (struct voice_tts_stream_send_ctx *)user;
+    claw_err_t rc;
+
+    if (stream->voice->state != VOICE_ENDPOINT_PLAYING) {
+        voice_set_state(stream->voice, VOICE_ENDPOINT_PLAYING, NULL);
+    }
+    rc = voice_endpoint_send_tts_audio(data, data_len, mime_type);
+    if (rc == CLAW_OK) {
+        stream->emitted = 1;
+    }
+    return rc;
+}
+
+static claw_err_t voice_run_tts_buffered(struct voice_service_ctx *ctx,
+                                         const char **mime_type,
+                                         uint8_t **audio_out,
+                                         size_t *audio_out_len)
 {
     claw_err_t rc;
     size_t buf_size = VOICE_TTS_BUF_SIZE;
@@ -170,15 +227,18 @@ static claw_err_t voice_run_tts(struct voice_service_ctx *ctx,
         CLAW_LOGI(TAG,
                   "starting TTS provider=%s model=%s format=%s stream=%d "
                   "voice=%s style_prompt=%s out_buf=%u",
-                  ctx->cfg.tts_provider[0] ?
-                  ctx->cfg.tts_provider : "(default)",
-                  ctx->cfg.tts_model[0] ? ctx->cfg.tts_model : "(unset)",
-                  ctx->cfg.tts_format[0] ? ctx->cfg.tts_format : "(default)",
-                  ctx->cfg.tts_stream,
-                  ctx->cfg.tts_voice[0] ? ctx->cfg.tts_voice : "(unset)",
-                  ctx->cfg.tts_style_prompt[0] ? "set" : "unset",
+                  ctx->turn_cfg.tts_provider[0] ?
+                  ctx->turn_cfg.tts_provider : "(default)",
+                  ctx->turn_cfg.tts_model[0] ?
+                  ctx->turn_cfg.tts_model : "(unset)",
+                  ctx->turn_cfg.tts_format[0] ?
+                  ctx->turn_cfg.tts_format : "(default)",
+                  ctx->turn_cfg.tts_stream,
+                  ctx->turn_cfg.tts_voice[0] ?
+                  ctx->turn_cfg.tts_voice : "(unset)",
+                  ctx->turn_cfg.tts_style_prompt[0] ? "set" : "unset",
                   (unsigned int)buf_size);
-        rc = voice_tts_synthesize(&ctx->cfg,
+        rc = voice_tts_synthesize(&ctx->turn_cfg,
                                   ctx->reply,
                                   *audio_out,
                                   buf_size,
@@ -206,6 +266,33 @@ static claw_err_t voice_run_tts(struct voice_service_ctx *ctx,
     }
 }
 
+static claw_err_t voice_run_tts_stream(struct voice_service_ctx *ctx,
+                                       const char **mime_type,
+                                       struct voice_tts_stream_send_ctx *stream)
+{
+    stream->voice = ctx;
+    stream->emitted = 0;
+
+    CLAW_LOGI(TAG,
+              "starting streaming TTS provider=%s model=%s format=%s "
+              "stream=%d voice=%s style_prompt=%s",
+              ctx->turn_cfg.tts_provider[0] ?
+              ctx->turn_cfg.tts_provider : "(default)",
+              ctx->turn_cfg.tts_model[0] ?
+              ctx->turn_cfg.tts_model : "(unset)",
+              ctx->turn_cfg.tts_format[0] ?
+              ctx->turn_cfg.tts_format : "(default)",
+              ctx->turn_cfg.tts_stream,
+              ctx->turn_cfg.tts_voice[0] ?
+              ctx->turn_cfg.tts_voice : "(unset)",
+              ctx->turn_cfg.tts_style_prompt[0] ? "set" : "unset");
+    return voice_tts_synthesize_stream(&ctx->turn_cfg,
+                                       ctx->reply,
+                                       voice_tts_send_chunk,
+                                       stream,
+                                       mime_type);
+}
+
 static void voice_process_end_capture(struct voice_service_ctx *ctx)
 {
     const char *hint =
@@ -213,6 +300,7 @@ static void voice_process_end_capture(struct voice_service_ctx *ctx)
     size_t audio_out_len = 0;
     uint8_t *audio_out = NULL;
     const char *mime_type = NULL;
+    struct voice_tts_stream_send_ctx stream;
     claw_err_t rc;
 
     if (ctx->turn_bytes == 0 || !ctx->stt_session) {
@@ -270,7 +358,26 @@ static void voice_process_end_capture(struct voice_service_ctx *ctx)
     (void)voice_endpoint_send_assistant_text(ctx->reply);
 
     voice_set_state(ctx, VOICE_ENDPOINT_SYNTHESIZING, NULL);
-    rc = voice_run_tts(ctx, &mime_type, &audio_out, &audio_out_len);
+    rc = voice_run_tts_stream(ctx, &mime_type, &stream);
+    if (rc == CLAW_OK) {
+        rc = voice_endpoint_send_tts_done();
+        if (rc != CLAW_OK) {
+            voice_fail(ctx, "tts playback failed");
+        }
+        return;
+    }
+    if (stream.emitted) {
+        CLAW_LOGE(TAG, "streaming TTS failed after audio output: %s",
+                  claw_strerror(rc));
+        (void)voice_endpoint_send_tts_done();
+        voice_fail(ctx, "tts stream failed");
+        return;
+    }
+
+    CLAW_LOGW(TAG, "streaming TTS failed, falling back: %s",
+              claw_strerror(rc));
+    rc = voice_run_tts_buffered(ctx, &mime_type,
+                                &audio_out, &audio_out_len);
     if (rc == CLAW_ERR_NOMEM) {
         voice_fail(ctx, "tts oom");
         return;
@@ -284,8 +391,16 @@ static void voice_process_end_capture(struct voice_service_ctx *ctx)
               (unsigned int)audio_out_len,
               mime_type ? mime_type : "(null)");
     voice_set_state(ctx, VOICE_ENDPOINT_PLAYING, NULL);
-    (void)voice_endpoint_send_tts_audio(audio_out, audio_out_len, mime_type);
+    rc = voice_endpoint_send_tts_audio(audio_out, audio_out_len, mime_type);
     claw_free(audio_out);
+    if (rc != CLAW_OK) {
+        voice_fail(ctx, "tts playback failed");
+        return;
+    }
+    rc = voice_endpoint_send_tts_done();
+    if (rc != CLAW_OK) {
+        voice_fail(ctx, "tts playback failed");
+    }
 }
 
 static void voice_handle_audio_chunk(struct voice_service_ctx *ctx,
@@ -358,15 +473,16 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         }
         break;
     case VOICE_ENDPOINT_EVENT_START_CAPTURE:
-        if (!ctx->cfg.enabled) {
+        if (!voice_cfg_enabled(ctx)) {
             voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
             break;
         }
+        voice_cfg_snapshot(ctx, &ctx->turn_cfg);
         CLAW_LOGI(TAG, "start capture: session=%d active=%d provider=%s",
                   event->session_id,
                   ctx->active_session_id,
-                  ctx->cfg.stt_provider[0] ?
-                  ctx->cfg.stt_provider : "(default)");
+                  ctx->turn_cfg.stt_provider[0] ?
+                  ctx->turn_cfg.stt_provider : "(default)");
         if (ctx->active_session_id != event->session_id) {
             voice_fail(ctx, "session mismatch");
             break;
@@ -379,7 +495,7 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
                   ctx->turn_format.bits_per_sample,
                   ctx->turn_format.encoding);
         rc = voice_stt_session_start(&ctx->stt_session,
-                                     &ctx->cfg,
+                                     &ctx->turn_cfg,
                                      &ctx->turn_format);
         if (rc == CLAW_ERR_INVALID) {
             CLAW_LOGE(TAG, "stt session start failed: %s", claw_strerror(rc));
@@ -394,14 +510,17 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         voice_set_state(ctx, VOICE_ENDPOINT_CAPTURING, NULL);
         break;
     case VOICE_ENDPOINT_EVENT_AUDIO_CHUNK:
-        if (!ctx->cfg.enabled) {
+        if (!voice_cfg_enabled(ctx)) {
             voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
+            break;
+        }
+        if (ctx->active_session_id != event->session_id) {
             break;
         }
         voice_handle_audio_chunk(ctx, event);
         break;
     case VOICE_ENDPOINT_EVENT_END_CAPTURE:
-        if (!ctx->cfg.enabled) {
+        if (!voice_cfg_enabled(ctx)) {
             voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
             break;
         }
@@ -419,7 +538,7 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         voice_set_ready_state(ctx);
         break;
     case VOICE_ENDPOINT_EVENT_PLAYBACK_DONE:
-        if (!ctx->cfg.enabled) {
+        if (!voice_cfg_enabled(ctx)) {
             voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
             break;
         }
@@ -454,8 +573,14 @@ static void voice_worker(void *arg)
 
 claw_err_t voice_config_set_enabled(int enabled)
 {
+    int cfg_enabled;
+
+    voice_cfg_lock(&s_voice);
     s_voice.cfg.enabled = enabled ? 1 : 0;
-    if (!s_voice.cfg.enabled) {
+    cfg_enabled = s_voice.cfg.enabled;
+    voice_cfg_unlock(&s_voice);
+
+    if (!cfg_enabled) {
         voice_abort_turn(&s_voice);
         s_voice.state = VOICE_ENDPOINT_DISABLED;
     } else if (s_voice.active_session_id >= 0) {
@@ -468,7 +593,7 @@ claw_err_t voice_config_set_enabled(int enabled)
 
 int voice_config_get_enabled(void)
 {
-    return s_voice.cfg.enabled;
+    return voice_cfg_enabled(&s_voice);
 }
 
 claw_err_t voice_config_set_web_port(int port)
@@ -476,21 +601,29 @@ claw_err_t voice_config_set_web_port(int port)
     if (port <= 0 || port > 65535) {
         return CLAW_ERR_INVALID;
     }
+    voice_cfg_lock(&s_voice);
     s_voice.cfg.web_port = port;
+    voice_cfg_unlock(&s_voice);
     return CLAW_OK;
 }
 
 int voice_config_get_web_port(void)
 {
-    return s_voice.cfg.web_port;
+    int port;
+
+    voice_cfg_lock(&s_voice);
+    port = s_voice.cfg.web_port;
+    voice_cfg_unlock(&s_voice);
+    return port;
 }
 
-static claw_err_t voice_config_set_int(int *dst, const char *value, int min)
+static claw_err_t voice_config_parse_int(const char *value, int min,
+                                          int *out)
 {
     long parsed = 0;
     int i = 0;
 
-    if (!dst || !value || !value[0]) {
+    if (!value || !value[0] || !out) {
         return CLAW_ERR_INVALID;
     }
     while (value[i] >= '0' && value[i] <= '9') {
@@ -503,7 +636,7 @@ static claw_err_t voice_config_set_int(int *dst, const char *value, int min)
     if (value[i] != '\0' || parsed < min) {
         return CLAW_ERR_INVALID;
     }
-    *dst = (int)parsed;
+    *out = (int)parsed;
     return CLAW_OK;
 }
 
@@ -564,28 +697,47 @@ claw_err_t voice_config_set_string(const char *key, const char *value)
     } else if (strcmp(key, "tts_format") == 0) {
         dst = s_voice.cfg.tts_format;
         dst_size = sizeof(s_voice.cfg.tts_format);
-    } else if (strcmp(key, "stt_timeout_ms") == 0) {
-        return voice_config_set_int(&s_voice.cfg.stt_timeout_ms, value, 1);
-    } else if (strcmp(key, "tts_stream") == 0) {
-        return voice_config_set_int(&s_voice.cfg.tts_stream, value, 0);
-    } else if (strcmp(key, "input_sample_rate") == 0) {
-        return voice_config_set_int(&s_voice.cfg.input_sample_rate, value, 1);
-    } else if (strcmp(key, "input_channels") == 0) {
-        return voice_config_set_int(&s_voice.cfg.input_channels, value, 1);
-    } else if (strcmp(key, "input_bits_per_sample") == 0) {
-        return voice_config_set_int(&s_voice.cfg.input_bits_per_sample,
-                                    value, 1);
     } else {
-        return CLAW_ERR_NOENT;
+        int *int_dst = NULL;
+        int int_value = 0;
+        int min = 1;
+
+        if (strcmp(key, "stt_timeout_ms") == 0) {
+            int_dst = &s_voice.cfg.stt_timeout_ms;
+        } else if (strcmp(key, "tts_stream") == 0) {
+            int_dst = &s_voice.cfg.tts_stream;
+            min = 0;
+        } else if (strcmp(key, "input_sample_rate") == 0) {
+            int_dst = &s_voice.cfg.input_sample_rate;
+        } else if (strcmp(key, "input_channels") == 0) {
+            int_dst = &s_voice.cfg.input_channels;
+        } else if (strcmp(key, "input_bits_per_sample") == 0) {
+            int_dst = &s_voice.cfg.input_bits_per_sample;
+        } else {
+            return CLAW_ERR_NOENT;
+        }
+        if (voice_config_parse_int(value, min, &int_value) != CLAW_OK) {
+            return CLAW_ERR_INVALID;
+        }
+        voice_cfg_lock(&s_voice);
+        *int_dst = int_value;
+        voice_cfg_unlock(&s_voice);
+        return CLAW_OK;
     }
 
+    voice_cfg_lock(&s_voice);
     snprintf(dst, dst_size, "%s", value);
+    voice_cfg_unlock(&s_voice);
     return CLAW_OK;
 }
 
-const voice_runtime_config_t *voice_config_get(void)
+claw_err_t voice_config_snapshot(voice_runtime_config_t *cfg)
 {
-    return &s_voice.cfg;
+    if (!cfg) {
+        return CLAW_ERR_INVALID;
+    }
+    voice_cfg_snapshot(&s_voice, cfg);
+    return CLAW_OK;
 }
 
 int voice_state_get(void)

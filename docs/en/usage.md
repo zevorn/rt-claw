@@ -81,12 +81,13 @@ Current compile-time voice tuning entries:
 - `RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE` / `-Dvoice_tts_audio_buf_size=`
 
 Linux defaults are larger than embedded defaults for turn bytes, STT response
-buffer sizing, and TTS buffers. `voice_tts_resp_size` is the full HTTP JSON
-response buffer for MiMo TTS, including base64 audio and JSON overhead;
-`voice_tts_audio_buf_size` is the decoded audio output buffer after base64
-decode. If logs show `MiMo response truncated`, increase
-`voice_tts_resp_size`. If logs show `MiMo audio decode exceeded output buffer`,
-increase `voice_tts_audio_buf_size`.
+buffer sizing, and TTS buffers. MiMo TTS is consumed through the streaming
+response path when available, so decoded audio can be forwarded to the endpoint
+in chunks instead of requiring one full decoded output buffer. The buffered
+fallback still uses `voice_tts_resp_size` for the full HTTP JSON response and
+`voice_tts_audio_buf_size` for decoded audio. If logs show `MiMo response
+truncated`, increase `voice_tts_resp_size`. If logs show `MiMo audio decode
+exceeded output buffer`, increase `voice_tts_audio_buf_size`.
 
 ### Shell commands
 

@@ -48,6 +48,11 @@ typedef struct {
 
 struct voice_stt_session;
 
+typedef claw_err_t (*voice_tts_audio_cb_t)(const void *data,
+                                           size_t data_len,
+                                           const char *mime_type,
+                                           void *user);
+
 claw_err_t voice_stt_session_start(struct voice_stt_session **session_out,
                                    const voice_runtime_config_t *cfg,
                                    const struct voice_audio_format *format);
@@ -66,6 +71,11 @@ claw_err_t voice_tts_synthesize(const voice_runtime_config_t *cfg,
                                 size_t audio_size,
                                 size_t *audio_len,
                                 const char **mime_type);
+claw_err_t voice_tts_synthesize_stream(const voice_runtime_config_t *cfg,
+                                       const char *text,
+                                       voice_tts_audio_cb_t cb,
+                                       void *user,
+                                       const char **mime_type);
 
 #ifdef __cplusplus
 }

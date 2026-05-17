@@ -295,9 +295,10 @@ meson compile -C build/linux
 最后在本机浏览器打开 `http://127.0.0.1:8080/voice.html` 测试 Linux web
 语音页面。
 
-如果 MiMo TTS 回复较长，需要分别调整两个缓冲：`-Dvoice_tts_resp_size=`
-用于包含 base64 音频的完整 HTTP JSON 响应，`-Dvoice_tts_audio_buf_size=`
-用于 base64 解码后的音频输出。
+如果 MiMo TTS 回复较长，语音服务会在可用时把解码后的音频分块流式转发给
+端点。缓冲式回退路径仍然有两个可调项：`-Dvoice_tts_resp_size=` 用于包含
+base64 音频的完整 HTTP JSON 响应，`-Dvoice_tts_audio_buf_size=` 用于 base64
+解码后的音频输出。
 
 ## Zephyr（Cortex-A9 / Cortex-M3）
 

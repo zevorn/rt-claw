@@ -45,12 +45,29 @@ static void test_disabled_attach_is_retained_on_enable(void)
     voice_service_stop();
 }
 
+static void test_voice_config_snapshot_copies_runtime_config(void)
+{
+    voice_runtime_config_t cfg;
+
+    TEST_ASSERT_EQ(voice_config_set_string("endpoint_backend", "local"),
+                   CLAW_OK);
+    TEST_ASSERT_EQ(voice_config_set_string("input_sample_rate", "22050"),
+                   CLAW_OK);
+    TEST_ASSERT_EQ(voice_config_set_string("input_channels", "2"), CLAW_OK);
+    TEST_ASSERT_EQ(voice_config_snapshot(&cfg), CLAW_OK);
+
+    TEST_ASSERT_STR_EQ(cfg.endpoint_backend, "local");
+    TEST_ASSERT_EQ(cfg.input_sample_rate, 22050);
+    TEST_ASSERT_EQ(cfg.input_channels, 2);
+}
+
 int test_voice_service_suite(void)
 {
     printf("=== test_voice_service ===\n");
     TEST_BEGIN();
 
     RUN_TEST(test_disabled_attach_is_retained_on_enable);
+    RUN_TEST(test_voice_config_snapshot_copies_runtime_config);
 
     TEST_END();
 }
