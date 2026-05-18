@@ -302,6 +302,7 @@ static void voice_process_end_capture(struct voice_service_ctx *ctx)
     const char *mime_type = NULL;
     struct voice_tts_stream_send_ctx stream;
     claw_err_t rc;
+    int old_ai_channel;
 
     if (ctx->turn_bytes == 0 || !ctx->stt_session) {
         voice_fail(ctx, "no audio captured");
@@ -342,12 +343,14 @@ static void voice_process_end_capture(struct voice_service_ctx *ctx)
     (void)voice_endpoint_send_transcript(ctx->transcript);
 
     voice_set_state(ctx, VOICE_ENDPOINT_THINKING, NULL);
+    old_ai_channel = ai_get_channel();
     ai_set_channel(AI_CHANNEL_SHELL);
     ai_set_channel_hint(hint);
     CLAW_LOGI(TAG, "sending transcript to ai_chat (%u bytes)",
               (unsigned int)strlen(ctx->transcript));
     rc = ai_chat(ctx->transcript, ctx->reply, sizeof(ctx->reply));
     ai_set_channel_hint(NULL);
+    ai_set_channel(old_ai_channel);
     if (rc != CLAW_OK) {
         CLAW_LOGE(TAG, "ai_chat failed: %s", claw_strerror(rc));
         voice_fail(ctx, "ai chat failed");
@@ -460,6 +463,14 @@ static void voice_handle_audio_chunk(struct voice_service_ctx *ctx,
     }
 }
 
+static int voice_event_matches_active_session(
+    struct voice_service_ctx *ctx,
+    const struct voice_endpoint_event *event)
+{
+    return ctx->active_session_id >= 0 &&
+           ctx->active_session_id == event->session_id;
+}
+
 static void voice_handle_event(struct voice_service_ctx *ctx,
                                const struct voice_endpoint_event *event)
 {
@@ -491,8 +502,9 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
                   ctx->active_session_id,
                   ctx->turn_cfg.stt_provider[0] ?
                   ctx->turn_cfg.stt_provider : "(default)");
-        if (ctx->active_session_id != event->session_id) {
-            voice_fail(ctx, "session mismatch");
+        if (!voice_event_matches_active_session(ctx, event)) {
+            CLAW_LOGW(TAG, "ignoring start from inactive session=%d active=%d",
+                      event->session_id, ctx->active_session_id);
             break;
         }
         voice_abort_turn(ctx);
@@ -522,7 +534,7 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
             voice_set_state(ctx, VOICE_ENDPOINT_DISABLED, NULL);
             break;
         }
-        if (ctx->active_session_id != event->session_id) {
+        if (!voice_event_matches_active_session(ctx, event)) {
             break;
         }
         voice_handle_audio_chunk(ctx, event);
@@ -535,6 +547,9 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         CLAW_LOGI(TAG, "end capture: session=%d total=%u",
                   event->session_id,
                   (unsigned int)ctx->turn_bytes);
+        if (!voice_event_matches_active_session(ctx, event)) {
+            break;
+        }
         if (ctx->state != VOICE_ENDPOINT_CAPTURING) {
             break;
         }
@@ -542,6 +557,10 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
         break;
     case VOICE_ENDPOINT_EVENT_CANCEL:
         CLAW_LOGI(TAG, "capture cancelled: session=%d", event->session_id);
+        if (event->session_id >= 0 &&
+            !voice_event_matches_active_session(ctx, event)) {
+            break;
+        }
         voice_abort_turn(ctx);
         voice_set_ready_state(ctx);
         break;
@@ -551,6 +570,9 @@ static void voice_handle_event(struct voice_service_ctx *ctx,
             break;
         }
         CLAW_LOGI(TAG, "playback done: session=%d", event->session_id);
+        if (!voice_event_matches_active_session(ctx, event)) {
+            break;
+        }
         if (ctx->state == VOICE_ENDPOINT_PLAYING) {
             voice_reset_turn(ctx);
             voice_set_ready_state(ctx);
@@ -594,7 +616,7 @@ claw_err_t voice_config_set_enabled(int enabled)
     if (s_voice.mq) {
         memset(&sync_event, 0, sizeof(sync_event));
         sync_event.type = VOICE_ENDPOINT_EVENT_CANCEL;
-        sync_event.session_id = s_voice.active_session_id;
+        sync_event.session_id = -1;
         (void)voice_submit_event(&sync_event);
     }
     return CLAW_OK;

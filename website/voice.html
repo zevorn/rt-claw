@@ -144,6 +144,7 @@ let captureActive = false;
 let chunkQueue = Promise.resolve();
 let playbackQueue = [];
 let playbackActive = false;
+let currentAudio = null;
 let pendingPlaybackUrls = [];
 let ttsStreamDone = false;
 let playbackDoneSent = false;
@@ -198,7 +199,7 @@ function pcm16FromFloat(input) {
 }
 
 function queueChunkUpload(arrayBuffer) {
-    chunkQueue = chunkQueue.then(function () {
+    chunkQueue = chunkQueue.catch(function () {}).then(function () {
         return postBinaryChunk(arrayBuffer);
     }).catch(function (err) {
         logLine('chunk upload failed: ' + err.message);
@@ -326,7 +327,9 @@ function processPlaybackQueue() {
     pendingPlaybackUrls.push(url);
     playbackActive = true;
     const audio = new Audio(url);
+    currentAudio = audio;
     audio.onended = function () {
+        currentAudio = null;
         playbackActive = false;
         URL.revokeObjectURL(url);
         const idx = pendingPlaybackUrls.indexOf(url);
@@ -337,6 +340,7 @@ function processPlaybackQueue() {
     };
     audio.onerror = function () {
         logLine('audio playback failed');
+        currentAudio = null;
         playbackActive = false;
         URL.revokeObjectURL(url);
         const idx = pendingPlaybackUrls.indexOf(url);
@@ -349,6 +353,7 @@ function processPlaybackQueue() {
         logLine('audio reply playback started');
     }).catch(function (err) {
         logLine('audio playback blocked: ' + err.message);
+        currentAudio = null;
         playbackActive = false;
         URL.revokeObjectURL(url);
         const idx = pendingPlaybackUrls.indexOf(url);
@@ -360,6 +365,15 @@ function processPlaybackQueue() {
 }
 
 function resetPlaybackState() {
+    if (currentAudio) {
+        currentAudio.onended = null;
+        currentAudio.onerror = null;
+        currentAudio.pause();
+        currentAudio.src = '';
+        currentAudio.load();
+        currentAudio = null;
+    }
+    playbackActive = false;
     playbackQueue = [];
     pendingPlaybackUrls.forEach(function (url) {
         URL.revokeObjectURL(url);
@@ -409,6 +423,9 @@ function handleMessage(msg) {
         return;
     }
     if (msg.type === 'tts_audio') {
+        if (ttsStreamDone) {
+            resetPlaybackState();
+        }
         logLine('tts payload mime=' + (msg.mime_type || '') + ' size=' + (msg.size || 0));
         playAudioMessage(msg);
         return;
@@ -420,6 +437,7 @@ function handleMessage(msg) {
         return;
     }
     if (msg.type === 'error') {
+        resetPlaybackState();
         logLine('error: ' + (msg.message || 'unknown'));
     }
 }
