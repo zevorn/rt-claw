@@ -142,7 +142,11 @@ let mediaSource = null;
 let processor = null;
 let captureActive = false;
 let chunkQueue = Promise.resolve();
-let pendingPlaybackUrl = null;
+let playbackQueue = [];
+let playbackActive = false;
+let pendingPlaybackUrls = [];
+let ttsStreamDone = false;
+let playbackDoneSent = false;
 
 function logLine(message) {
     const now = new Date().toLocaleTimeString();
@@ -291,6 +295,80 @@ function decodeBase64ToBytes(base64) {
     return bytes;
 }
 
+function maybeFinishPlayback() {
+    if (playbackActive) {
+        return;
+    }
+    if (playbackQueue.length > 0) {
+        return;
+    }
+    if (!ttsStreamDone) {
+        return;
+    }
+    if (playbackDoneSent) {
+        return;
+    }
+    playbackDoneSent = true;
+    postJsonEvent('playback_done').catch(function (err) {
+        logLine('playback_done failed: ' + err.message);
+    });
+}
+
+function processPlaybackQueue() {
+    if (playbackActive) {
+        return;
+    }
+    if (playbackQueue.length === 0) {
+        maybeFinishPlayback();
+        return;
+    }
+    const url = playbackQueue.shift();
+    pendingPlaybackUrls.push(url);
+    playbackActive = true;
+    const audio = new Audio(url);
+    audio.onended = function () {
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    };
+    audio.onerror = function () {
+        logLine('audio playback failed');
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    };
+    audio.play().then(function () {
+        logLine('audio reply playback started');
+    }).catch(function (err) {
+        logLine('audio playback blocked: ' + err.message);
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    });
+}
+
+function resetPlaybackState() {
+    playbackQueue = [];
+    pendingPlaybackUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+    });
+    pendingPlaybackUrls = [];
+    ttsStreamDone = false;
+    playbackDoneSent = false;
+}
+
 function playAudioMessage(msg) {
     if (!msg.audio_base64) {
         if (msg.text) {
@@ -300,24 +378,9 @@ function playAudioMessage(msg) {
     }
     const bytes = decodeBase64ToBytes(msg.audio_base64);
     const blob = new Blob([bytes], { type: msg.mime_type || 'application/octet-stream' });
-    if (pendingPlaybackUrl) {
-        URL.revokeObjectURL(pendingPlaybackUrl);
-    }
-    pendingPlaybackUrl = URL.createObjectURL(blob);
-    const audio = new Audio(pendingPlaybackUrl);
-    audio.onended = function () {
-        postJsonEvent('playback_done').catch(function (err) {
-            logLine('playback_done failed: ' + err.message);
-        });
-    };
-    audio.onerror = function () {
-        logLine('audio playback failed');
-    };
-    audio.play().then(function () {
-        logLine('audio reply playback started');
-    }).catch(function (err) {
-        logLine('audio playback blocked: ' + err.message);
-    });
+    const url = URL.createObjectURL(blob);
+    playbackQueue.push(url);
+    processPlaybackQueue();
 }
 
 function handleMessage(msg) {
@@ -329,6 +392,10 @@ function handleMessage(msg) {
     if (msg.type === 'state') {
         stateEl.textContent = msg.state || 'unknown';
         logLine('state -> ' + stateEl.textContent + (msg.detail ? ' (' + msg.detail + ')' : ''));
+        if (msg.state === 'capturing' || msg.state === 'session_ready' ||
+            msg.state === 'idle' || msg.state === 'error') {
+            resetPlaybackState();
+        }
         return;
     }
     if (msg.type === 'transcript') {
@@ -344,6 +411,12 @@ function handleMessage(msg) {
     if (msg.type === 'tts_audio') {
         logLine('tts payload mime=' + (msg.mime_type || '') + ' size=' + (msg.size || 0));
         playAudioMessage(msg);
+        return;
+    }
+    if (msg.type === 'tts_done') {
+        logLine('tts stream done');
+        ttsStreamDone = true;
+        maybeFinishPlayback();
         return;
     }
     if (msg.type === 'error') {
@@ -381,6 +454,7 @@ stopBtn.addEventListener('click', function () {
 
 cancelBtn.addEventListener('click', function () {
     cleanupCapture();
+    resetPlaybackState();
     postJsonEvent('cancel').catch(function (err) {
         logLine('cancel failed: ' + err.message);
     });

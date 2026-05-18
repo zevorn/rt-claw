@@ -36,6 +36,8 @@ voice_tts_parse_provider(const voice_runtime_config_t *cfg,
     return CLAW_ERR_INVALID;
 }
 
+static int voice_tts_b64_value(char ch);
+
 static const char *voice_tts_format_mime(const char *format)
 {
     if (!format || !format[0] || strcmp(format, "wav") == 0) {
@@ -95,25 +97,6 @@ static claw_err_t voice_tts_base64_decode(const char *data,
                                           size_t out_size,
                                           size_t *out_len)
 {
-    static const int8_t table[256] = {
-        ['A'] = 0,  ['B'] = 1,  ['C'] = 2,  ['D'] = 3,
-        ['E'] = 4,  ['F'] = 5,  ['G'] = 6,  ['H'] = 7,
-        ['I'] = 8,  ['J'] = 9,  ['K'] = 10, ['L'] = 11,
-        ['M'] = 12, ['N'] = 13, ['O'] = 14, ['P'] = 15,
-        ['Q'] = 16, ['R'] = 17, ['S'] = 18, ['T'] = 19,
-        ['U'] = 20, ['V'] = 21, ['W'] = 22, ['X'] = 23,
-        ['Y'] = 24, ['Z'] = 25,
-        ['a'] = 26, ['b'] = 27, ['c'] = 28, ['d'] = 29,
-        ['e'] = 30, ['f'] = 31, ['g'] = 32, ['h'] = 33,
-        ['i'] = 34, ['j'] = 35, ['k'] = 36, ['l'] = 37,
-        ['m'] = 38, ['n'] = 39, ['o'] = 40, ['p'] = 41,
-        ['q'] = 42, ['r'] = 43, ['s'] = 44, ['t'] = 45,
-        ['u'] = 46, ['v'] = 47, ['w'] = 48, ['x'] = 49,
-        ['y'] = 50, ['z'] = 51,
-        ['0'] = 52, ['1'] = 53, ['2'] = 54, ['3'] = 55,
-        ['4'] = 56, ['5'] = 57, ['6'] = 58, ['7'] = 59,
-        ['8'] = 60, ['9'] = 61, ['+'] = 62, ['/'] = 63,
-    };
     const unsigned char *src = (const unsigned char *)data;
     uint8_t *dst = (uint8_t *)out;
     size_t input_len;
@@ -129,10 +112,10 @@ static claw_err_t voice_tts_base64_decode(const char *data,
     }
 
     for (i = 0; i < input_len; i += 4) {
-        int8_t a = table[src[i + 0]];
-        int8_t b = table[src[i + 1]];
-        int8_t c = src[i + 2] == '=' ? 0 : table[src[i + 2]];
-        int8_t d = src[i + 3] == '=' ? 0 : table[src[i + 3]];
+        int a = voice_tts_b64_value((char)src[i + 0]);
+        int b = voice_tts_b64_value((char)src[i + 1]);
+        int c = src[i + 2] == '=' ? 0 : voice_tts_b64_value((char)src[i + 2]);
+        int d = src[i + 3] == '=' ? 0 : voice_tts_b64_value((char)src[i + 3]);
         uint32_t chunk;
 
         if (a < 0 || b < 0 || (src[i + 2] != '=' && c < 0) ||

@@ -350,6 +350,21 @@ static claw_err_t send_tts_audio(int session_id,
     return ret;
 }
 
+static claw_err_t send_tts_done(int session_id)
+{
+    cJSON *root = cJSON_CreateObject();
+    claw_err_t ret;
+
+    if (!root) {
+        return CLAW_ERR_NOMEM;
+    }
+    cJSON_AddStringToObject(root, "type", "tts_done");
+    cJSON_AddNumberToObject(root, "session_id", session_id);
+    ret = web_voice_send_sse_json(root) == 0 ? CLAW_OK : CLAW_ERR_NOENT;
+    cJSON_Delete(root);
+    return ret;
+}
+
 static claw_err_t send_error(int session_id, const char *message)
 {
     cJSON *root = cJSON_CreateObject();
@@ -779,6 +794,7 @@ int web_voice_server_start(void)
         .send_transcript = send_transcript,
         .send_assistant_text = send_assistant_text,
         .send_tts_audio = send_tts_audio,
+        .send_tts_done = send_tts_done,
         .send_error = send_error,
     };
     struct sockaddr_in addr;
