@@ -6,9 +6,11 @@
  */
 
 #include "osal/claw_os.h"
+#include "claw_config.h"
 #include "claw/core/errno.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "claw/shell/shell_commands.h"
@@ -19,6 +21,15 @@
 #include "claw/services/im/feishu.h"
 #include "claw/services/im/telegram.h"
 #include "claw/services/net/net_service.h"
+#ifdef CONFIG_RTCLAW_VOICE_ENABLE
+#include "claw/services/voice/voice_service.h"
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+#include "platform/linux/web_voice_server.h"
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+#include "platform/linux/local_voice_endpoint.h"
+#endif
+#endif
 
 #ifdef CONFIG_RTCLAW_SKILL_ENABLE
 #include "claw/services/ai/ai_skill.h"
@@ -46,7 +57,7 @@ void shell_nvs_save_str(const char *ns, const char *key, const char *val)
 
 void shell_nvs_config_load(void)
 {
-    char buf[256];
+    char buf[1024];
 
     /* Load AI config from KV (overrides compile-time defaults) */
     if (claw_kv_get_str(SHELL_NVS_NS_AI, "api_key",
@@ -77,6 +88,112 @@ void shell_nvs_config_load(void)
                         buf, sizeof(buf)) == CLAW_OK) {
         telegram_set_bot_token(buf);
     }
+
+#ifdef CONFIG_RTCLAW_VOICE_ENABLE
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "enabled",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_enabled(strcmp(buf, "on") == 0 ||
+                                 strcmp(buf, "1") == 0);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "web_port",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_web_port((int)atoi(buf));
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "endpoint_backend",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("endpoint_backend", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_provider",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_provider", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_url",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_url", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_key",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_key", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_model",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_model", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_xfyun_app_id",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_xfyun_app_id", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_xfyun_api_key",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_xfyun_api_key", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_xfyun_api_secret",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_xfyun_api_secret", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "stt_timeout_ms",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("stt_timeout_ms", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "input_sample_rate",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("input_sample_rate", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "input_channels",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("input_channels", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "input_bits_per_sample",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("input_bits_per_sample", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "input_encoding",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("input_encoding", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_provider",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_provider", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_url",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_url", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_key",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_key", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_model",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_model", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_voice",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_voice", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_style_prompt",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_style_prompt", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_format",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_format", buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "tts_stream",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        voice_config_set_string("tts_stream", buf);
+    }
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "local_input",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        local_voice_endpoint_set_input(buf);
+    }
+    if (claw_kv_get_str(SHELL_NVS_NS_VOICE, "local_output",
+                        buf, sizeof(buf)) == CLAW_OK) {
+        local_voice_endpoint_set_output(buf);
+    }
+#endif
+#endif
 }
 
 /* ---- Common command handlers ---- */
@@ -187,6 +304,227 @@ static void cmd_ai_status(int argc, char **argv)
     claw_printf("  API URL: %s\n", ai_get_api_url());
     claw_printf("  Model:   %s\n", ai_get_model());
 }
+
+#ifdef CONFIG_RTCLAW_VOICE_ENABLE
+#if defined(CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE) || \
+    defined(CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE)
+static int voice_endpoint_backend_is(const char *backend)
+{
+    voice_runtime_config_t cfg;
+
+    if (voice_config_snapshot(&cfg) != CLAW_OK) {
+        return 0;
+    }
+    return strcmp(cfg.endpoint_backend, backend) == 0;
+}
+#endif
+
+static const char *mask_secret(const char *value)
+{
+    size_t len;
+
+    if (!value || !value[0]) {
+        return "(not set)";
+    }
+    len = strlen(value);
+    return len <= 8 ? "****" : "****...****";
+}
+
+static void cmd_voice_enable(int argc, char **argv)
+{
+    if (argc < 2) {
+        claw_printf("Usage: /voice_enable on|off\n");
+        return;
+    }
+
+    if (strcmp(argv[1], "on") == 0) {
+        voice_config_set_enabled(1);
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "enabled", "on");
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+        if (voice_endpoint_backend_is("web")) {
+            if (web_voice_server_init() != CLAW_OK) {
+                claw_printf("Voice enabled, but web voice init failed.\n");
+                return;
+            }
+            if (!web_voice_server_running() &&
+                web_voice_server_start() != CLAW_OK) {
+                claw_printf("Voice enabled, but web voice start failed.\n");
+                return;
+            }
+        }
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+        if (voice_endpoint_backend_is("local")) {
+            if (local_voice_endpoint_init() != CLAW_OK) {
+                claw_printf("Voice enabled, but local voice init failed.\n");
+                return;
+            }
+            if (!local_voice_endpoint_running() &&
+                local_voice_endpoint_start() != CLAW_OK) {
+                claw_printf("Voice enabled, but local voice start failed.\n");
+                return;
+            }
+        }
+#endif
+        claw_printf("Voice enabled.\n");
+    } else if (strcmp(argv[1], "off") == 0) {
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+        if (web_voice_server_running()) {
+            web_voice_server_stop();
+        }
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+        if (local_voice_endpoint_running()) {
+            local_voice_endpoint_stop();
+        }
+#endif
+        voice_config_set_enabled(0);
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "enabled", "off");
+        claw_printf("Voice disabled.\n");
+    } else {
+        claw_printf("Usage: /voice_enable on|off\n");
+    }
+}
+
+static void cmd_voice_set(int argc, char **argv)
+{
+    char value[VOICE_PROMPT_MAX] = "";
+    int off = 0;
+    int i;
+
+    if (argc < 3) {
+        claw_printf("Usage: /voice_set <field> <value>\n");
+        return;
+    }
+
+    for (i = 2; i < argc && off < (int)sizeof(value) - 1; i++) {
+        if (i > 2) {
+            value[off++] = ' ';
+        }
+        off += snprintf(value + off, sizeof(value) - off, "%s", argv[i]);
+    }
+
+    if (strcmp(argv[1], "web_port") == 0) {
+        int port = (int)atoi(value);
+        if (voice_config_set_web_port(port) != CLAW_OK) {
+            claw_printf("[error] invalid web_port\n");
+            return;
+        }
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "web_port", value);
+    } else {
+        if (voice_config_set_string(argv[1], value) != CLAW_OK) {
+            claw_printf("[error] unknown field: %s\n", argv[1]);
+            return;
+        }
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, argv[1], value);
+    }
+    claw_printf("Voice config saved: %s\n", argv[1]);
+}
+
+static void cmd_voice_status(int argc, char **argv)
+{
+    voice_runtime_config_t cfg;
+
+    (void)argc;
+    (void)argv;
+    if (voice_config_snapshot(&cfg) != CLAW_OK) {
+        claw_printf("Voice config unavailable.\n");
+        return;
+    }
+    claw_printf("Voice:\n");
+    claw_printf("  Enabled:          %s\n",
+                voice_config_get_enabled() ? "on" : "off");
+    claw_printf("  State:            %s\n",
+                voice_state_name(voice_state_get()));
+    claw_printf("  Endpoint backend: %s\n",
+                cfg.endpoint_backend[0] ? cfg.endpoint_backend : "(not set)");
+    claw_printf("  Web port:         %d\n", cfg.web_port);
+#ifdef CONFIG_RTCLAW_LINUX_WEB_VOICE_ENABLE
+    claw_printf("  Web running:      %s\n",
+                web_voice_server_running() ? "yes" : "no");
+#endif
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    claw_printf("  Local running:    %s\n",
+                local_voice_endpoint_running() ? "yes" : "no");
+    claw_printf("  Local input:      %s\n",
+                local_voice_endpoint_get_input()[0] ?
+                local_voice_endpoint_get_input() : "default");
+    claw_printf("  Local output:     %s\n",
+                local_voice_endpoint_get_output()[0] ?
+                local_voice_endpoint_get_output() : "default");
+#endif
+    claw_printf("  Max turn bytes:   %d\n", CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES);
+    claw_printf("  STT Provider:     %s\n",
+                cfg.stt_provider[0] ? cfg.stt_provider : "(not set)");
+    claw_printf("  STT URL:          %s\n",
+                cfg.stt_url[0] ? cfg.stt_url : "(not set)");
+    claw_printf("  STT Key:          %s\n", mask_secret(cfg.stt_key));
+    claw_printf("  STT Model:        %s\n",
+                cfg.stt_model[0] ? cfg.stt_model : "(not set)");
+    claw_printf("  XFYUN App ID:     %s\n", mask_secret(cfg.stt_xfyun_app_id));
+    claw_printf("  XFYUN API Key:    %s\n",
+                mask_secret(cfg.stt_xfyun_api_key));
+    claw_printf("  XFYUN API Secret: %s\n",
+                mask_secret(cfg.stt_xfyun_api_secret));
+    claw_printf("  STT Timeout:      %d ms\n", cfg.stt_timeout_ms);
+    claw_printf("  Input Format:     %d Hz, %d ch, %d bit, %s\n",
+                cfg.input_sample_rate,
+                cfg.input_channels,
+                cfg.input_bits_per_sample,
+                cfg.input_encoding[0] ? cfg.input_encoding : "(not set)");
+    claw_printf("  TTS Provider:     %s\n",
+                cfg.tts_provider[0] ? cfg.tts_provider : "(not set)");
+    claw_printf("  TTS URL:          %s\n",
+                cfg.tts_url[0] ? cfg.tts_url : "(not set)");
+    claw_printf("  TTS Key:          %s\n", mask_secret(cfg.tts_key));
+    claw_printf("  TTS Model:        %s\n",
+                cfg.tts_model[0] ? cfg.tts_model : "(not set)");
+    claw_printf("  TTS Voice:        %s\n",
+                cfg.tts_voice[0] ? cfg.tts_voice : "(not set)");
+    claw_printf("  TTS Style Prompt: %s\n",
+                cfg.tts_style_prompt[0] ? cfg.tts_style_prompt : "(not set)");
+    claw_printf("  TTS Format:       %s\n",
+                cfg.tts_format[0] ? cfg.tts_format : "(not set)");
+    claw_printf("  TTS Stream:       %s\n",
+                cfg.tts_stream ? "on" : "off");
+}
+
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+static void cmd_voice_local(int argc, char **argv)
+{
+    int rc;
+
+    if (argc < 2) {
+        claw_printf("Usage: /voice_local start|stop|cancel|input|output\n");
+        return;
+    }
+    if (strcmp(argv[1], "start") == 0) {
+        rc = local_voice_endpoint_capture_start();
+    } else if (strcmp(argv[1], "stop") == 0) {
+        rc = local_voice_endpoint_capture_stop();
+    } else if (strcmp(argv[1], "cancel") == 0) {
+        rc = local_voice_endpoint_cancel();
+    } else if (strcmp(argv[1], "input") == 0 && argc >= 3) {
+        rc = local_voice_endpoint_set_input(argv[2]);
+    } else if (strcmp(argv[1], "output") == 0 && argc >= 3) {
+        rc = local_voice_endpoint_set_output(argv[2]);
+    } else {
+        claw_printf("Usage: /voice_local start|stop|cancel|input|output\n");
+        return;
+    }
+    if (rc != CLAW_OK) {
+        claw_printf("[error] local voice failed: %s\n", claw_strerror(rc));
+        return;
+    }
+    if (strcmp(argv[1], "input") == 0) {
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "local_input", argv[2]);
+    } else if (strcmp(argv[1], "output") == 0) {
+        shell_nvs_save_str(SHELL_NVS_NS_VOICE, "local_output", argv[2]);
+    }
+    claw_printf("Local voice %s ok.\n", argv[1]);
+}
+#endif
+#endif
 
 static void cmd_feishu_set(int argc, char **argv)
 {
@@ -451,6 +789,14 @@ const shell_cmd_t shell_common_commands[] = {
     SHELL_CMD("/clear",         cmd_clear,         "Clear conversation memory"),
     SHELL_CMD("/ai_set",        cmd_ai_set,        "Set AI config (NVS)"),
     SHELL_CMD("/ai_status",     cmd_ai_status,     "Show AI config"),
+#ifdef CONFIG_RTCLAW_VOICE_ENABLE
+    SHELL_CMD("/voice_enable",  cmd_voice_enable,  "Enable or disable voice"),
+    SHELL_CMD("/voice_set",     cmd_voice_set,     "Set voice config (NVS)"),
+    SHELL_CMD("/voice_status",  cmd_voice_status,  "Show voice config"),
+#ifdef CONFIG_RTCLAW_LINUX_LOCAL_VOICE_ENABLE
+    SHELL_CMD("/voice_local",   cmd_voice_local,   "Control local voice I/O"),
+#endif
+#endif
     SHELL_CMD("/feishu_set",    cmd_feishu_set,    "Set Feishu creds (NVS)"),
     SHELL_CMD("/feishu_status", cmd_feishu_status, "Show Feishu config"),
     SHELL_CMD("/telegram_set",  cmd_telegram_set,  "Set Telegram token"),

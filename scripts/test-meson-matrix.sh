@@ -86,6 +86,14 @@ echo "--- Individual toggles (on from default-off) ---"
 run_combo "heartbeat=true" -Dosal=linux -Dheartbeat=true
 run_combo "ota=true" -Dosal=linux -Dota=true
 run_combo "tool_mouse=true" -Dosal=linux -Dtool_mouse=true
+run_combo "voice=true" -Dosal=linux -Dvoice=true
+run_combo "linux_web_voice=true" \
+    -Dosal=linux -Dvoice=true -Dlinux_web_voice=true
+run_combo "linux_local_voice=true" \
+    -Dosal=linux -Dvoice=true -Dlinux_local_voice=true
+run_combo "linux voice endpoints" \
+    -Dosal=linux -Dvoice=true \
+    -Dlinux_web_voice=true -Dlinux_local_voice=true
 
 echo ""
 echo "--- Invalid / edge-case combinations ---"
@@ -93,6 +101,12 @@ echo "--- Invalid / edge-case combinations ---"
 # heartbeat without sched should fail at meson setup
 expect_fail "heartbeat=true + sched=false" \
     -Dosal=linux -Dheartbeat=true -Dsched=false
+
+# Linux voice endpoints require voice=true.
+expect_fail "linux_web_voice=true + voice=false" \
+    -Dosal=linux -Dvoice=false -Dlinux_web_voice=true
+expect_fail "linux_local_voice=true + voice=false" \
+    -Dosal=linux -Dvoice=false -Dlinux_local_voice=true
 
 # All services and tools off (empty shell)
 run_combo "empty shell (all services+tools off)" \

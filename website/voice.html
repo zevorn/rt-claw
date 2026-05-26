@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RT-Claw Voice Transport</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        button {
+            border: 0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #f59e0b;
+            color: #0f172a;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button.secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        textarea, pre {
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #020617;
+            color: #e2e8f0;
+            padding: 12px;
+        }
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+        pre {
+            min-height: 180px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .status {
+            font-weight: bold;
+            color: #22c55e;
+        }
+        .muted {
+            color: #94a3b8;
+        }
+        .warn {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <div class="card">
+        <h1>RT-Claw Voice Transport</h1>
+        <p class="muted">This page captures microphone audio in the browser, uploads PCM chunks to rt-claw, and plays audio replies when the backend returns a playable payload.</p>
+        <div class="row">
+            <div>Connection: <span id="connection" class="status">connecting</span></div>
+            <div>State: <span id="state">unknown</span></div>
+            <div>Capture: <span id="captureState" class="warn">idle</span></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Voice Controls</h2>
+        <div class="row">
+            <button id="startBtn">Start Mic Capture</button>
+            <button id="stopBtn" disabled>Stop Mic Capture</button>
+            <button id="cancelBtn" class="secondary">Cancel</button>
+            <button id="doneBtn" class="secondary">Playback Done</button>
+        </div>
+        <p class="muted">Microphone data is captured as mono PCM16 at 16 kHz and uploaded in small binary chunks. The text box below remains as a fallback test payload.</p>
+        <label for="chunkText">Fallback test chunk</label>
+        <textarea id="chunkText">hello from the browser voice transport page</textarea>
+        <div class="row">
+            <button id="sendTextBtn" class="secondary">Send Text Chunk</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Transcript</h2>
+        <pre id="transcript"></pre>
+    </div>
+
+    <div class="card">
+        <h2>Assistant Reply</h2>
+        <pre id="assistant"></pre>
+    </div>
+
+    <div class="card">
+        <h2>Transport Log</h2>
+        <pre id="log"></pre>
+    </div>
+</main>
+<script>
+const connectionEl = document.getElementById('connection');
+const stateEl = document.getElementById('state');
+const captureStateEl = document.getElementById('captureState');
+const transcriptEl = document.getElementById('transcript');
+const assistantEl = document.getElementById('assistant');
+const logEl = document.getElementById('log');
+const chunkTextEl = document.getElementById('chunkText');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const doneBtn = document.getElementById('doneBtn');
+const sendTextBtn = document.getElementById('sendTextBtn');
+
+let audioContext = null;
+let mediaStream = null;
+let mediaSource = null;
+let processor = null;
+let captureActive = false;
+let chunkQueue = Promise.resolve();
+let playbackQueue = [];
+let playbackActive = false;
+let currentAudio = null;
+let pendingPlaybackUrls = [];
+let ttsStreamDone = false;
+let playbackDoneSent = false;
+
+function logLine(message) {
+    const now = new Date().toLocaleTimeString();
+    logEl.textContent += '[' + now + '] ' + message + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setCaptureState(text) {
+    captureStateEl.textContent = text;
+}
+
+async function postJsonEvent(type, extra) {
+    const body = Object.assign({ type }, extra || {});
+    const resp = await fetch('/voice/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || ('HTTP ' + resp.status));
+    }
+}
+
+async function postBinaryChunk(buffer) {
+    const resp = await fetch('/voice/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buffer
+    });
+    if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || ('HTTP ' + resp.status));
+    }
+}
+
+function pcm16FromFloat(input) {
+    const pcm = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i += 1) {
+        let sample = input[i];
+        if (sample > 1) {
+            sample = 1;
+        } else if (sample < -1) {
+            sample = -1;
+        }
+        pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+    return pcm;
+}
+
+function queueChunkUpload(arrayBuffer) {
+    chunkQueue = chunkQueue.catch(function () {}).then(function () {
+        return postBinaryChunk(arrayBuffer);
+    }).catch(function (err) {
+        logLine('chunk upload failed: ' + err.message);
+        throw err;
+    });
+    return chunkQueue;
+}
+
+function cleanupCapture() {
+    if (processor) {
+        processor.disconnect();
+        processor.onaudioprocess = null;
+        processor = null;
+    }
+    if (mediaSource) {
+        mediaSource.disconnect();
+        mediaSource = null;
+    }
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(function (track) {
+            track.stop();
+        });
+        mediaStream = null;
+    }
+    if (audioContext) {
+        audioContext.close().catch(function () {});
+        audioContext = null;
+    }
+    captureActive = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setCaptureState('idle');
+}
+
+async function startMicCapture() {
+    if (captureActive) {
+        return;
+    }
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        }
+    });
+    mediaSource = audioContext.createMediaStreamSource(mediaStream);
+    processor = audioContext.createScriptProcessor(2048, 1, 1);
+    processor.onaudioprocess = function (event) {
+        if (!captureActive) {
+            return;
+        }
+        const input = event.inputBuffer.getChannelData(0);
+        const pcm = pcm16FromFloat(input);
+        queueChunkUpload(pcm.buffer.slice(0));
+    };
+    mediaSource.connect(processor);
+    processor.connect(audioContext.destination);
+
+    await postJsonEvent('start_capture', {
+        sample_rate: 16000,
+        channels: 1,
+        bits_per_sample: 16,
+        encoding: 'pcm_s16le'
+    });
+    captureActive = true;
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    setCaptureState('capturing');
+    logLine('microphone capture started');
+}
+
+async function stopMicCapture() {
+    if (!captureActive) {
+        return;
+    }
+    captureActive = false;
+    stopBtn.disabled = true;
+    setCaptureState('stopping');
+    await chunkQueue.catch(function () {});
+    cleanupCapture();
+    await postJsonEvent('end_capture');
+    logLine('microphone capture stopped');
+}
+
+function decodeBase64ToBytes(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function maybeFinishPlayback() {
+    if (playbackActive) {
+        return;
+    }
+    if (playbackQueue.length > 0) {
+        return;
+    }
+    if (!ttsStreamDone) {
+        return;
+    }
+    if (playbackDoneSent) {
+        return;
+    }
+    playbackDoneSent = true;
+    postJsonEvent('playback_done').catch(function (err) {
+        logLine('playback_done failed: ' + err.message);
+    });
+}
+
+function processPlaybackQueue() {
+    if (playbackActive) {
+        return;
+    }
+    if (playbackQueue.length === 0) {
+        maybeFinishPlayback();
+        return;
+    }
+    const url = playbackQueue.shift();
+    pendingPlaybackUrls.push(url);
+    playbackActive = true;
+    const audio = new Audio(url);
+    currentAudio = audio;
+    audio.onended = function () {
+        currentAudio = null;
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    };
+    audio.onerror = function () {
+        logLine('audio playback failed');
+        currentAudio = null;
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    };
+    audio.play().then(function () {
+        logLine('audio reply playback started');
+    }).catch(function (err) {
+        logLine('audio playback blocked: ' + err.message);
+        currentAudio = null;
+        playbackActive = false;
+        URL.revokeObjectURL(url);
+        const idx = pendingPlaybackUrls.indexOf(url);
+        if (idx >= 0) {
+            pendingPlaybackUrls.splice(idx, 1);
+        }
+        processPlaybackQueue();
+    });
+}
+
+function resetPlaybackState() {
+    if (currentAudio) {
+        currentAudio.onended = null;
+        currentAudio.onerror = null;
+        currentAudio.pause();
+        currentAudio.src = '';
+        currentAudio.load();
+        currentAudio = null;
+    }
+    playbackActive = false;
+    playbackQueue = [];
+    pendingPlaybackUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+    });
+    pendingPlaybackUrls = [];
+    ttsStreamDone = false;
+    playbackDoneSent = false;
+}
+
+function playAudioMessage(msg) {
+    if (!msg.audio_base64) {
+        if (msg.text) {
+            assistantEl.textContent = msg.text;
+        }
+        return;
+    }
+    const bytes = decodeBase64ToBytes(msg.audio_base64);
+    const blob = new Blob([bytes], { type: msg.mime_type || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    playbackQueue.push(url);
+    processPlaybackQueue();
+}
+
+function handleMessage(msg) {
+    if (msg.type === 'ready') {
+        connectionEl.textContent = 'connected';
+        logLine('event stream ready on port ' + msg.port);
+        return;
+    }
+    if (msg.type === 'state') {
+        stateEl.textContent = msg.state || 'unknown';
+        logLine('state -> ' + stateEl.textContent + (msg.detail ? ' (' + msg.detail + ')' : ''));
+        if (msg.state === 'capturing' || msg.state === 'session_ready' ||
+            msg.state === 'idle' || msg.state === 'error') {
+            resetPlaybackState();
+        }
+        return;
+    }
+    if (msg.type === 'transcript') {
+        transcriptEl.textContent = msg.text || '';
+        logLine('transcript received');
+        return;
+    }
+    if (msg.type === 'assistant_text') {
+        assistantEl.textContent = msg.text || '';
+        logLine('assistant text received');
+        return;
+    }
+    if (msg.type === 'tts_audio') {
+        if (ttsStreamDone) {
+            resetPlaybackState();
+        }
+        logLine('tts payload mime=' + (msg.mime_type || '') + ' size=' + (msg.size || 0));
+        playAudioMessage(msg);
+        return;
+    }
+    if (msg.type === 'tts_done') {
+        logLine('tts stream done');
+        ttsStreamDone = true;
+        maybeFinishPlayback();
+        return;
+    }
+    if (msg.type === 'error') {
+        resetPlaybackState();
+        logLine('error: ' + (msg.message || 'unknown'));
+    }
+}
+
+const events = new EventSource('/voice/events');
+events.onopen = function () {
+    connectionEl.textContent = 'connected';
+    logLine('event stream connected');
+};
+events.onmessage = function (event) {
+    const msg = JSON.parse(event.data);
+    handleMessage(msg);
+};
+events.onerror = function () {
+    connectionEl.textContent = 'disconnected';
+    logLine('event stream disconnected');
+};
+
+startBtn.addEventListener('click', function () {
+    startMicCapture().catch(function (err) {
+        cleanupCapture();
+        logLine('start capture failed: ' + err.message);
+    });
+});
+
+stopBtn.addEventListener('click', function () {
+    stopMicCapture().catch(function (err) {
+        cleanupCapture();
+        logLine('stop capture failed: ' + err.message);
+    });
+});
+
+cancelBtn.addEventListener('click', function () {
+    cleanupCapture();
+    resetPlaybackState();
+    postJsonEvent('cancel').catch(function (err) {
+        logLine('cancel failed: ' + err.message);
+    });
+});
+
+doneBtn.addEventListener('click', function () {
+    postJsonEvent('playback_done').catch(function (err) {
+        logLine('done failed: ' + err.message);
+    });
+});
+
+sendTextBtn.addEventListener('click', function () {
+    postJsonEvent('audio_chunk_text', { chunk_text: chunkTextEl.value }).catch(function (err) {
+        logLine('text chunk failed: ' + err.message);
+    });
+});
+</script>
+</body>
+</html>

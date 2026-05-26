@@ -30,6 +30,24 @@ option('tool_mouse', type: 'boolean', value: false,
     description: 'Enable USB HID mouse tools (ESP32-S3 only)')
 option('heartbeat', type: 'boolean', value: false,
     description: 'Enable periodic AI heartbeat (requires sched)')
+option('voice', type: 'boolean', value: false,
+    description: 'Enable voice service')
+option('linux_web_voice', type: 'boolean', value: false,
+    description: 'Enable Linux web voice endpoint backend')
+option('linux_local_voice', type: 'boolean', value: false,
+    description: 'Enable Linux local ALSA voice endpoint backend')
+option('voice_max_turn_bytes', type: 'integer', value: 0, min: 0,
+    description: 'Max PCM bytes per voice turn, 0=use default (env: RTCLAW_VOICE_MAX_TURN_BYTES)')
+option('voice_text_buf_size', type: 'integer', value: 0, min: 0,
+    description: 'Voice transcript/reply buffer size, 0=use default (env: RTCLAW_VOICE_TEXT_BUF_SIZE)')
+option('voice_stt_resp_size', type: 'integer', value: 0, min: 0,
+    description: 'Voice STT response buffer size, 0=use default (env: RTCLAW_VOICE_STT_RESP_SIZE)')
+option('voice_stt_timeout_ms', type: 'integer', value: 0, min: 0,
+    description: 'Voice STT timeout in ms, 0=use default (env: RTCLAW_VOICE_STT_TIMEOUT_MS)')
+option('voice_tts_resp_size', type: 'integer', value: 0, min: 0,
+    description: 'Voice TTS HTTP JSON response buffer size (includes base64 audio + JSON overhead); must be >= ceil(audio_buf/3)*4+4096. 0=use default (env: RTCLAW_VOICE_TTS_RESP_SIZE)')
+option('voice_tts_audio_buf_size', type: 'integer', value: 0, min: 0,
+    description: 'Voice TTS decoded audio output buffer size (bytes after base64 decode). 0=use default (env: RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE)')
 
 # AI Engine — credentials and tuning
 option('ai_api_key', type: 'string', value: '',

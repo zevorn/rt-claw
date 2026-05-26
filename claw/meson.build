@@ -1,3 +1,5 @@
+cc = meson.get_compiler('c')
+
 src_files = files(
     'init.c',
     'core/errno.c',
@@ -77,6 +79,10 @@ if get_option('heartbeat')
     feature_defs += '-DCONFIG_RTCLAW_HEARTBEAT_ENABLE'
     src_files += files('services/heartbeat.c')
 endif
+if get_option('voice')
+    feature_defs += '-DCONFIG_RTCLAW_VOICE_ENABLE'
+    subdir('services/voice')
+endif
 if get_option('feishu')
     feature_defs += '-DCONFIG_RTCLAW_FEISHU_ENABLE'
 endif
@@ -100,9 +106,15 @@ if osal_backend != 'linux'
     src_files += files('../platform/linux/ota_stub.c')
 endif
 
+rtclaw_extra_deps = [osal_dep, cjson_dep]
+if osal_backend == 'linux' and get_option('voice')
+    libcrypto_dep = cc.find_library('crypto', required: true)
+    rtclaw_extra_deps += [libcrypto_dep]
+endif
+
 rtclaw_lib = static_library('rtclaw', src_files,
     include_directories: [claw_root_inc, claw_inc] + platform_incs,
-    dependencies: [osal_dep, cjson_dep],
+    dependencies: rtclaw_extra_deps,
     c_args: feature_defs,
 )
 

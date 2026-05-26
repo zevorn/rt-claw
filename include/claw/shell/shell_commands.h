@@ -48,5 +48,6 @@ int shell_exec_capture(const char *cmd_name, int argc, char **argv,
 #define SHELL_NVS_NS_AI       "ai_config"
 #define SHELL_NVS_NS_FEISHU   "feishu_cfg"
 #define SHELL_NVS_NS_TELEGRAM "telegram_cfg"
+#define SHELL_NVS_NS_VOICE    "voice_cfg"
 
 #endif /* CLAW_SHELL_COMMANDS_H */

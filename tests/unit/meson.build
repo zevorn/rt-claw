@@ -8,6 +8,8 @@ unit_test_src = files(
     'test_tools.c',
     'test_script_tool.c',
     'test_im_util.c',
+    'test_voice_endpoint.c',
+    'test_voice_service.c',
 )
 
 test_defs = platform_defs
@@ -18,6 +20,10 @@ endif
 
 if get_option('skill')
     test_defs += '-DCONFIG_RTCLAW_SKILL_ENABLE'
+endif
+
+if get_option('voice')
+    test_defs += '-DCONFIG_RTCLAW_VOICE_ENABLE'
 endif
 
 # OTA and skill tests always compiled; guarded by #ifdef inside.

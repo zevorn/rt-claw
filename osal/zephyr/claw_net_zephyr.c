@@ -99,10 +99,13 @@ static int parse_url(const char *url, struct parsed_url *out)
 /* ---------- response callback ---------- */
 
 struct http_ctx {
-    char   *resp_buf;
-    size_t  resp_size;
-    size_t  resp_len;
-    int     http_status;
+    char              *resp_buf;
+    size_t             resp_size;
+    size_t             resp_len;
+    int                http_status;
+    claw_net_body_cb_t stream_cb;
+    void              *stream_user;
+    int                stream_err;
 };
 
 static int response_cb(struct http_response *rsp,
@@ -114,6 +117,17 @@ static int response_cb(struct http_response *rsp,
     (void)final_data;
 
     ctx->http_status = rsp->http_status_code;
+
+    if (rsp->body_frag_len > 0 && ctx->stream_cb) {
+        ctx->stream_err = ctx->stream_cb(rsp->body_frag_start,
+                                         rsp->body_frag_len,
+                                         ctx->stream_user);
+        if (ctx->stream_err != CLAW_OK) {
+            return -1;
+        }
+        ctx->resp_len += rsp->body_frag_len;
+        return 0;
+    }
 
     if (rsp->body_frag_len > 0 && ctx->resp_buf && ctx->resp_size > 1) {
         size_t avail = 0;
@@ -222,7 +236,8 @@ static int do_request(enum http_method method,
                       const struct parsed_url *pu,
                       const claw_net_header_t *headers, int header_count,
                       const char *body, size_t body_len,
-                      char *resp, size_t resp_size, size_t *resp_len)
+                      char *resp, size_t resp_size, size_t *resp_len,
+                      claw_net_body_cb_t stream_cb, void *stream_user)
 {
     int sock = create_and_connect(pu);
 
@@ -237,6 +252,9 @@ static int do_request(enum http_method method,
         .resp_size = resp_size,
         .resp_len  = 0,
         .http_status = 0,
+        .stream_cb = stream_cb,
+        .stream_user = stream_user,
+        .stream_err = CLAW_OK,
     };
 
     /*
@@ -316,7 +334,24 @@ int claw_net_post(const char *url,
         return CLAW_ERR_INVALID;
     }
     return do_request(HTTP_POST, &pu, headers, header_count,
-                      body, body_len, resp, resp_size, resp_len);
+                      body, body_len, resp, resp_size, resp_len,
+                      NULL, NULL);
+}
+
+int claw_net_post_stream(const char *url,
+                         const claw_net_header_t *headers, int header_count,
+                         const char *body, size_t body_len,
+                         claw_net_body_cb_t cb, void *user,
+                         size_t *resp_len)
+{
+    struct parsed_url pu;
+
+    if (parse_url(url, &pu) < 0) {
+        return CLAW_ERR_INVALID;
+    }
+    return do_request(HTTP_POST, &pu, headers, header_count,
+                      body, body_len, NULL, 0, resp_len,
+                      cb, user);
 }
 
 int claw_net_get(const char *url,
@@ -329,5 +364,6 @@ int claw_net_get(const char *url,
         return CLAW_ERR_INVALID;
     }
     return do_request(HTTP_GET, &pu, headers, header_count,
-                      NULL, 0, resp, resp_size, resp_len);
+                      NULL, 0, resp, resp_size, resp_len,
+                      NULL, NULL);
 }

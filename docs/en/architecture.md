@@ -19,7 +19,7 @@ links into the final firmware binary.
 +----------------------------------------------------------------------+
 |  Application                                                         |
 |  gateway | swarm | net | ai_engine | tools | shell | sched | im      |
-|  heartbeat                                                           |
+|  heartbeat | voice                                                   |
 +----------------------------------------------------------------------+
 |  OSAL                                                                |
 |  claw_os.h  |  claw_net.h                                            |
@@ -151,6 +151,31 @@ typing indicators via sendChatAction.
 UART REPL with chat-first design. Direct text input goes to the AI engine.
 `/commands` trigger system operations. Insert-mode line editing with tab
 completion. UTF-8 aware.
+
+### Voice (`claw/services/voice/`)
+
+Optional voice service that keeps the existing AI path intact: input backends
+submit `start_capture` / `audio_chunk` / `end_capture` events to
+`voice_service`, STT converts the audio to text, then the transcript is passed
+into `ai_chat()`. The returned assistant text is sent both to the endpoint and
+then into TTS, whose decoded audio is handed back to the active output backend.
+Current implementation includes config-driven provider selection for both STT
+and TTS, per-turn byte cutoff, audio format metadata, queue-based event
+handoff, MiMo TTS response streaming with buffered fallback, and a Linux web
+endpoint backend under `platform/linux/web_voice_server.c`. The Linux web path
+uses browser HTTP POST for PCM upload and SSE for state / transcript /
+assistant text / TTS audio updates.
+
+At the interface level, `include/claw/services/voice/voice_endpoint.h` defines
+session states, endpoint event types, and the backend callback contract.
+Capture-side backends submit `ATTACH`, `DETACH`, `START_CAPTURE`,
+`AUDIO_CHUNK`, `END_CAPTURE`, `CANCEL`, and `PLAYBACK_DONE` events through
+`voice_submit_event()`. `AUDIO_CHUNK` uses a pointer-based payload
+(`data_ptr`/`data_len`) plus `data_owns` ownership transfer, so large PCM data
+is not copied inline into the queue item. Output-side callbacks
+(`send_state`, `send_transcript`, `send_assistant_text`, `send_tts_audio`,
+`send_error`) are borrow-only: asynchronous backends must copy the referenced
+data before returning.
 
 ## Driver Architecture
 

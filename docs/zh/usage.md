@@ -35,10 +35,120 @@
 | `/ota update [url]` | 安装更新（或直接 URL） |
 | `/ota rollback` | 回滚到上一版本固件 |
 | `/ota version` | 显示当前固件版本 |
+| `/voice_enable on\|off` | 启用或关闭语音服务 |
+| `/voice_set <field> <value>` | 设置语音运行时配置并持久化 |
+| `/voice_status` | 显示当前语音配置和运行时状态 |
 | `/help` | 列出命令 |
 
 > WiFi 命令（`/wifi_*`）仅在支持 WiFi 的开发板上可用。
 > OTA 命令（`/ota`）仅在有 OTA 分区的开发板上可用（xiaozhi-xmini、ESP32-S3 default）。
+
+## 语音（Linux 端点）
+
+当前语音 MVP 将输入/输出端点和语音业务逻辑解耦。在 Linux 上，
+`platform/linux/web_voice_server.c` 负责面向浏览器的端点，
+`platform/linux/local_voice_endpoint.c` 负责本机 ALSA 工具链端点，
+`claw/services/voice/voice_service.c` 则负责状态机、STT 编排、AI 交接和 TTS 交接。
+
+### 构建期开关
+
+```bash
+meson setup build/linux --reconfigure \
+    -Dosal=linux \
+    -Dvoice=true \
+    -Dlinux_web_voice=true \
+    -Dlinux_local_voice=true
+```
+
+`linux_web_voice` 和 `linux_local_voice` 都依赖 `voice=true`。
+
+### 运行时配置
+
+语音配置目前有三层来源，优先级如下：
+
+1. 通过 OSAL KV 保存的 Shell 运行时配置（`/voice_set`、`/voice_enable`）
+2. 通过 Meson 选项 / 环境变量注入的编译期默认值
+3. `claw_config.h` 中的平台默认值
+
+当前可用的编译期语音调优项：
+
+- `RTCLAW_VOICE_MAX_TURN_BYTES` / `-Dvoice_max_turn_bytes=`
+- `RTCLAW_VOICE_TEXT_BUF_SIZE` / `-Dvoice_text_buf_size=`
+- `RTCLAW_VOICE_STT_RESP_SIZE` / `-Dvoice_stt_resp_size=`
+- `RTCLAW_VOICE_STT_TIMEOUT_MS` / `-Dvoice_stt_timeout_ms=`
+- `RTCLAW_VOICE_TTS_RESP_SIZE` / `-Dvoice_tts_resp_size=`
+- `RTCLAW_VOICE_TTS_AUDIO_BUF_SIZE` / `-Dvoice_tts_audio_buf_size=`
+
+Linux 的单轮音频上限、STT 响应缓冲和 TTS 缓冲默认值高于嵌入式平台。
+MiMo TTS 在可用时会走流式响应路径，解码后的音频可以分块转发给端点，
+不再强制依赖一次完整的解码输出缓冲。缓冲式回退路径仍然使用
+`voice_tts_resp_size` 保存完整 HTTP JSON 响应，并使用
+`voice_tts_audio_buf_size` 保存解码后的音频。如果日志出现
+`MiMo response truncated`，需要调大 `voice_tts_resp_size`；如果日志出现
+`MiMo audio decode exceeded output buffer`，需要调大 `voice_tts_audio_buf_size`。
+
+### Shell 命令
+
+```text
+/voice_set endpoint_backend local
+/voice_enable on
+/voice_local input plughw:1,0
+/voice_local output default
+/voice_set stt_provider xfyun
+/voice_set stt_xfyun_app_id <APPID>
+/voice_set stt_xfyun_api_key <APIKey>
+/voice_set stt_xfyun_api_secret <APISecret>
+/voice_local start
+/voice_local stop
+/voice_status
+```
+
+`/voice_status` 会对敏感字段做掩码显示；在 Linux voice 构建下，还会显示
+web/local 端点是否正在运行，以及本机音频输入/输出设备名。
+
+### 运行流程
+
+1. 端点附加一个 voice session。Web 端点由浏览器连接事件流触发，本机端点由
+   `/voice_enable on` 或 `/voice_local start` 触发。
+2. 端点发送带音频格式元数据的 `start_capture`。
+3. Web 端点通过 HTTP 上传 PCM 数据块；本机端点通过 `arecord` 从 USB 麦克风
+   读取 PCM 数据块。
+4. `voice_service` 将数据块转发到当前选定的 STT session，并用
+   `CONFIG_RTCLAW_VOICE_MAX_TURN_BYTES` 做单轮硬截断。
+5. `end_capture` 触发 STT 收尾，再把 transcript 送入 `ai_chat()`，最后将
+   assistant 文本和 TTS 音频回传给端点；本机端点通过 `aplay` 播放音频。
+
+### 浏览器页面
+
+在 Linux web voice 构建下，浏览器测试页面由以下地址提供：
+
+- `http://127.0.0.1:<web_port>/voice.html`
+
+远程/手机端麦克风可用性仍然受浏览器安全模型限制；仅使用局域网 HTTP 时，
+手机浏览器通常无法直接通过 `getUserMedia()` 取麦克风。
+
+### 树莓派 3 本机音频
+
+在 64 位 Raspberry Pi OS 上，本机端点复用系统自带 ALSA 工具链：
+`arecord` 负责 USB 麦克风输入，`aplay` 负责耳机口或系统默认输出。先用：
+
+```bash
+arecord -l
+aplay -l
+```
+
+确认设备编号。常见配置是 USB 麦克风为 `plughw:1,0`，耳机口输出走系统默认
+`default`，也可以通过 `raspi-config` 或桌面音频设置把默认输出切到 3.5mm
+耳机口。运行时设置示例：
+
+```text
+/voice_set endpoint_backend local
+/voice_local input plughw:1,0
+/voice_local output default
+/voice_enable on
+/voice_local start
+/voice_local stop
+```
 
 ## Tool Use
 

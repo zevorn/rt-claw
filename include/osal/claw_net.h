@@ -19,6 +19,8 @@ typedef struct {
     const char *value;
 } claw_net_header_t;
 
+typedef int (*claw_net_body_cb_t)(const void *data, size_t len, void *user);
+
 /*
  * Perform an HTTP POST request.
  *
@@ -38,6 +40,16 @@ int claw_net_post(const char *url,
                   const claw_net_header_t *headers, int header_count,
                   const char *body, size_t body_len,
                   char *resp, size_t resp_size, size_t *resp_len);
+
+/*
+ * Perform an HTTP POST request and stream response body chunks to cb.
+ * Existing claw_net_post callers should keep using claw_net_post.
+ */
+int claw_net_post_stream(const char *url,
+                         const claw_net_header_t *headers, int header_count,
+                         const char *body, size_t body_len,
+                         claw_net_body_cb_t cb, void *user,
+                         size_t *resp_len);
 
 /*
  * Perform an HTTP GET request.

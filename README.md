@@ -43,6 +43,8 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 | Gateway | Thread-safe message routing between services | Done |
 | Networking | Ethernet (QEMU) and WiFi (real hardware); HTTP client for API calls | Done |
 | IM Integrations | Feishu (Lark) WebSocket + Telegram HTTP long polling; planned: DingTalk, QQ | Done |
+| Voice Service | Config-driven voice pipeline (`input backend -> voice_service -> STT -> ai_chat() -> TTS -> output backend`) with per-turn cutoff, per-channel AI memory reuse, runtime provider selection, and audio-format-aware event flow | In Progress |
+| Linux Web Voice Endpoint | Built-in browser mic/speaker endpoint on Linux via SSE + HTTP POST, with session attach/detach, runtime shell configuration, and browser-facing assistant text + TTS audio playback | In Progress |
 | Web Flash & Serial | Browser-based firmware flash (esptool-js) and serial terminal with ANSI color rendering | Done |
 | Multi-Model API | Claude native API + OpenAI-compatible format (GPT, DeepSeek, GLM, MiniMax, Grok, Moonshot, Baichuan, Qwen, Doubao, Llama/Ollama); auto-detect by model name | Done |
 | Web Config Portal | Lightweight built-in web page for configuring API keys, selecting models, and tuning parameters at runtime | Planned |
@@ -53,7 +55,7 @@ ESP32-S3 WiFi support adapted from [MimiClaw](https://github.com/memovai/mimicla
 ```
 +----------------------------------------------------------------+
 |                      rt-claw Application                       |
-|     gateway | net | swarm | ai_engine | shell | sched | im     |
+| gateway | net | swarm | ai_engine | shell | sched | im | voice |
 +----------------------------------------------------------------+
 |                       skills (AI Skills)                       |
 |              (one skill composes multiple tools)               |
@@ -100,7 +102,7 @@ make run-esp32c3-qemu
 
 > **No hardware? No problem.** Try the [CNB Cloud IDE](https://cnb.cool/gevico.online/rtclaw/rt-claw) — all toolchains pre-installed, build and run in your browser.
 
-For real hardware (ESP32-S3/C3), WiFi setup, Feishu bot, and more — see the **[Getting Started Guide](docs/en/getting-started.md)**.
+For real hardware (ESP32-S3/C3), WiFi setup, Feishu bot, Linux web voice, and more — see the **[Getting Started Guide](docs/en/getting-started.md)** and **[Usage Guide](docs/en/usage.md)**.
 
 ## Community
 

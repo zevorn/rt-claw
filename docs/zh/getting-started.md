@@ -252,51 +252,6 @@ make run-zynq-a9-qemu GDB=1        # 调试模式（GDB 端口 1234）
 > 与 vexpress-a9 一样，不支持 TLS — 需要使用 `scripts/api-proxy.py`
 > 将 HTTP 桥接到 HTTPS 以发起 AI API 请求。
 
-## Zephyr（Cortex-A9 / Cortex-M3）
-
-无需 ESP-IDF。需要安装 Zephyr SDK。rt-claw 源码由 Zephyr CMake 直接编译，
-无需 Meson 中间步骤。
-
-### 前置条件
-
-- Zephyr SDK 1.0.1（包含 ARM 工具链）
-- CMake 和 Ninja
-- Zephyr 内核及模块已作为子模块包含，首次使用需初始化：
-
-```bash
-git submodule update --init --recursive
-```
-
-### Cortex-M3（标准 QEMU）
-
-```bash
-export RTCLAW_AI_API_KEY='sk-...'
-# TLS 尚未默认启用，通过 api-proxy 使用 HTTP
-export RTCLAW_AI_API_URL='http://10.0.2.2:8888/v1/messages'
-export RTCLAW_AI_MODEL='claude-sonnet-4-6'
-
-# 在另一个终端启动代理：python3 scripts/api-proxy.py
-make build-zephyr-cortex-m3-qemu
-make run-zephyr-cortex-m3-qemu
-```
-
-### Cortex-A9（需要 Xilinx QEMU）
-
-```bash
-make build-zephyr-cortex-a9-qemu
-make run-zephyr-cortex-a9-qemu
-make run-zephyr-cortex-a9-qemu GDB=1   # 调试模式（GDB 端口 1234）
-```
-
-> **注意：** Zephyr qemu_cortex_a9 开发板需要 Xilinx QEMU 分支
-> （`qemu-system-aarch64` 并支持 `arm-generic-fdt-7series` 机型）。
-> 标准 `qemu-system-arm` 不支持此目标。
-> 安装地址：<https://github.com/Xilinx/qemu>
-
-> **HTTPS 支持：** Zephyr 包含 mbedTLS 用于原生 HTTPS，但 TLS Kconfig
-> 默认尚未启用。在此之前，请使用 `scripts/api-proxy.py` 代理进行
-> AI API HTTPS 请求，与 vexpress-a9 和 Zynq-A9 相同。
-
 ## Linux 原生平台
 
 无需交叉编译器或 QEMU，直接在宿主机上构建和运行。
@@ -312,6 +267,80 @@ make run-linux
 
 Linux OSAL 使用 pthreads、libcurl（含 TLS）和基于文件的 KV 存储。
 在嵌入式 Linux 上部署时，请参阅[嵌入式 Linux HTTPS 注意事项](#嵌入式-linux-https-注意事项)。
+
+### Linux Web 语音 MVP
+
+如需启用 Linux 下的浏览器语音端点，请带上语音选项重新构建：
+
+```bash
+meson setup build/linux --reconfigure \
+    -Dosal=linux \
+    -Dvoice=true \
+    -Dlinux_web_voice=true
+meson compile -C build/linux
+./build/linux/platform/linux/rtclaw
+```
+
+然后在 shell 中执行：
+
+```text
+/voice_enable on
+/voice_set stt_provider xfyun
+/voice_set stt_xfyun_app_id <APPID>
+/voice_set stt_xfyun_api_key <APIKey>
+/voice_set stt_xfyun_api_secret <APISecret>
+/voice_status
+```
+
+最后在本机浏览器打开 `http://127.0.0.1:8080/voice.html` 测试 Linux web
+语音页面。
+
+如果 MiMo TTS 回复较长，语音服务会在可用时把解码后的音频分块流式转发给
+端点。缓冲式回退路径仍然有两个可调项：`-Dvoice_tts_resp_size=` 用于包含
+base64 音频的完整 HTTP JSON 响应，`-Dvoice_tts_audio_buf_size=` 用于 base64
+解码后的音频输出。
+
+## Zephyr（Cortex-A9 / Cortex-M3）
+
+### 前置条件
+
+- Zephyr SDK 1.0.1 —— 按照官方
+  [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/)
+  安装
+- 已初始化 Git 子模块（`git submodule update --init --recursive`）
+
+无需 ESP-IDF。Zephyr 构建使用 CMake（west），并将 OSAL + claw 源码直接编译进
+Zephyr 应用中（不经过 Meson 预编译 `.a` 文件）。
+
+### Cortex-A9（需要 Xilinx QEMU）
+
+```bash
+export RTCLAW_AI_API_KEY='sk-...'
+# TLS 默认尚未启用，通过 api-proxy 访问 HTTPS
+export RTCLAW_AI_API_URL='http://10.0.2.2:8888/v1/messages'
+export RTCLAW_AI_MODEL='claude-sonnet-4-6'
+
+# 在另一个终端启动代理：python3 scripts/api-proxy.py
+make build-zephyr-cortex-a9-qemu
+make run-zephyr-cortex-a9-qemu
+```
+
+> **注意：** Cortex-A9 目标需要 Xilinx QEMU（`qemu-system-aarch64`
+> 且具备 Xilinx 机型支持），不是标准上游 QEMU。
+
+### Cortex-M3（标准 QEMU）
+
+```bash
+make build-zephyr-cortex-m3-qemu
+make run-zephyr-cortex-m3-qemu
+```
+
+Cortex-M3 目标使用标准 `qemu-system-arm` 和系统 QEMU 包中自带的
+`lm3s6965evb` 机型。
+
+> **注意：** Zephyr 自带 mbedTLS 用于原生 HTTPS，但 TLS Kconfig 默认尚未
+> 启用。在完成默认配置之前，请和 vexpress-a9、Zynq-A9 一样使用
+> `scripts/api-proxy.py` 代理 AI API 的 HTTPS 请求。
 
 ## 嵌入式 Linux HTTPS 注意事项
 
